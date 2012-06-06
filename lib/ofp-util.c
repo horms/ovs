@@ -1037,12 +1037,13 @@ ofputil_protocol_from_ofp_version(int version)
 {
     switch (version) {
     case OFP10_VERSION: return OFPUTIL_P_OF10;
+    case OFP12_VERSION: return OFPUTIL_P_OF12;
     default: return 0;
     }
 }
 
-/* Returns the OpenFlow protocol version number (e.g. OFP10_VERSION or
- * OFP11_VERSION) that corresponds to 'protocol'. */
+/* Returns the OpenFlow protocol version number (e.g. OFP10_VERSION,
+ * OFP11_VERSION or OFP12_VERSION) that corresponds to 'protocol'. */
 uint8_t
 ofputil_protocol_to_ofp_version(enum ofputil_protocol protocol)
 {
@@ -1052,6 +1053,8 @@ ofputil_protocol_to_ofp_version(enum ofputil_protocol protocol)
     case OFPUTIL_P_NXM:
     case OFPUTIL_P_NXM_TID:
         return OFP10_VERSION;
+    case OFPUTIL_P_OF12:
+        return OFP12_VERSION;
     }
 
     NOT_REACHED();
@@ -1087,6 +1090,9 @@ ofputil_protocol_set_tid(enum ofputil_protocol protocol, bool enable)
     case OFPUTIL_P_NXM_TID:
         return enable ? OFPUTIL_P_NXM_TID : OFPUTIL_P_NXM;
 
+    case OFPUTIL_P_OF12:
+        return OFPUTIL_P_OF12;
+
     default:
         NOT_REACHED();
     }
@@ -1118,6 +1124,9 @@ ofputil_protocol_set_base(enum ofputil_protocol cur,
     case OFPUTIL_P_NXM_TID:
         return ofputil_protocol_set_tid(OFPUTIL_P_NXM, tid);
 
+    case OFPUTIL_P_OF12:
+        return ofputil_protocol_set_tid(OFPUTIL_P_OF12, tid);
+
     default:
         NOT_REACHED();
     }
@@ -1145,6 +1154,9 @@ ofputil_protocol_to_string(enum ofputil_protocol protocol)
 
     case OFPUTIL_P_OF10_TID:
         return "OpenFlow10+table_id";
+
+    case OFPUTIL_P_OF12:
+        return "OpenFlow12";
     }
 
     /* Check abbreviations. */
@@ -1415,6 +1427,9 @@ ofputil_encode_set_protocol(enum ofputil_protocol current,
         case OFPUTIL_P_OF10:
             return ofputil_encode_nx_set_flow_format(NXFF_OPENFLOW10);
 
+        case OFPUTIL_P_OF12:
+            return ofputil_encode_nx_set_flow_format(NXFF_OPENFLOW12);
+
         case OFPUTIL_P_OF10_TID:
         case OFPUTIL_P_NXM_TID:
             NOT_REACHED();
@@ -1462,6 +1477,9 @@ ofputil_nx_flow_format_to_protocol(enum nx_flow_format flow_format)
     case NXFF_NXM:
         return OFPUTIL_P_NXM;
 
+    case NXFF_OPENFLOW12:
+        return OFPUTIL_P_OF12;
+
     default:
         return 0;
     }
@@ -1484,6 +1502,8 @@ ofputil_nx_flow_format_to_string(enum nx_flow_format flow_format)
         return "openflow10";
     case NXFF_NXM:
         return "nxm";
+    case NXFF_OPENFLOW12:
+        return "openflow12";
     default:
         NOT_REACHED();
     }

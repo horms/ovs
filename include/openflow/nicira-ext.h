@@ -210,8 +210,8 @@ struct nx_flow_mod_table_id {
 OFP_ASSERT(sizeof(struct nx_flow_mod_table_id) == 24);
 
 enum nx_packet_in_format {
-    NXPIF_OPENFLOW10 = 0,       /* Standard OpenFlow 1.0 compatible. */
-    NXPIF_NXM = 1               /* Nicira Extended. */
+    NXPIF_OPENFLOW10 = 0,       /* OpenFlow 1.0 format. */
+    NXPIF_NXM = 1,              /* Nicira Extended. */
 };
 
 /* NXT_SET_PACKET_IN_FORMAT request. */
@@ -1776,8 +1776,9 @@ OFP_ASSERT(sizeof(struct nx_action_output_reg) == 24);
 /* ## --------------------- ## */
 
 enum nx_flow_format {
-    NXFF_OPENFLOW10 = 0,         /* Standard OpenFlow 1.0 compatible. */
-    NXFF_NXM = 2                 /* Nicira extended match. */
+    NXFF_OPENFLOW10 = 0,         /* OpenFlow 1.0 format. */
+    NXFF_NXM = 2,                /* Nicira extended match. */
+    NXFF_OPENFLOW12 = 3          /* OpenFlow 1.2 format. */
 };
 
 /* NXT_SET_FLOW_FORMAT request. */
