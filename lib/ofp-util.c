@@ -1535,6 +1535,41 @@ ofputil_make_flow_mod_table_id(bool flow_mod_table_id)
     return msg;
 }
 
+static int
+ofputil_put_match(struct ofpbuf *msg, const struct cls_rule *cr,
+                  ovs_be64 cookie, ovs_be64 cookie_mask,
+                  enum ofputil_protocol protocol)
+{
+    int match_len;
+
+    switch (protocol) {
+    case OFPUTIL_P_OF10:
+    case OFPUTIL_P_OF10_TID:
+    default:
+        NOT_REACHED();
+
+    case OFPUTIL_P_NXM:
+    case OFPUTIL_P_NXM_TID:
+        match_len = nx_put_match(msg, false, cr, cookie, cookie_mask);
+        break;
+
+    case OFPUTIL_P_OF12: {
+        struct ofp11_match_header *omh;
+        size_t start_len = msg->size;
+
+        ofpbuf_put_uninit(msg, sizeof *omh);
+        match_len = nx_put_match(msg, true, cr, cookie, cookie_mask) +
+            sizeof *omh;
+        omh = (struct ofp11_match_header *)((char *)msg->data + start_len);
+        omh->type = htons(OFPMT_OXM);
+        omh->length = htons(match_len);
+        break;
+    }
+    }
+
+    return match_len;
+}
+
 /* Converts an OFPT_FLOW_MOD or NXT_FLOW_MOD message 'oh' into an abstract
  * flow_mod in 'fm'.  Returns 0 if successful, otherwise an OpenFlow error
  * code.
@@ -1728,8 +1763,8 @@ ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
         nfm = msg->data;
         nfm->command = htons(command);
         nfm->cookie = fm->new_cookie;
-        match_len = nx_put_match(msg, false, &fm->cr,
-                                 fm->cookie, fm->cookie_mask);
+        match_len = ofputil_put_match(msg, &fm->cr, fm->cookie,
+                                      fm->cookie_mask, OFPUTIL_P_NXM);
         nfm->idle_timeout = htons(fm->idle_timeout);
         nfm->hard_timeout = htons(fm->hard_timeout);
         nfm->priority = htons(fm->cr.priority);
@@ -1888,8 +1923,8 @@ ofputil_encode_flow_stats_request(const struct ofputil_flow_stats_request *fsr,
         subtype = fsr->aggregate ? NXST_AGGREGATE : NXST_FLOW;
         ofputil_make_stats_request(sizeof *nfsr, ofp_version,
                                    OFPST_VENDOR, subtype, &msg);
-        match_len = nx_put_match(msg, false, &fsr->match,
-                                 fsr->cookie, fsr->cookie_mask);
+        match_len = ofputil_put_match(msg, &fsr->match, fsr->cookie,
+                                      fsr->cookie_mask, OFPUTIL_P_NXM);
 
         nfsr = ofputil_stats_msg_body(msg->data);
         nfsr->out_port = htons(fsr->out_port);
@@ -2110,7 +2145,8 @@ ofputil_append_flow_stats_reply(const struct ofputil_flow_stats *fs,
         nfs->hard_age = htons(fs->hard_age < 0 ? 0
                               : fs->hard_age < UINT16_MAX ? fs->hard_age + 1
                               : UINT16_MAX);
-        nfs->match_len = htons(nx_put_match(reply, false, &fs->rule, 0, 0));
+        nfs->match_len = htons(ofputil_put_match(reply, &fs->rule,
+                                                 0, 0, OFPUTIL_P_NXM));
         nfs->cookie = fs->cookie;
         nfs->packet_count = htonll(fs->packet_count);
         nfs->byte_count = htonll(fs->byte_count);
