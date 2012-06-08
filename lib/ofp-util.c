@@ -2359,6 +2359,23 @@ ofputil_encode_flow_removed(const struct ofputil_flow_removed *fr,
     uint8_t ofp_version = ofputil_protocol_to_ofp_version(protocol);
 
     switch (protocol) {
+    case OFPUTIL_P_OF12: {
+        struct ofp12_flow_removed *ofr;
+
+        ofr = make_openflow_xid(sizeof *ofr, ofp_version,
+                                OFPT_FLOW_REMOVED, 0, &msg);
+        ofr->cookie = fr->cookie;
+        ofr->priority = htons(fr->rule.priority);
+        ofr->reason = fr->reason;
+        ofr->table_id = 0;
+        ofr->duration_sec = htonl(fr->duration_sec);
+        ofr->duration_nsec = htonl(fr->duration_nsec);
+        ofr->idle_timeout = htons(fr->idle_timeout);
+        ofr->packet_count = htonll(fr->packet_count);
+        ofr->byte_count = htonll(fr->byte_count);
+        ofputil_put_match(msg, &fr->rule, 0, 0, protocol);
+        break;
+    }
 
     case OFPUTIL_P_OF10:
     case OFPUTIL_P_OF10_TID: {
