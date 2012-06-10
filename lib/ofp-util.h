@@ -547,13 +547,7 @@ size_t ofputil_stats_body_len(const struct ofp_header *);
 const void *ofputil_nxstats_body(const struct ofp_header *);
 size_t ofputil_nxstats_body_len(const struct ofp_header *);
 
-struct ofpbuf *make_flow_mod(uint16_t command, const struct cls_rule *,
-                             size_t actions_len);
-struct ofpbuf *make_add_flow(const struct cls_rule *, uint32_t buffer_id,
-                             uint16_t max_idle, size_t actions_len);
-struct ofpbuf *make_packet_in(uint32_t buffer_id, uint16_t in_port,
-                              uint8_t reason,
-                              const struct ofpbuf *payload, int max_send_len);
+/*  */
 struct ofpbuf *make_echo_request(void);
 struct ofpbuf *make_echo_reply(const struct ofp_header *rq);
 

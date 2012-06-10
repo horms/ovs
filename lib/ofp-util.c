@@ -3426,58 +3426,6 @@ ofputil_nxstats_body_len(const struct ofp_header *oh)
     return ntohs(oh->length) - sizeof(struct nicira_stats_msg);
 }
 
-struct ofpbuf *
-make_flow_mod(uint16_t command, const struct cls_rule *rule,
-              size_t actions_len)
-{
-    struct ofp_flow_mod *ofm;
-    size_t size = sizeof *ofm + actions_len;
-    struct ofpbuf *out = ofpbuf_new(size);
-    ofm = ofpbuf_put_zeros(out, sizeof *ofm);
-    ofm->header.version = OFP10_VERSION;
-    ofm->header.type = OFPT10_FLOW_MOD;
-    ofm->header.length = htons(size);
-    ofm->cookie = 0;
-    ofm->priority = htons(MIN(rule->priority, UINT16_MAX));
-    ofputil_cls_rule_to_ofp10_match(rule, &ofm->match);
-    ofm->command = htons(command);
-    return out;
-}
-
-struct ofpbuf *
-make_add_flow(const struct cls_rule *rule, uint32_t buffer_id,
-              uint16_t idle_timeout, size_t actions_len)
-{
-    struct ofpbuf *out = make_flow_mod(OFPFC_ADD, rule, actions_len);
-    struct ofp_flow_mod *ofm = out->data;
-    ofm->idle_timeout = htons(idle_timeout);
-    ofm->hard_timeout = htons(OFP_FLOW_PERMANENT);
-    ofm->buffer_id = htonl(buffer_id);
-    return out;
-}
-
-struct ofpbuf *
-make_packet_in(uint32_t buffer_id, uint16_t in_port, uint8_t reason,
-               const struct ofpbuf *payload, int max_send_len)
-{
-    struct ofp_packet_in *opi;
-    struct ofpbuf *buf;
-    int send_len;
-
-    send_len = MIN(max_send_len, payload->size);
-    buf = ofpbuf_new(sizeof *opi + send_len);
-    opi = put_openflow_xid(offsetof(struct ofp_packet_in, data),
-                           OFPT_PACKET_IN, 0, buf);
-    opi->buffer_id = htonl(buffer_id);
-    opi->total_len = htons(payload->size);
-    opi->in_port = htons(in_port);
-    opi->reason = reason;
-    ofpbuf_put(buf, payload->data, send_len);
-    update_openflow_length(buf);
-
-    return buf;
-}
-
 /* Creates and returns an OFPT_ECHO_REQUEST message with an empty payload. */
 struct ofpbuf *
 make_echo_request(void)
