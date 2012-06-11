@@ -2889,7 +2889,7 @@ ofputil_append_port_desc_stats_reply(uint8_t ofp_version,
 /* ofputil_switch_features */
 
 #define OFPC_COMMON (OFPC_FLOW_STATS | OFPC_TABLE_STATS | OFPC_PORT_STATS | \
-                     OFPC_IP_REASM | OFPC_QUEUE_STATS | OFPC_ARP_MATCH_IP)
+                     OFPC_IP_REASM | OFPC_QUEUE_STATS)
 BUILD_ASSERT_DECL((int) OFPUTIL_C_FLOW_STATS == OFPC_FLOW_STATS);
 BUILD_ASSERT_DECL((int) OFPUTIL_C_TABLE_STATS == OFPC_TABLE_STATS);
 BUILD_ASSERT_DECL((int) OFPUTIL_C_PORT_STATS == OFPC_PORT_STATS);
@@ -2962,6 +2962,22 @@ decode_action_bits(ovs_be32 of_actions,
     return ofputil_actions;
 }
 
+static uint32_t
+ofputil_capabilities_mask(uint8_t ofp_version)
+{
+    /* Handle capabilities whose bit is unique for all Open Flow versions */
+    switch (ofp_version) {
+    case OFP10_VERSION:
+    case OFP11_VERSION:
+        return OFPC_COMMON | OFPUTIL_C_ARP_MATCH_IP;
+    case OFP12_VERSION:
+        return OFPC_COMMON | OFPUTIL_C_PORT_BLOCKED;
+    default:
+        /* Caller needs to check osf->header.version itself */
+        return 0;
+    }
+}
+
 /* Decodes an OpenFlow 1.0 or 1.1 "switch_features" structure 'osf' into an
  * abstract representation in '*features'.  Initializes '*b' to iterate over
  * the OpenFlow port structures following 'osf' with later calls to
@@ -2979,7 +2995,8 @@ ofputil_decode_switch_features(const struct ofp_switch_features *osf,
     features->n_buffers = ntohl(osf->n_buffers);
     features->n_tables = osf->n_tables;
 
-    features->capabilities = ntohl(osf->capabilities) & OFPC_COMMON;
+    features->capabilities = ntohl(osf->capabilities) &
+        ofputil_capabilities_mask(osf->header.version);
 
     if (b->size % ofputil_get_phy_port_size(osf->header.version)) {
         return OFPERR_OFPBRC_BAD_LEN;
@@ -3067,7 +3084,8 @@ ofputil_encode_switch_features(const struct ofputil_switch_features *features,
     osf->n_buffers = htonl(features->n_buffers);
     osf->n_tables = features->n_tables;
 
-    osf->capabilities = htonl(features->capabilities & OFPC_COMMON);
+    osf->capabilities = htonl(features->capabilities &
+                              ofputil_capabilities_mask(osf->header.version));
     if (osf->header.version == OFP10_VERSION) {
         if (features->capabilities & OFPUTIL_C_STP) {
             osf->capabilities |= htonl(OFPC10_STP);
