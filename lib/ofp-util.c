@@ -3202,7 +3202,7 @@ ofputil_encode_port_mod(const struct ofputil_port_mod *pm,
         opm->config = htonl(pm->config & OFPPC10_ALL);
         opm->mask = htonl(pm->mask & OFPPC10_ALL);
         opm->advertise = netdev_port_features_to_ofp10(pm->advertise);
-    } else if (ofp_version == OFP11_VERSION) {
+    } else if (ofp_version == OFP11_VERSION || ofp_version == OFP12_VERSION) {
         struct ofp11_port_mod *opm;
 
         opm = make_openflow(sizeof *opm, ofp_version, OFPT11_PORT_MOD, &b);
