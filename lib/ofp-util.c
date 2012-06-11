@@ -836,6 +836,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
            sizeof(struct ofp12_flow_removed), 0),
     OFPT12(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
            sizeof(struct ofp11_flow_mod), 1),
+    OFPT12(OFPT_PORT_MOD,       OFPT11_PORT_MOD,
+           sizeof(struct ofp11_port_mod), 0),
 #undef OPFT12
 
 #define OFPST10_REQUEST(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
@@ -3158,7 +3160,7 @@ ofputil_decode_port_mod(const struct ofp_header *oh,
         pm->config = ntohl(opm->config) & OFPPC10_ALL;
         pm->mask = ntohl(opm->mask) & OFPPC10_ALL;
         pm->advertise = netdev_port_features_from_ofp10(opm->advertise);
-    } else if (oh->version == OFP11_VERSION) {
+    } else if (oh->version == OFP11_VERSION || oh->version == OFP12_VERSION) {
         const struct ofp11_port_mod *opm = (const struct ofp11_port_mod *) oh;
         enum ofperr error;
 
