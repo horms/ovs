@@ -832,6 +832,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
         MIN_SIZE,                               \
         EXTRA_MULTIPLE                          \
     }
+    OFPT12(OFPT_FEATURES_REPLY, OFPT_FEATURES_REPLY,
+           sizeof(struct ofp_switch_features), sizeof(struct ofp11_port)),
     OFPT12(OFPT_FLOW_REMOVED,       OFPT_FLOW_REMOVED,
            sizeof(struct ofp12_flow_removed), 0),
     OFPT12(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
@@ -3007,7 +3009,8 @@ ofputil_decode_switch_features(const struct ofp_switch_features *osf,
             features->capabilities |= OFPUTIL_C_STP;
         }
         features->actions = decode_action_bits(osf->actions, of10_action_bits);
-    } else if (osf->header.version == OFP11_VERSION) {
+    } else if (osf->header.version == OFP11_VERSION ||
+               osf->header.version == OFP12_VERSION) {
         if (osf->capabilities & htonl(OFPC11_GROUP_STATS)) {
             features->capabilities |= OFPUTIL_C_GROUP_STATS;
         }
