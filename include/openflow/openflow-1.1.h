@@ -495,8 +495,8 @@ struct ofp11_flow_mod {
                                     indicates no restriction. */
     ovs_be16 flags;              /* One of OFPFF_*. */
     uint8_t pad[2];
-    /* Open Flow version specific match */
-    /* struct ofp_instruction instructions[0];  Instruction set */
+    /* Followed by an ofp11_match structure. */
+    /* Followed by an instruction set. */
 };
 OFP_ASSERT(sizeof(struct ofp11_flow_mod) == 48);
 
@@ -557,7 +557,7 @@ struct ofp11_stats_msg {
     ovs_be16 type;              /* One of the OFPST_* constants. */
     ovs_be16 flags;             /* OFPSF_REQ_* flags (none yet defined). */
     uint8_t pad[4];
-    /* uint8_t body[0];             Body of the request. */
+    /* Followed by the body of the request. */
 };
 OFP_ASSERT(sizeof(struct ofp11_stats_msg) == 16);
 
@@ -589,9 +589,9 @@ struct ofp11_flow_stats_request {
     ovs_be64 cookie_mask;     /* Mask used to restrict the cookie bits that
                                  must match. A value of 0 indicates
                                  no restriction. */
-    struct ofp11_match match; /* Fields to match. */
+    /* Followed by an ofp11_match structure. */
 };
-OFP_ASSERT(sizeof(struct ofp11_flow_stats_request) == 120);
+OFP_ASSERT(sizeof(struct ofp11_flow_stats_request) == 32);
 
 /* Body of reply to OFPST_FLOW request. */
 struct ofp11_flow_stats {
@@ -712,11 +712,10 @@ OFP_ASSERT(sizeof(struct ofp11_group_stats) == 32);
 
 /* Used in group stats replies. */
 struct ofp11_bucket_counter {
-    struct ofp11_stats_msg osm;
     ovs_be64 packet_count;   /* Number of packets processed by bucket. */
     ovs_be64 byte_count;     /* Number of bytes processed by bucket. */
 };
-OFP_ASSERT(sizeof(struct ofp11_bucket_counter) == 32);
+OFP_ASSERT(sizeof(struct ofp11_bucket_counter) == 16);
 
 /* Body of reply to OFPST11_GROUP_DESC request. */
 struct ofp11_group_desc_stats {
@@ -776,8 +775,8 @@ struct ofp11_flow_removed {
     uint8_t pad2[2];          /* Align to 64-bits. */
     ovs_be64 packet_count;
     ovs_be64 byte_count;
-    struct ofp11_match match; /* Description of fields. */
+    /* Followed by an ofp11_match structure. */
 };
-OFP_ASSERT(sizeof(struct ofp11_flow_removed) == 136);
+OFP_ASSERT(sizeof(struct ofp11_flow_removed) == 48);
 
 #endif /* openflow/openflow-1.1.h */

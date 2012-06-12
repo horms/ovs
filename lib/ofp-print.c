@@ -659,12 +659,10 @@ ofp10_match_to_string(const struct ofp10_match *om, int verbosity)
 }
 
 static void
-ofp_print_flow_mod(struct ds *s, const struct ofp_header *oh,
-                   enum ofputil_msg_code code, int verbosity)
+ofp_print_flow_mod(struct ds *s, const struct ofp_header *oh)
 {
     struct ofputil_flow_mod fm;
     struct ofpbuf ofpacts;
-    bool need_priority;
     enum ofperr error;
 
     ofpbuf_init(&ofpacts, 64);
@@ -700,29 +698,7 @@ ofp_print_flow_mod(struct ds *s, const struct ofp_header *oh,
     }
 
     ds_put_char(s, ' ');
-    if (verbosity >= 3 && code == OFPUTIL_OFPT_FLOW_MOD) {
-        const struct ofp_flow_mod *ofm = (const struct ofp_flow_mod *) oh;
-        ofp10_match_print(s, &ofm->match, verbosity);
-
-        /* ofp_print_match() doesn't print priority. */
-        need_priority = true;
-    } else if (verbosity >= 3 && code == OFPUTIL_NXT_FLOW_MOD) {
-        const struct nx_flow_mod *nfm = (const struct nx_flow_mod *) oh;
-        const void *nxm = nfm + 1;
-        char *nxm_s;
-
-        nxm_s = nx_match_to_string(nxm, ntohs(nfm->match_len));
-        ds_put_cstr(s, nxm_s);
-        free(nxm_s);
-
-        /* nx_match_to_string() doesn't print priority. */
-        need_priority = true;
-    } else {
-        cls_rule_format(&fm.cr, s);
-
-        /* cls_rule_format() does print priority. */
-        need_priority = false;
-    }
+    cls_rule_format(&fm.cr, s);
 
     if (ds_last(s) != ' ') {
         ds_put_char(s, ' ');
@@ -739,9 +715,6 @@ ofp_print_flow_mod(struct ds *s, const struct ofp_header *oh,
     }
     if (fm.hard_timeout != OFP_FLOW_PERMANENT) {
         ds_put_format(s, "hard:%"PRIu16" ", fm.hard_timeout);
-    }
-    if (fm.cr.priority != OFP_DEFAULT_PRIORITY && need_priority) {
-        ds_put_format(s, "pri:%"PRIu16" ", fm.cr.priority);
     }
     if (fm.buffer_id != UINT32_MAX) {
         ds_put_format(s, "buf:0x%"PRIx32" ", fm.buffer_id);
@@ -1456,9 +1429,10 @@ ofp_to_string__(const struct ofp_header *oh,
         ofp_print_packet_out(string, msg, verbosity);
         break;
 
-    case OFPUTIL_OFPT_FLOW_MOD:
+    case OFPUTIL_OFPT10_FLOW_MOD:
+    case OFPUTIL_OFPT11_FLOW_MOD:
     case OFPUTIL_NXT_FLOW_MOD:
-        ofp_print_flow_mod(string, msg, code, verbosity);
+        ofp_print_flow_mod(string, msg);
         break;
 
     case OFPUTIL_OFPT_PORT_MOD:
@@ -1479,12 +1453,14 @@ ofp_to_string__(const struct ofp_header *oh,
         ofp_print_stats_request(string, oh);
         break;
 
-    case OFPUTIL_OFPST_FLOW_REQUEST:
+    case OFPUTIL_OFPST10_FLOW_REQUEST:
+    case OFPUTIL_OFPST11_FLOW_REQUEST:
     case OFPUTIL_NXST_FLOW_REQUEST:
-    case OFPUTIL_OFPST_AGGREGATE_REQUEST:
+    case OFPUTIL_OFPST10_AGGREGATE_REQUEST:
+    case OFPUTIL_OFPST11_AGGREGATE_REQUEST:
     case OFPUTIL_NXST_AGGREGATE_REQUEST:
         ofp_print_stats_request(string, oh);
-        ofp_print_flow_stats_request(string, msg);
+        ofp_print_flow_stats_request(string, oh);
         break;
 
     case OFPUTIL_OFPST_TABLE_REQUEST:
@@ -1506,7 +1482,8 @@ ofp_to_string__(const struct ofp_header *oh,
         ofp_print_ofpst_desc_reply(string, msg);
         break;
 
-    case OFPUTIL_OFPST_FLOW_REPLY:
+    case OFPUTIL_OFPST10_FLOW_REPLY:
+    case OFPUTIL_OFPST11_FLOW_REPLY:
     case OFPUTIL_NXST_FLOW_REPLY:
         ofp_print_stats_reply(string, oh);
         ofp_print_flow_stats_reply(string, oh);
@@ -1527,7 +1504,8 @@ ofp_to_string__(const struct ofp_header *oh,
         ofp_print_ofpst_table_reply(string, oh, verbosity);
         break;
 
-    case OFPUTIL_OFPST_AGGREGATE_REPLY:
+    case OFPUTIL_OFPST10_AGGREGATE_REPLY:
+    case OFPUTIL_OFPST11_AGGREGATE_REPLY:
         ofp_print_stats_reply(string, oh);
         ofp_print_ofpst_aggregate_reply(string, msg);
         break;

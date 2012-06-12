@@ -49,7 +49,8 @@ enum ofputil_msg_code {
     OFPUTIL_OFPT_FLOW_REMOVED,
     OFPUTIL_OFPT_PORT_STATUS,
     OFPUTIL_OFPT_PACKET_OUT,
-    OFPUTIL_OFPT_FLOW_MOD,
+    OFPUTIL_OFPT10_FLOW_MOD,
+    OFPUTIL_OFPT11_FLOW_MOD,
     OFPUTIL_OFPT_PORT_MOD,
     OFPUTIL_OFPT_BARRIER_REQUEST,
     OFPUTIL_OFPT_BARRIER_REPLY,
@@ -58,8 +59,10 @@ enum ofputil_msg_code {
 
     /* OFPST_* stat requests. */
     OFPUTIL_OFPST_DESC_REQUEST,
-    OFPUTIL_OFPST_FLOW_REQUEST,
-    OFPUTIL_OFPST_AGGREGATE_REQUEST,
+    OFPUTIL_OFPST10_FLOW_REQUEST,
+    OFPUTIL_OFPST11_FLOW_REQUEST,
+    OFPUTIL_OFPST10_AGGREGATE_REQUEST,
+    OFPUTIL_OFPST11_AGGREGATE_REQUEST,
     OFPUTIL_OFPST_TABLE_REQUEST,
     OFPUTIL_OFPST_PORT_REQUEST,
     OFPUTIL_OFPST_QUEUE_REQUEST,
@@ -67,11 +70,13 @@ enum ofputil_msg_code {
 
     /* OFPST_* stat replies. */
     OFPUTIL_OFPST_DESC_REPLY,
-    OFPUTIL_OFPST_FLOW_REPLY,
+    OFPUTIL_OFPST10_FLOW_REPLY,
+    OFPUTIL_OFPST11_FLOW_REPLY,
     OFPUTIL_OFPST_QUEUE_REPLY,
     OFPUTIL_OFPST_PORT_REPLY,
     OFPUTIL_OFPST_TABLE_REPLY,
-    OFPUTIL_OFPST_AGGREGATE_REPLY,
+    OFPUTIL_OFPST10_AGGREGATE_REPLY,
+    OFPUTIL_OFPST11_AGGREGATE_REPLY,
     OFPUTIL_OFPST_PORT_DESC_REPLY,
 
     /* NXT_* messages. */
@@ -188,6 +193,8 @@ void ofputil_cls_rule_to_ofp10_match(const struct cls_rule *,
                                      struct ofp10_match *);
 
 /* Work with ofp11_match. */
+enum ofperr ofputil_pull_ofp11_match(struct ofpbuf *, unsigned int priority,
+                                     struct cls_rule *);
 enum ofperr ofputil_cls_rule_from_ofp11_match(const struct ofp11_match *,
                                               unsigned int priority,
                                               struct cls_rule *);

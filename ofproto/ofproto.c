@@ -3315,7 +3315,8 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
     case OFPUTIL_OFPT_PORT_MOD:
         return handle_port_mod(ofconn, oh);
 
-    case OFPUTIL_OFPT_FLOW_MOD:
+    case OFPUTIL_OFPT10_FLOW_MOD:
+    case OFPUTIL_OFPT11_FLOW_MOD:
         return handle_flow_mod(ofconn, oh);
 
     case OFPUTIL_OFPT_BARRIER_REQUEST:
@@ -3355,11 +3356,13 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
     case OFPUTIL_OFPST_DESC_REQUEST:
         return handle_desc_stats_request(ofconn, msg->data);
 
-    case OFPUTIL_OFPST_FLOW_REQUEST:
+    case OFPUTIL_OFPST10_FLOW_REQUEST:
+    case OFPUTIL_OFPST11_FLOW_REQUEST:
     case OFPUTIL_NXST_FLOW_REQUEST:
         return handle_flow_stats_request(ofconn, msg->data);
 
-    case OFPUTIL_OFPST_AGGREGATE_REQUEST:
+    case OFPUTIL_OFPST10_AGGREGATE_REQUEST:
+    case OFPUTIL_OFPST11_AGGREGATE_REQUEST:
     case OFPUTIL_NXST_AGGREGATE_REQUEST:
         return handle_aggregate_stats_request(ofconn, msg->data);
 
@@ -3387,11 +3390,13 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
     case OFPUTIL_OFPT_QUEUE_GET_CONFIG_REQUEST:
     case OFPUTIL_OFPT_QUEUE_GET_CONFIG_REPLY:
     case OFPUTIL_OFPST_DESC_REPLY:
-    case OFPUTIL_OFPST_FLOW_REPLY:
+    case OFPUTIL_OFPST10_FLOW_REPLY:
+    case OFPUTIL_OFPST11_FLOW_REPLY:
     case OFPUTIL_OFPST_QUEUE_REPLY:
     case OFPUTIL_OFPST_PORT_REPLY:
     case OFPUTIL_OFPST_TABLE_REPLY:
-    case OFPUTIL_OFPST_AGGREGATE_REPLY:
+    case OFPUTIL_OFPST10_AGGREGATE_REPLY:
+    case OFPUTIL_OFPST11_AGGREGATE_REPLY:
     case OFPUTIL_OFPST_PORT_DESC_REPLY:
     case OFPUTIL_NXT_ROLE_REPLY:
     case OFPUTIL_NXT_FLOW_REMOVED:
