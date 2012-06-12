@@ -119,13 +119,22 @@ enum nicira_type {
     NXT_SET_CONTROLLER_ID = 20, /* struct nx_controller_id. */
 };
 
-/* Header for Nicira vendor stats request and reply messages. */
+/* Header for Nicira vendor stats request and reply messages in OpenFlow
+ * 1.0. */
 struct nicira10_stats_msg {
     struct ofp10_vendor_stats_msg vsm; /* Vendor NX_VENDOR_ID. */
     ovs_be32 subtype;           /* One of NXST_* below. */
     uint8_t pad[4];             /* Align to 64-bits. */
 };
 OFP_ASSERT(sizeof(struct nicira10_stats_msg) == 24);
+
+/* Header for Nicira vendor stats request and reply messages in OpenFlow
+ * 1.1. */
+struct nicira11_stats_msg {
+    struct ofp11_vendor_stats_msg vsm; /* Vendor NX_VENDOR_ID. */
+    ovs_be32 subtype;           /* One of NXST_* below. */
+};
+OFP_ASSERT(sizeof(struct nicira11_stats_msg) == 24);
 
 /* Values for the 'subtype' member of struct nicira10_stats_msg. */
 enum nicira_stats_type {
