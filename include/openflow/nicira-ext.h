@@ -101,7 +101,7 @@ enum nicira_type {
     NXT_FLOW_MOD = 13,          /* Analogous to OFPT_FLOW_MOD. */
     NXT_FLOW_REMOVED = 14,      /* Analogous to OFPT_FLOW_REMOVED. */
 
-    /* Use the upper 8 bits of the 'command' member in struct ofp_flow_mod to
+    /* Use the upper 8 bits of the 'command' member in struct ofp10_flow_mod to
      * designate the table to which a flow is to be added?  See the big comment
      * on struct nx_flow_mod_table_id for more information. */
     NXT_FLOW_MOD_TABLE_ID = 15,
@@ -167,7 +167,7 @@ enum nx_hash_fields {
  * instead of having the switch decide which table is most appropriate as
  * required by OpenFlow 1.0.  By default, the extension is disabled.
  *
- * When this feature is enabled, Open vSwitch treats struct ofp_flow_mod's
+ * When this feature is enabled, Open vSwitch treats struct ofp10_flow_mod's
  * 16-bit 'command' member as two separate fields.  The upper 8 bits are used
  * as the table ID, the lower 8 bits specify the command as usual.  A table ID
  * of 0xff is treated like a wildcarded table ID.

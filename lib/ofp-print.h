@@ -22,7 +22,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-struct ofp_flow_mod;
 struct ofp10_match;
 struct ds;
 

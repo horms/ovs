@@ -755,11 +755,11 @@ ofp_print_flow_mod(struct ds *s, const struct ofp_header *oh,
         if (flags & OFPFF_CHECK_OVERLAP) {
             ds_put_cstr(s, "check_overlap ");
         }
-        if (flags & OFPFF_EMERG) {
+        if (flags & OFPFF10_EMERG) {
             ds_put_cstr(s, "emerg ");
         }
 
-        flags &= ~(OFPFF_SEND_FLOW_REM | OFPFF_CHECK_OVERLAP | OFPFF_EMERG);
+        flags &= ~(OFPFF_SEND_FLOW_REM | OFPFF_CHECK_OVERLAP | OFPFF10_EMERG);
         if (flags) {
             ds_put_format(s, "flags:0x%"PRIx16" ", flags);
         }

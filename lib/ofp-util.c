@@ -1591,7 +1591,7 @@ struct ofpbuf *
 ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
                         enum ofputil_protocol protocol)
 {
-    struct ofp_flow_mod *ofm;
+    struct ofp10_flow_mod *ofm;
     struct nx_flow_mod *nfm;
     struct ofpbuf *msg;
     uint16_t command;
