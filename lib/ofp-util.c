@@ -836,6 +836,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
            sizeof(struct ofp_switch_features), sizeof(struct ofp11_port)),
     OFPT12(OFPT_FLOW_REMOVED,       OFPT_FLOW_REMOVED,
            sizeof(struct ofp12_flow_removed), 0),
+    OFPT12(OFPT_PACKET_IN,          OFPT_PACKET_IN,
+           offsetof(struct ofp_packet_in, data), 1),
     OFPT12(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
            sizeof(struct ofp11_flow_mod), 1),
     OFPT12(OFPT_PORT_MOD,       OFPT11_PORT_MOD,
@@ -2472,6 +2474,24 @@ ofputil_encode_flow_removed(const struct ofputil_flow_removed *fr,
     return msg;
 }
 
+static void
+ofputil_decode_packet_in_finish(struct ofputil_packet_in *pin,
+                                struct cls_rule *rule,
+                                struct ofpbuf *b)
+{
+    pin->packet = b->data;
+    pin->packet_len = b->size;
+
+    pin->fmd.in_port = rule->flow.in_port;
+
+    pin->fmd.tun_id = rule->flow.tun_id;
+    pin->fmd.tun_id_mask = rule->wc.tun_id_mask;
+
+    memcpy(pin->fmd.regs, rule->flow.regs, sizeof pin->fmd.regs);
+    memcpy(pin->fmd.reg_masks, rule->wc.reg_masks,
+           sizeof pin->fmd.reg_masks);
+}
+
 enum ofperr
 ofputil_decode_packet_in(struct ofputil_packet_in *pin,
                          const struct ofp_header *oh)
@@ -2483,7 +2503,32 @@ ofputil_decode_packet_in(struct ofputil_packet_in *pin,
     code = ofputil_msg_type_code(type);
     memset(pin, 0, sizeof *pin);
 
-    if (code == OFPUTIL_OFPT_PACKET_IN) {
+    if (code == OFPUTIL_OFPT_PACKET_IN && oh->version == OFP12_VERSION) {
+        const struct ofp11_packet_in *opi;
+        struct cls_rule rule;
+        struct ofpbuf b;
+        int error;
+
+        ofpbuf_use_const(&b, oh, ntohs(oh->length));
+
+        opi = ofpbuf_pull(&b, sizeof *opi);
+        error = ofputil_pull_ofp12_match(&b, 0, &rule, NULL, NULL, NULL);
+        if (error) {
+            return error;
+        }
+
+        if (!ofpbuf_try_pull(&b, 2)) {
+            return OFPERR_OFPBRC_BAD_LEN;
+        }
+
+        pin->reason = opi->reason;
+        pin->table_id = opi->table_id;
+
+        pin->buffer_id = ntohl(opi->buffer_id);
+        pin->total_len = ntohs(opi->total_len);
+
+        ofputil_decode_packet_in_finish(pin, &rule, &b);
+    } else if (code == OFPUTIL_OFPT_PACKET_IN && oh->version == OFP10_VERSION) {
         const struct ofp_packet_in *opi = (const struct ofp_packet_in *) oh;
 
         pin->packet = opi->data;
@@ -2513,23 +2558,14 @@ ofputil_decode_packet_in(struct ofputil_packet_in *pin,
             return OFPERR_OFPBRC_BAD_LEN;
         }
 
-        pin->packet = b.data;
-        pin->packet_len = b.size;
         pin->reason = npi->reason;
         pin->table_id = npi->table_id;
         pin->cookie = npi->cookie;
 
-        pin->fmd.in_port = rule.flow.in_port;
-
-        pin->fmd.tun_id = rule.flow.tun_id;
-        pin->fmd.tun_id_mask = rule.wc.tun_id_mask;
-
-        memcpy(pin->fmd.regs, rule.flow.regs, sizeof pin->fmd.regs);
-        memcpy(pin->fmd.reg_masks, rule.wc.reg_masks,
-               sizeof pin->fmd.reg_masks);
-
         pin->buffer_id = ntohl(npi->buffer_id);
         pin->total_len = ntohs(npi->total_len);
+
+        ofputil_decode_packet_in_finish(pin, &rule, &b);
     } else {
         NOT_REACHED();
     }
