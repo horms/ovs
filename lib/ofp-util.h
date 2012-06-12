@@ -204,6 +204,12 @@ enum ofperr ofputil_cls_rule_from_ofp11_match(const struct ofp11_match *,
 void ofputil_cls_rule_to_ofp11_match(const struct cls_rule *,
                                      struct ofp11_match *);
 
+/* Work with ofp12_match. */
+enum ofperr ofputil_pull_ofp12_match(struct ofpbuf *, unsigned int priority,
+                                     struct cls_rule *, ovs_be64 *cookie,
+                                     ovs_be64 *cookie_mask,
+                                     uint16_t *padded_match_len);
+
 /* dl_type translation between OpenFlow and 'struct flow' format. */
 ovs_be16 ofputil_dl_type_to_openflow(ovs_be16 flow_dl_type);
 ovs_be16 ofputil_dl_type_from_openflow(ovs_be16 ofp_dl_type);

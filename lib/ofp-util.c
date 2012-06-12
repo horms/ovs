@@ -263,29 +263,74 @@ ofputil_cls_rule_to_ofp10_match(const struct cls_rule *rule,
     memset(match->pad2, '\0', sizeof match->pad2);
 }
 
-enum ofperr
-ofputil_pull_ofp11_match(struct ofpbuf *buf, unsigned int priority,
-                         struct cls_rule *rule)
+static enum ofperr
+__ofputil_pull_ofp11_match(struct ofpbuf *buf, unsigned int priority,
+                           struct cls_rule *rule, ovs_be64 *cookie,
+                           ovs_be64 *cookie_mask, uint16_t *padded_match_len,
+                           uint8_t max_version)
 {
-    struct ofp11_match_header *omh;
-    struct ofp11_match *om;
+    struct ofp11_match_header *omh = buf->data;
+    uint16_t match_len;
 
     if (buf->size < sizeof(struct ofp11_match_header)) {
         return OFPERR_OFPBMC_BAD_LEN;
     }
 
-    omh = buf->data;
+    match_len = ntohs(omh->length);
+
     switch (ntohs(omh->type)) {
-    case OFPMT_STANDARD:
-        if (omh->length != htons(sizeof *om) || buf->size < sizeof *om) {
+    case OFPMT_STANDARD: {
+        struct ofp11_match *om;
+
+        if (match_len != sizeof *om || buf->size < sizeof *om) {
             return OFPERR_OFPBMC_BAD_LEN;
         }
         om = ofpbuf_pull(buf, sizeof *om);
+        if (padded_match_len) {
+            *padded_match_len = match_len;
+        }
         return ofputil_cls_rule_from_ofp11_match(om, priority, rule);
+    }
+
+    case OFPMT_OXM: {
+        enum ofperr error;
+
+        if (max_version < OFP12_VERSION) {
+            error = OFPERR_OFPBMC_BAD_TYPE;
+        } else {
+            if (padded_match_len) {
+                *padded_match_len =
+                    nx_padded_match_len(match_len - sizeof *omh, sizeof *omh) +
+                    sizeof *omh;
+            }
+            ofpbuf_pull(buf, sizeof *omh);
+            error = nx_pull_match(buf, match_len - sizeof *omh, sizeof *omh,
+                                  priority, rule, cookie, cookie_mask);
+        }
+        return error;
+    }
 
     default:
         return OFPERR_OFPBMC_BAD_TYPE;
     }
+}
+
+enum ofperr
+ofputil_pull_ofp11_match(struct ofpbuf *buf, unsigned int priority,
+                         struct cls_rule *rule)
+{
+    return __ofputil_pull_ofp11_match(buf, priority, rule, NULL, NULL,
+                                      NULL, OFP11_VERSION);
+}
+
+enum ofperr
+ofputil_pull_ofp12_match(struct ofpbuf *buf, unsigned int priority,
+                         struct cls_rule *rule, ovs_be64 *cookie,
+                         ovs_be64 *cookie_mask, uint16_t *padded_match_len)
+{
+    return __ofputil_pull_ofp11_match(buf, priority, rule, cookie,
+                                      cookie_mask, padded_match_len,
+                                      OFP12_VERSION);
 }
 
 /* Converts the ofp11_match in 'match' into a cls_rule in 'rule', with the
