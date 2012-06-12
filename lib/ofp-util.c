@@ -3228,17 +3228,49 @@ ofputil_postappend_stats_reply(size_t start_ofs, struct list *replies)
     }
 }
 
+bool
+ofputil_is_stats_msg(const struct ofp_header *oh)
+{
+    return (
+        oh->version == OFP10_VERSION
+        ? oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY
+        : oh->type == OFPT11_STATS_REQUEST || oh->type == OFPT11_STATS_REPLY);
+}
+
+bool
+ofputil_is_vendor_stats_msg(const struct ofp_header *oh)
+{
+    int min_len = (oh->version == OFP10_VERSION
+                   ? sizeof(struct ofp10_vendor_stats_msg)
+                   : sizeof(struct ofp11_vendor_stats_msg));
+    return (ofputil_is_stats_msg(oh)
+            && ntohs(oh->length) >= min_len
+            && ofputil_decode_stats_msg_type(oh) == OFPST_VENDOR);
+}
+
+bool
+ofputil_is_nx_stats_msg(const struct ofp_header *oh)
+{
+    BUILD_ASSERT_DECL(sizeof(struct nicira10_stats_msg) ==
+                      sizeof(struct nicira11_stats_msg));
+
+    return (ofputil_is_vendor_stats_msg(oh)
+            && ntohs(oh->length) >= sizeof(struct nicira10_stats_msg)
+            && ofputil_decode_stats_msg_vendor(oh) == NX_VENDOR_ID);
+}
+
 size_t
 ofputil_stats_msg_len(const struct ofp_header *oh)
 {
-    const struct ofp10_stats_msg *osm;
-
-    assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
-
-    osm = (const struct ofp10_stats_msg *) oh;
-    return (osm->type == htons(OFPST_VENDOR)
-            ? sizeof(struct nicira10_stats_msg)
-            : sizeof(struct ofp10_stats_msg));
+    if (ofputil_decode_stats_msg_type(oh) == OFPST_VENDOR) {
+        return (oh->version == OFP10_VERSION
+                ? sizeof(struct nicira10_stats_msg)
+                : sizeof(struct nicira11_stats_msg));
+    } else {
+        return (oh->version == OFP10_VERSION
+                ? sizeof(struct ofp10_stats_msg)
+                : sizeof(struct ofp11_stats_msg));
+    }
 }
 
 void
@@ -3256,14 +3288,36 @@ ofputil_stats_msg_body(const struct ofp_header *oh)
 uint16_t
 ofputil_decode_stats_msg_type(const struct ofp_header *oh)
 {
-    assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
+    BUILD_ASSERT_DECL(offsetof(struct ofp10_stats_msg, type) ==
+                      offsetof(struct ofp11_stats_msg, type));
+    assert(ofputil_is_stats_msg(oh));
     return ntohs(((const struct ofp10_stats_msg *) oh)->type);
+}
+
+uint32_t
+ofputil_decode_stats_msg_vendor(const struct ofp_header *oh)
+{
+    assert(ofputil_is_vendor_stats_msg(oh));
+    return ntohl(oh->version == OFP10_VERSION
+                 ? ((const struct ofp10_vendor_stats_msg *) oh)->vendor
+                 : ((const struct ofp11_vendor_stats_msg *) oh)->vendor);
+}
+
+uint32_t
+ofputil_decode_stats_msg_subtype(const struct ofp_header *oh)
+{
+    assert(ofputil_is_nx_stats_msg(oh));
+    return ntohl(oh->version == OFP10_VERSION
+                 ? ((const struct nicira10_stats_msg *) oh)->subtype
+                 : ((const struct nicira11_stats_msg *) oh)->subtype);
 }
 
 uint16_t
 ofputil_decode_stats_msg_flags(const struct ofp_header *oh)
 {
-    assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
+    BUILD_ASSERT_DECL(offsetof(struct ofp10_stats_msg, type) ==
+                      offsetof(struct ofp11_stats_msg, type));
+    assert(ofputil_is_stats_msg(oh));
     return ntohs(((const struct ofp10_stats_msg *) oh)->flags);
 }
 

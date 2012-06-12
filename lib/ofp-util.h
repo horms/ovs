@@ -543,10 +543,17 @@ void ofputil_append_port_desc_stats_reply(uint8_t ofp_version,
                                           struct list *replies);
 
 /* Decoding OpenFlow stats messages. */
+bool ofputil_is_stats_msg(const struct ofp_header *);
+bool ofputil_is_vendor_stats_msg(const struct ofp_header *);
+bool ofputil_is_nx_stats_msg(const struct ofp_header *);
+
 size_t ofputil_stats_msg_len(const struct ofp_header *);
 void ofputil_pull_stats_msg(struct ofpbuf *msg);
 void *ofputil_stats_msg_body(const struct ofp_header *);
+
 uint16_t ofputil_decode_stats_msg_type(const struct ofp_header *);
+uint32_t ofputil_decode_stats_msg_vendor(const struct ofp_header *);
+uint32_t ofputil_decode_stats_msg_subtype(const struct ofp_header *);
 uint16_t ofputil_decode_stats_msg_flags(const struct ofp_header *);
 
 /* Encoding simple OpenFlow messages. */
