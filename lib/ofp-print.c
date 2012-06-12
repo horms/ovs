@@ -664,9 +664,19 @@ ofp_print_flow_mod(struct ds *s, const struct ofp_header *oh)
     struct ofputil_flow_mod fm;
     struct ofpbuf ofpacts;
     enum ofperr error;
+    enum ofputil_protocol protocol;
+
+    switch(oh->version) {
+    case OFP10_VERSION:
+          protocol = OFPUTIL_P_OF10_TID;
+          break;
+    default:
+          protocol = ofputil_protocol_from_ofp_version(oh->version);
+          break;
+    }
 
     ofpbuf_init(&ofpacts, 64);
-    error = ofputil_decode_flow_mod(&fm, oh, OFPUTIL_P_OF10_TID, &ofpacts);
+    error = ofputil_decode_flow_mod(&fm, oh, protocol, &ofpacts);
     if (error) {
         ofpbuf_uninit(&ofpacts);
         ofp_print_error(s, error);
