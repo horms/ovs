@@ -2537,17 +2537,66 @@ ofputil_decode_packet_in(struct ofputil_packet_in *pin,
     return 0;
 }
 
+static size_t
+ofputil_encode_packet_in_tail(const struct ofputil_packet_in *pin,
+                              struct ofpbuf **packet, size_t hdr_len,
+                              enum ofputil_protocol protocol)
+{
+    size_t send_len = MIN(pin->send_len, pin->packet_len);
+    size_t match_len = 0, i;
+    struct cls_rule rule;
+
+    /* Estimate of required PACKET_IN length includes the
+     * head portion of the packet in message, space for the match (2 times
+     * sizeof the metadata seems like enough), 2 bytes for padding, and the
+     * packet length. */
+    *packet = ofpbuf_new(hdr_len + sizeof(struct flow_metadata) * 2 +
+                        2 + send_len);
+
+    cls_rule_init_catchall(&rule, 0);
+    cls_rule_set_tun_id_masked(&rule, pin->fmd.tun_id,
+                               pin->fmd.tun_id_mask);
+
+    for (i = 0; i < FLOW_N_REGS; i++) {
+        cls_rule_set_reg_masked(&rule, i, pin->fmd.regs[i],
+                                pin->fmd.reg_masks[i]);
+    }
+
+    cls_rule_set_in_port(&rule, pin->fmd.in_port);
+
+    ofpbuf_put_zeros(*packet, hdr_len);
+    match_len = ofputil_put_match(*packet, &rule, 0, 0, protocol);
+    ofpbuf_put_zeros(*packet, 2);
+    ofpbuf_put(*packet, pin->packet, send_len);
+
+    return match_len;
+}
+
 /* Converts abstract ofputil_packet_in 'pin' into a PACKET_IN message
  * in the format specified by 'packet_in_format'.  */
 struct ofpbuf *
 ofputil_encode_packet_in(const struct ofputil_packet_in *pin,
+                         enum ofputil_protocol protocol,
                          enum nx_packet_in_format packet_in_format)
 {
     size_t send_len = MIN(pin->send_len, pin->packet_len);
     struct ofpbuf *packet;
 
     /* Add OFPT_PACKET_IN. */
-    if (packet_in_format == NXPIF_OPENFLOW10) {
+    if (protocol == OFPUTIL_P_OF12) {
+        struct ofp11_packet_in *opi;
+
+        ofputil_encode_packet_in_tail(pin, &packet, sizeof *opi,
+                                      OFPUTIL_P_OF12);
+
+        opi = packet->data;
+        opi->header.version = OFP12_VERSION;
+        opi->header.type = OFPT_PACKET_IN;
+        opi->buffer_id = htonl(pin->buffer_id);
+        opi->total_len = htons(pin->total_len);
+        opi->reason = pin->reason;
+        opi->table_id = pin->table_id;
+   } else if (packet_in_format == NXPIF_OPENFLOW10) {
         size_t header_len = offsetof(struct ofp_packet_in, data);
         struct ofp_packet_in *opi;
 
@@ -2563,31 +2612,10 @@ ofputil_encode_packet_in(const struct ofputil_packet_in *pin,
         ofpbuf_put(packet, pin->packet, send_len);
     } else if (packet_in_format == NXPIF_NXM) {
         struct nx_packet_in *npi;
-        struct cls_rule rule;
         size_t match_len;
-        size_t i;
 
-        /* Estimate of required PACKET_IN length includes the NPI header, space
-         * for the match (2 times sizeof the metadata seems like enough), 2
-         * bytes for padding, and the packet length. */
-        packet = ofpbuf_new(sizeof *npi + sizeof(struct flow_metadata) * 2
-                            + 2 + send_len);
-
-        cls_rule_init_catchall(&rule, 0);
-        cls_rule_set_tun_id_masked(&rule, pin->fmd.tun_id,
-                                   pin->fmd.tun_id_mask);
-
-        for (i = 0; i < FLOW_N_REGS; i++) {
-            cls_rule_set_reg_masked(&rule, i, pin->fmd.regs[i],
-                                    pin->fmd.reg_masks[i]);
-        }
-
-        cls_rule_set_in_port(&rule, pin->fmd.in_port);
-
-        ofpbuf_put_zeros(packet, sizeof *npi);
-        match_len = nx_put_match(packet, false, &rule, 0, 0);
-        ofpbuf_put_zeros(packet, 2);
-        ofpbuf_put(packet, pin->packet, send_len);
+        match_len = ofputil_encode_packet_in_tail(pin, &packet, sizeof *npi,
+                                                  OFPUTIL_P_NXM);
 
         npi = packet->data;
         npi->nxh.header.version = OFP10_VERSION;
