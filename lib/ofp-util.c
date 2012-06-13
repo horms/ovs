@@ -1729,12 +1729,9 @@ struct ofpbuf *
 ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
                         enum ofputil_protocol protocol)
 {
-    struct ofp10_flow_mod *ofm;
-    struct nx_flow_mod *nfm;
     struct ofpbuf *msg;
     uint8_t ofp_version = ofputil_protocol_to_ofp_version(protocol);
     uint16_t command;
-    int match_len;
 
     command = (protocol & OFPUTIL_P_TID
                ? (fm->command & 0xff) | (fm->table_id << 8)
@@ -1742,7 +1739,9 @@ ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
 
     switch (protocol) {
     case OFPUTIL_P_OF10:
-    case OFPUTIL_P_OF10_TID:
+    case OFPUTIL_P_OF10_TID: {
+        struct ofp10_flow_mod *ofm;
+
         msg = ofpbuf_new(sizeof *ofm + fm->ofpacts_len);
         ofm = put_openflow(sizeof *ofm, ofp_version, OFPT10_FLOW_MOD, msg);
         ofputil_cls_rule_to_ofp10_match(&fm->cr, &ofm->match);
@@ -1755,9 +1754,13 @@ ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
         ofm->out_port = htons(fm->out_port);
         ofm->flags = htons(fm->flags);
         break;
+    }
 
     case OFPUTIL_P_NXM:
-    case OFPUTIL_P_NXM_TID:
+    case OFPUTIL_P_NXM_TID: {
+        struct nx_flow_mod *nfm;
+        int match_len;
+
         msg = ofpbuf_new(sizeof *nfm + NXM_TYPICAL_LEN + fm->ofpacts_len);
         put_nxmsg(sizeof *nfm, NXT_FLOW_MOD, msg);
         nfm = msg->data;
@@ -1773,6 +1776,7 @@ ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
         nfm->flags = htons(fm->flags);
         nfm->match_len = htons(match_len);
         break;
+    }
 
     default:
         NOT_REACHED();
