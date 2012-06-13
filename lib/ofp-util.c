@@ -824,6 +824,18 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
            sizeof(struct ofp11_port_mod), 0),
 #undef OPFT11
 
+#define OFPT12(TYPE, RAW_TYPE, MIN_SIZE, EXTRA_MULTIPLE) \
+    {                                           \
+        OFPUTIL_##TYPE,                         \
+        { OFP12_VERSION, RAW_TYPE, 0, 0, 0 },   \
+        "OFPT_" #TYPE,                          \
+        MIN_SIZE,                               \
+        EXTRA_MULTIPLE                          \
+    }
+    OFPT12(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
+           sizeof(struct ofp11_flow_mod), 1),
+#undef OPFT12
+
 #define OFPST10_REQUEST(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
     {                                                           \
         OFPUTIL_##STAT##_REQUEST,                               \
@@ -1645,7 +1657,10 @@ ofputil_decode_flow_mod(struct ofputil_flow_mod *fm,
 
         ofm = ofpbuf_pull(&b, sizeof *ofm);
 
-        error = ofputil_pull_ofp11_match(&b, ntohs(ofm->priority), &fm->cr);
+        error = __ofputil_pull_ofp11_match(&b, ntohs(ofm->priority),
+                                           &fm->cr, &fm->cookie,
+                                           &fm->cookie_mask, NULL,
+                                           oh->version);
         if (error) {
             return error;
         }
