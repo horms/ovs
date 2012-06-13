@@ -721,95 +721,105 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
 
 #define OFPT10(TYPE, RAW_TYPE, MIN_SIZE, EXTRA_MULTIPLE)    \
     {                                                       \
-        OFPUTIL_OFPT_##TYPE,                                \
+        OFPUTIL_##TYPE,                                     \
         { OFP10_VERSION, RAW_TYPE, 0, 0, 0 },               \
         "OFPT_" #TYPE,                                      \
         MIN_SIZE,                                           \
         EXTRA_MULTIPLE                                      \
     }
-    OFPT10(HELLO,              OFPT_HELLO,
+    OFPT10(OFPT_HELLO,              OFPT_HELLO,
            sizeof(struct ofp_hello), 1),
-    OFPT10(ECHO_REQUEST,       OFPT_ECHO_REQUEST,
+    OFPT10(OFPT_ECHO_REQUEST,       OFPT_ECHO_REQUEST,
            sizeof(struct ofp_header), 1),
-    OFPT10(ECHO_REPLY,         OFPT_ECHO_REPLY,
+    OFPT10(OFPT_ECHO_REPLY,         OFPT_ECHO_REPLY,
            sizeof(struct ofp_header), 1),
-    OFPT10(FEATURES_REQUEST,   OFPT_FEATURES_REQUEST,
+    OFPT10(OFPT_FEATURES_REQUEST,   OFPT_FEATURES_REQUEST,
            sizeof(struct ofp_header), 0),
-    OFPT10(FEATURES_REPLY,     OFPT_FEATURES_REPLY,
+    OFPT10(OFPT_FEATURES_REPLY,     OFPT_FEATURES_REPLY,
            sizeof(struct ofp_switch_features), sizeof(struct ofp10_phy_port)),
-    OFPT10(GET_CONFIG_REQUEST, OFPT_GET_CONFIG_REQUEST,
+    OFPT10(OFPT_GET_CONFIG_REQUEST, OFPT_GET_CONFIG_REQUEST,
            sizeof(struct ofp_header), 0),
-    OFPT10(GET_CONFIG_REPLY,   OFPT_GET_CONFIG_REPLY,
+    OFPT10(OFPT_GET_CONFIG_REPLY,   OFPT_GET_CONFIG_REPLY,
            sizeof(struct ofp_switch_config), 0),
-    OFPT10(SET_CONFIG,         OFPT_SET_CONFIG,
+    OFPT10(OFPT_SET_CONFIG,         OFPT_SET_CONFIG,
            sizeof(struct ofp_switch_config), 0),
-    OFPT10(PACKET_IN,          OFPT_PACKET_IN,
+    OFPT10(OFPT_PACKET_IN,          OFPT_PACKET_IN,
            offsetof(struct ofp_packet_in, data), 1),
-    OFPT10(FLOW_REMOVED,       OFPT_FLOW_REMOVED,
+    OFPT10(OFPT_FLOW_REMOVED,       OFPT_FLOW_REMOVED,
            sizeof(struct ofp_flow_removed), 0),
-    OFPT10(PORT_STATUS,        OFPT_PORT_STATUS,
+    OFPT10(OFPT_PORT_STATUS,        OFPT_PORT_STATUS,
            sizeof(struct ofp_port_status) + sizeof(struct ofp10_phy_port), 0),
-    OFPT10(PACKET_OUT,         OFPT10_PACKET_OUT,
+    OFPT10(OFPT_PACKET_OUT,         OFPT10_PACKET_OUT,
            sizeof(struct ofp_packet_out), 1),
-    OFPT10(FLOW_MOD,           OFPT10_FLOW_MOD,
-           sizeof(struct ofp_flow_mod), 1),
-    OFPT10(PORT_MOD,           OFPT10_PORT_MOD,
+    OFPT10(OFPT10_FLOW_MOD,         OFPT10_FLOW_MOD,
+           sizeof(struct ofp10_flow_mod), 1),
+    OFPT10(OFPT_PORT_MOD,           OFPT10_PORT_MOD,
            sizeof(struct ofp10_port_mod), 0),
-    OFPT10(BARRIER_REQUEST,    OFPT10_BARRIER_REQUEST,
+    OFPT10(OFPT_BARRIER_REQUEST,    OFPT10_BARRIER_REQUEST,
            sizeof(struct ofp_header), 0),
-    OFPT10(BARRIER_REPLY,      OFPT10_BARRIER_REPLY,
+    OFPT10(OFPT_BARRIER_REPLY,      OFPT10_BARRIER_REPLY,
            sizeof(struct ofp_header), 0),
 
 #define OFPT11(TYPE, RAW_TYPE, MIN_SIZE, EXTRA_MULTIPLE) \
     {                                           \
-        OFPUTIL_OFPT_##TYPE,                    \
-        { OFP11_VERSION, RAW_TYPE, 0, 0, 0 },       \
+        OFPUTIL_##TYPE,                         \
+        { OFP11_VERSION, RAW_TYPE, 0, 0, 0 },   \
         "OFPT_" #TYPE,                          \
         MIN_SIZE,                               \
         EXTRA_MULTIPLE                          \
     }
-    OFPT11(FEATURES_REPLY, OFPT_FEATURES_REPLY,
+    OFPT11(OFPT_FEATURES_REPLY, OFPT_FEATURES_REPLY,
            sizeof(struct ofp_switch_features), sizeof(struct ofp11_port)),
-    OFPT11(PORT_STATUS,    OFPT_PORT_STATUS,
+    OFPT11(OFPT_PORT_STATUS,    OFPT_PORT_STATUS,
            sizeof(struct ofp_port_status) + sizeof(struct ofp11_port), 0),
-    OFPT11(FLOW_MOD,           OFPT11_FLOW_MOD,
+    OFPT11(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
            sizeof(struct ofp11_flow_mod), 1),
-    OFPT11(PORT_MOD,       OFPT11_PORT_MOD,
+    OFPT11(OFPT_PORT_MOD,       OFPT11_PORT_MOD,
            sizeof(struct ofp11_port_mod), 0),
 #undef OPFT11
 
-#define OFPST10_REQUEST(STAT, MIN_SIZE, EXTRA_MULTIPLE)           \
+#define OFPST10_REQUEST(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
     {                                                           \
-        OFPUTIL_OFPST_##STAT##_REQUEST,                         \
-        { OFP10_VERSION, OFPT10_STATS_REQUEST, OFPST_##STAT, 0, 0 },    \
+        OFPUTIL_##STAT##_REQUEST,                               \
+        { OFP10_VERSION, OFPT10_STATS_REQUEST, RAW_STAT, 0, 0 },\
         "OFPST_" #STAT " request",                              \
         sizeof(struct ofp10_stats_msg) + (MIN_SIZE),            \
         EXTRA_MULTIPLE                                          \
     }
-    OFPST10_REQUEST(DESC, 0, 0),
-    OFPST10_REQUEST(FLOW, sizeof(struct ofp10_flow_stats_request), 0),
-    OFPST10_REQUEST(AGGREGATE, sizeof(struct ofp10_flow_stats_request), 0),
-    OFPST10_REQUEST(TABLE, 0, 0),
-    OFPST10_REQUEST(PORT, sizeof(struct ofp10_port_stats_request), 0),
-    OFPST10_REQUEST(QUEUE, sizeof(struct ofp10_queue_stats_request), 0),
-    OFPST10_REQUEST(PORT_DESC, 0, 0),
+    OFPST10_REQUEST(OFPST_DESC, OFPST_DESC, 0, 0),
+    OFPST10_REQUEST(OFPST10_FLOW, OFPST_FLOW,
+                    sizeof(struct ofp10_flow_stats_request), 0),
+    OFPST10_REQUEST(OFPST10_AGGREGATE, OFPST_AGGREGATE,
+                    sizeof(struct ofp10_flow_stats_request), 0),
+    OFPST10_REQUEST(OFPST_TABLE, OFPST_TABLE, 0, 0),
+    OFPST10_REQUEST(OFPST_PORT, OFPST_PORT,
+                    sizeof(struct ofp10_port_stats_request), 0),
+    OFPST10_REQUEST(OFPST_QUEUE, OFPST_QUEUE,
+                    sizeof(struct ofp10_queue_stats_request), 0),
+    OFPST10_REQUEST(OFPST_PORT_DESC, OFPST_PORT_DESC, 0, 0),
 #undef OFPST10_REQUEST
 
-#define OFPST10_REPLY(STAT, MIN_SIZE, EXTRA_MULTIPLE)         \
+#define OFPST10_REPLY(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
     {                                                       \
-        OFPUTIL_OFPST_##STAT##_REPLY,                       \
-        { OFP10_VERSION, OFPT10_STATS_REPLY, OFPST_##STAT, 0, 0 },  \
+        OFPUTIL_##STAT##_REPLY,                             \
+        { OFP10_VERSION, OFPT10_STATS_REPLY, RAW_STAT, 0, 0 },  \
         "OFPST_" #STAT " reply",                           \
         sizeof(struct ofp10_stats_msg) + (MIN_SIZE),        \
         EXTRA_MULTIPLE                                      \
     }
-    OFPST10_REPLY(DESC, sizeof(struct ofp_desc_stats), 0),
-    OFPST10_REPLY(FLOW, 0, 1),
-    OFPST10_REPLY(AGGREGATE, sizeof(struct ofp_aggregate_stats_reply), 0),
-    OFPST10_REPLY(TABLE, 0, sizeof(struct ofp10_table_stats)),
-    OFPST10_REPLY(PORT, 0, sizeof(struct ofp10_port_stats)),
-    OFPST10_REPLY(QUEUE, 0, sizeof(struct ofp10_queue_stats)),
-    OFPST10_REPLY(PORT_DESC, 0, sizeof(struct ofp10_phy_port)),
+    OFPST10_REPLY(OFPST_DESC, OFPST_DESC,
+                  sizeof(struct ofp_desc_stats), 0),
+    OFPST10_REPLY(OFPST10_FLOW, OFPST_FLOW, 0, 1),
+    OFPST10_REPLY(OFPST10_AGGREGATE, OFPST_AGGREGATE,
+                  sizeof(struct ofp_aggregate_stats_reply), 0),
+    OFPST10_REPLY(OFPST_TABLE, OFPST_TABLE,
+                  0, sizeof(struct ofp10_table_stats)),
+    OFPST10_REPLY(OFPST_PORT, OFPST_PORT,
+                  0, sizeof(struct ofp10_port_stats)),
+    OFPST10_REPLY(OFPST_QUEUE, OFPST_QUEUE,
+                  0, sizeof(struct ofp10_queue_stats)),
+    OFPST10_REPLY(OFPST_PORT_DESC, OFPST_PORT_DESC,
+                  0, sizeof(struct ofp10_phy_port)),
 #undef OFPST10_REPLY
 
 #define NXT(SUBTYPE, MIN_SIZE, EXTRA_MULTIPLE)                          \
@@ -1806,7 +1816,7 @@ ofputil_decode_flow_stats_request(struct ofputil_flow_stats_request *fsr,
     case OFPUTIL_OFPST10_FLOW_REQUEST:
         return ofputil_decode_ofpst_flow_request(fsr, b.data, false);
 
-    case OFPUTIL_OFPST_AGGREGATE_REQUEST:
+    case OFPUTIL_OFPST10_AGGREGATE_REQUEST:
         return ofputil_decode_ofpst_flow_request(fsr, b.data, true);
 
     case OFPUTIL_NXST_FLOW_REQUEST:
@@ -1924,7 +1934,7 @@ ofputil_decode_flow_stats_reply(struct ofputil_flow_stats *fs,
 
     if (!msg->size) {
         return EOF;
-    } else if (code == OFPUTIL_OFPST_FLOW_REPLY) {
+    } else if (code == OFPUTIL_OFPST10_FLOW_REPLY) {
         const struct ofp10_flow_stats *ofs;
         size_t length;
 
@@ -2102,7 +2112,7 @@ ofputil_encode_aggregate_stats_reply(
 
     ofputil_decode_msg_type(request, &type);
     code = ofputil_msg_type_code(type);
-    if (code == OFPUTIL_OFPST_AGGREGATE_REQUEST) {
+    if (code == OFPUTIL_OFPST10_AGGREGATE_REQUEST) {
         struct ofp_aggregate_stats_reply *asr;
 
         asr = ofputil_make_stats_reply(sizeof *asr, request, &msg);

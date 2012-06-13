@@ -1659,7 +1659,7 @@ read_flows_from_switch(struct vconn *vconn,
 
             ofputil_decode_msg_type(reply->data, &type);
             code = ofputil_msg_type_code(type);
-            if (code != OFPUTIL_OFPST_FLOW_REPLY &&
+            if (code != OFPUTIL_OFPST10_FLOW_REPLY &&
                 code != OFPUTIL_NXST_FLOW_REPLY) {
                 ovs_fatal(0, "received bad reply: %s",
                           ofp_to_string(reply->data, reply->size,
