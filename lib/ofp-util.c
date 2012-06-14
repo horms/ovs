@@ -818,6 +818,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
            sizeof(struct ofp_switch_features), sizeof(struct ofp11_port)),
     OFPT11(OFPT_PORT_STATUS,    OFPT_PORT_STATUS,
            sizeof(struct ofp_port_status) + sizeof(struct ofp11_port), 0),
+    OFPT11(OFPT_PACKET_OUT,     OFPT11_PACKET_OUT,
+           sizeof(struct ofp11_packet_out), 1),
     OFPT11(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
            sizeof(struct ofp11_flow_mod), 1),
     OFPT11(OFPT_PORT_MOD,       OFPT11_PORT_MOD,
@@ -838,6 +840,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
            sizeof(struct ofp12_flow_removed), 0),
     OFPT12(OFPT_PACKET_IN,          OFPT_PACKET_IN,
            offsetof(struct ofp_packet_in, data), 1),
+    OFPT12(OFPT_PACKET_OUT,     OFPT11_PACKET_OUT,
+           sizeof(struct ofp11_packet_out), 1),
     OFPT12(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
            sizeof(struct ofp11_flow_mod), 1),
     OFPT12(OFPT_PORT_MOD,       OFPT11_PORT_MOD,
@@ -2727,7 +2731,25 @@ ofputil_decode_packet_out(struct ofputil_packet_out *po,
 
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
 
-    if (oh->version == OFP10_VERSION) {
+    if (oh->version == OFP11_VERSION || oh->version == OFP12_VERSION) {
+        const struct ofp11_packet_out *opo = (const struct ofp11_packet_out *) oh;
+        enum ofperr error;
+
+        ofpbuf_pull(&b, sizeof *opo);
+
+        po->buffer_id = ntohl(opo->buffer_id);
+        error = ofputil_port_from_ofp11(opo->in_port, &po->in_port);
+        if (error) {
+            return error;
+        }
+
+        error = ofpacts_pull_openflow11_instructions(&b,
+                                                     ntohs(opo->actions_len),
+                                                     ofpacts);
+        if (error) {
+            return error;
+        }
+    } else if (oh->version == OFP10_VERSION) {
         const struct ofp_packet_out *opo = (const struct ofp_packet_out *) oh;
         enum ofperr error;
 
