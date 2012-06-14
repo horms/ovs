@@ -832,6 +832,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
         MIN_SIZE,                               \
         EXTRA_MULTIPLE                          \
     }
+    OFPT12(OFPT_FLOW_REMOVED,       OFPT_FLOW_REMOVED,
+           sizeof(struct ofp12_flow_removed), 0),
     OFPT12(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
            sizeof(struct ofp11_flow_mod), 1),
 #undef OPFT12
@@ -2304,7 +2306,31 @@ ofputil_decode_flow_removed(struct ofputil_flow_removed *fr,
 
     ofputil_decode_msg_type(oh, &type);
     code = ofputil_msg_type_code(type);
-    if (code == OFPUTIL_OFPT_FLOW_REMOVED) {
+    if (code == OFPUTIL_OFPT_FLOW_REMOVED && oh->version == OFP12_VERSION) {
+        const struct ofp12_flow_removed *ofr;
+        struct ofpbuf b;
+        int error;
+
+        ofpbuf_use_const(&b, oh, ntohs(oh->length));
+
+        ofr = ofpbuf_pull(&b, sizeof *ofr);
+        error = ofputil_pull_ofp12_match(&b, ntohs(ofr->priority),
+                                         &fr->rule, NULL, NULL, NULL);
+        if (error) {
+            return error;
+        }
+
+        fr->cookie = ofr->cookie;
+        fr->reason = ofr->reason;
+        /* FIXMIE: table_id is ignored */
+        fr->duration_sec = ntohl(ofr->duration_sec);
+        fr->duration_nsec = ntohl(ofr->duration_nsec);
+        fr->idle_timeout = ntohs(ofr->idle_timeout);
+        /* FIXMIE: hard_timeout is ignored */
+        fr->packet_count = ntohll(ofr->packet_count);
+        fr->byte_count = ntohll(ofr->byte_count);
+    } else if (code == OFPUTIL_OFPT_FLOW_REMOVED &&
+               oh->version == OFP10_VERSION) {
         const struct ofp_flow_removed *ofr;
 
         ofr = (const struct ofp_flow_removed *) oh;
