@@ -148,7 +148,7 @@ ofp_print_packet_in(struct ds *string, const struct ofp_header *oh,
 }
 
 static void
-ofp_print_packet_out(struct ds *string, const struct ofp_packet_out *opo,
+ofp_print_packet_out(struct ds *string, const struct ofp_header *oh,
                      int verbosity)
 {
     struct ofputil_packet_out po;
@@ -156,7 +156,7 @@ ofp_print_packet_out(struct ds *string, const struct ofp_packet_out *opo,
     enum ofperr error;
 
     ofpbuf_init(&ofpacts, 64);
-    error = ofputil_decode_packet_out(&po, opo, &ofpacts);
+    error = ofputil_decode_packet_out(&po, oh, &ofpacts);
     if (error) {
         ofpbuf_uninit(&ofpacts);
         ofp_print_error(string, error);

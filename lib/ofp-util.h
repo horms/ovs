@@ -377,7 +377,7 @@ struct ofputil_packet_out {
 };
 
 enum ofperr ofputil_decode_packet_out(struct ofputil_packet_out *,
-                                      const struct ofp_packet_out *,
+                                      const struct ofp_header *,
                                       struct ofpbuf *ofpacts);
 struct ofpbuf *ofputil_encode_packet_out(const struct ofputil_packet_out *);
 

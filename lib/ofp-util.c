@@ -2718,28 +2718,39 @@ ofputil_packet_in_reason_from_string(const char *s,
  * Returns 0 if successful, otherwise an OFPERR_* value. */
 enum ofperr
 ofputil_decode_packet_out(struct ofputil_packet_out *po,
-                          const struct ofp_packet_out *opo,
+                          const struct ofp_header *oh,
                           struct ofpbuf *ofpacts)
 {
-    enum ofperr error;
     struct ofpbuf b;
 
-    po->buffer_id = ntohl(opo->buffer_id);
-    po->in_port = ntohs(opo->in_port);
+    memset(po, 0, sizeof *po);
+
+    ofpbuf_use_const(&b, oh, ntohs(oh->length));
+
+    if (oh->version == OFP10_VERSION) {
+        const struct ofp_packet_out *opo = (const struct ofp_packet_out *) oh;
+        enum ofperr error;
+
+        ofpbuf_pull(&b, sizeof *opo);
+
+        po->buffer_id = ntohl(opo->buffer_id);
+        po->in_port = ntohs(opo->in_port);
+
+        error = ofpacts_pull_openflow10(&b, ntohs(opo->actions_len), ofpacts);
+        if (error) {
+            return error;
+        }
+    } else {
+        NOT_REACHED();
+    }
+
     if (po->in_port >= OFPP_MAX && po->in_port != OFPP_LOCAL
         && po->in_port != OFPP_NONE && po->in_port != OFPP_CONTROLLER) {
         VLOG_WARN_RL(&bad_ofmsg_rl, "packet-out has bad input port %#"PRIx16,
-                     po->in_port);
+                    po->in_port);
         return OFPERR_NXBRC_BAD_IN_PORT;
     }
 
-    ofpbuf_use_const(&b, opo, ntohs(opo->header.length));
-    ofpbuf_pull(&b, sizeof *opo);
-
-    error = ofpacts_pull_openflow10(&b, ntohs(opo->actions_len), ofpacts);
-    if (error) {
-        return error;
-    }
     po->ofpacts = ofpacts->data;
     po->ofpacts_len = ofpacts->size;
 

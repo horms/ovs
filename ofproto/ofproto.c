@@ -1999,7 +1999,7 @@ reject_slave_controller(struct ofconn *ofconn)
 }
 
 static enum ofperr
-handle_packet_out(struct ofconn *ofconn, const struct ofp_packet_out *opo)
+handle_packet_out(struct ofconn *ofconn, const struct ofp_header *oh)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
     struct ofputil_packet_out po;
@@ -2018,7 +2018,7 @@ handle_packet_out(struct ofconn *ofconn, const struct ofp_packet_out *opo)
 
     /* Decode message. */
     ofpbuf_use_stub(&ofpacts, ofpacts_stub, sizeof ofpacts_stub);
-    error = ofputil_decode_packet_out(&po, opo, &ofpacts);
+    error = ofputil_decode_packet_out(&po, oh, &ofpacts);
     if (error) {
         goto exit_free_ofpacts;
     }
