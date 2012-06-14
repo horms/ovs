@@ -1244,6 +1244,7 @@ do_probe(int argc OVS_UNUSED, char *argv[])
 static void
 do_packet_out(int argc, char *argv[])
 {
+    enum ofputil_protocol protocol;
     struct ofputil_packet_out po;
     struct ofpbuf ofpacts;
     struct vconn *vconn;
@@ -1259,7 +1260,7 @@ do_packet_out(int argc, char *argv[])
     po.ofpacts = ofpacts.data;
     po.ofpacts_len = ofpacts.size;
 
-    open_vconn(argv[1], &vconn);
+    protocol = open_vconn(argv[1], &vconn);
     for (i = 4; i < argc; i++) {
         struct ofpbuf *packet, *opo;
         const char *error_msg;
@@ -1271,7 +1272,7 @@ do_packet_out(int argc, char *argv[])
 
         po.packet = packet->data;
         po.packet_len = packet->size;
-        opo = ofputil_encode_packet_out(&po);
+        opo = ofputil_encode_packet_out(&po, protocol);
         transact_noreply(vconn, opo);
         ofpbuf_delete(packet);
     }

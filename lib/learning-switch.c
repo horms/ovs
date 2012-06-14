@@ -539,13 +539,13 @@ process_packet_in(struct lswitch *sw, struct rconn *rconn,
 
         /* If the switch didn't buffer the packet, we need to send a copy. */
         if (pi.buffer_id == UINT32_MAX && out_port != OFPP_NONE) {
-            queue_tx(sw, rconn, ofputil_encode_packet_out(&po));
+            queue_tx(sw, rconn, ofputil_encode_packet_out(&po, protocol));
         }
     } else {
         /* We don't know that MAC, or we don't set up flows.  Send along the
          * packet without setting up a flow. */
         if (pi.buffer_id != UINT32_MAX || out_port != OFPP_NONE) {
-            queue_tx(sw, rconn, ofputil_encode_packet_out(&po));
+            queue_tx(sw, rconn, ofputil_encode_packet_out(&po, protocol));
         }
     }
 }

@@ -3339,25 +3339,31 @@ ofputil_encode_port_mod(const struct ofputil_port_mod *pm,
 }
 
 struct ofpbuf *
-ofputil_encode_packet_out(const struct ofputil_packet_out *po)
+ofputil_encode_packet_out(const struct ofputil_packet_out *po,
+                          enum ofputil_protocol protocol)
 {
-    struct ofp_packet_out *opo;
+    uint8_t ofp_version = ofputil_protocol_to_ofp_version(protocol);
     struct ofpbuf *msg;
-    size_t size;
+    size_t packet_len = 0;
 
-    size = sizeof *opo + po->ofpacts_len;
     if (po->buffer_id == UINT32_MAX) {
-        size += po->packet_len;
+        packet_len = po->packet_len;
     }
 
-    msg = ofpbuf_new(size);
-    put_openflow(sizeof *opo, OFP10_VERSION, OFPT10_PACKET_OUT, msg);
-    ofpacts_to_openflow10(po->ofpacts, msg);
+    if (ofp_version == OFP10_VERSION) {
+        struct ofp_packet_out *opo;
 
-    opo = msg->data;
-    opo->buffer_id = htonl(po->buffer_id);
-    opo->in_port = htons(po->in_port);
-    opo->actions_len = htons(msg->size - sizeof *opo);
+        msg = ofpbuf_new(packet_len + sizeof *opo);
+        put_openflow(sizeof *opo, ofp_version, OFPT10_PACKET_OUT, msg);
+        opo = msg->data;
+        opo->buffer_id = htonl(po->buffer_id);
+        opo->in_port = htons(po->in_port);
+        opo->actions_len = htons(msg->size - sizeof *opo);
+    } else {
+        NOT_REACHED();
+    }
+
+    ofpacts_to_openflow10(po->ofpacts, msg);
 
     if (po->buffer_id == UINT32_MAX) {
         ofpbuf_put(msg, po->packet, po->packet_len);
