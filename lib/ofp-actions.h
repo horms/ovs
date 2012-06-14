@@ -389,7 +389,8 @@ enum ofperr ofpacts_check(const struct ofpact[],
                           const struct flow *, int max_ports);
 
 /* Converting ofpacts to OpenFlow. */
-void ofpacts_to_openflow(const struct ofpact[], struct ofpbuf *openflow);
+void ofpacts_to_openflow(const struct ofpact[], struct ofpbuf *openflow,
+                         enum ofputil_protocol protocol);
 
 /* Working with ofpacts. */
 bool ofpacts_output_to_port(const struct ofpact[], uint16_t port);

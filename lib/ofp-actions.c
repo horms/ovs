@@ -1257,16 +1257,184 @@ ofpact_to_openflow10(const struct ofpact *a, struct ofpbuf *out)
     }
 }
 
+/* Converting ofpacts to OpenFlow 1.1. */
+
+static void
+ofpact_output_to_openflow11(const struct ofpact_output *output,
+                            struct ofpbuf *out)
+{
+    struct ofp11_action_output *oao;
+
+    oao = ofputil_put_OFPAT11_OUTPUT(out);
+    oao->port = ofputil_port_to_ofp11(output->port);
+    oao->max_len = htons(output->max_len);
+}
+
+static void
+ofpact_controller_to_openflow11(const struct ofpact_controller *oc,
+                                struct ofpbuf *out)
+{
+    struct ofp11_action_output *oao;
+
+    oao = ofputil_put_OFPAT11_OUTPUT(out);
+    oao->port = htonl(OFPP_CONTROLLER);
+    oao->max_len = htons(oc->max_len);
+}
+
+static void
+ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
+{
+    switch (a->type) {
+    case OFPACT_END:
+    case OFPACT_ENQUEUE:
+        NOT_REACHED();
+
+    case OFPACT_OUTPUT:
+        return ofpact_output_to_openflow11(ofpact_get_OUTPUT(a), out);
+
+    case OFPACT_CONTROLLER:
+        ofpact_controller_to_openflow11(ofpact_get_CONTROLLER(a), out);
+        break;
+
+    case OFPACT_OUTPUT_REG:
+        /* FIXME: Is this generic or is an openflow11 version required ? */
+        ofpact_output_reg_to_openflow10(ofpact_get_OUTPUT_REG(a), out);
+        break;
+
+    case OFPACT_BUNDLE:
+        bundle_to_openflow(ofpact_get_BUNDLE(a), out);
+        break;
+
+    case OFPACT_SET_VLAN_VID:
+        ofputil_put_OFPAT11_SET_VLAN_VID(out)->vlan_vid
+            = htons(ofpact_get_SET_VLAN_VID(a)->vlan_vid);
+        break;
+
+    case OFPACT_SET_VLAN_PCP:
+        ofputil_put_OFPAT11_SET_VLAN_PCP(out)->vlan_pcp
+            = ofpact_get_SET_VLAN_PCP(a)->vlan_pcp;
+        break;
+
+    case OFPACT_STRIP_VLAN:
+        /* FIXME: Is this generic or is an OFPAT11 version required ? */
+        ofputil_put_OFPAT10_STRIP_VLAN(out);
+        break;
+
+    case OFPACT_SET_ETH_SRC:
+        memcpy(ofputil_put_OFPAT11_SET_DL_SRC(out)->dl_addr,
+               ofpact_get_SET_ETH_SRC(a)->mac, ETH_ADDR_LEN);
+        break;
+
+    case OFPACT_SET_ETH_DST:
+        memcpy(ofputil_put_OFPAT11_SET_DL_DST(out)->dl_addr,
+               ofpact_get_SET_ETH_DST(a)->mac, ETH_ADDR_LEN);
+        break;
+
+    case OFPACT_SET_IPV4_SRC:
+        ofputil_put_OFPAT11_SET_NW_SRC(out)->nw_addr
+            = ofpact_get_SET_IPV4_SRC(a)->ipv4;
+        break;
+
+    case OFPACT_SET_IPV4_DST:
+        ofputil_put_OFPAT11_SET_NW_DST(out)->nw_addr
+            = ofpact_get_SET_IPV4_DST(a)->ipv4;
+        break;
+
+    case OFPACT_SET_IPV4_DSCP:
+        ofputil_put_OFPAT11_SET_NW_TOS(out)->nw_tos
+            = ofpact_get_SET_IPV4_DSCP(a)->dscp;
+        break;
+
+    case OFPACT_SET_L4_SRC_PORT:
+        ofputil_put_OFPAT11_SET_TP_SRC(out)->tp_port
+            = htons(ofpact_get_SET_L4_SRC_PORT(a)->port);
+        break;
+
+    case OFPACT_SET_L4_DST_PORT:
+        ofputil_put_OFPAT11_SET_TP_DST(out)->tp_port
+            = htons(ofpact_get_SET_L4_DST_PORT(a)->port);
+        break;
+
+    case OFPACT_REG_MOVE:
+        nxm_reg_move_to_openflow(ofpact_get_REG_MOVE(a), out);
+        break;
+
+    case OFPACT_REG_LOAD:
+        nxm_reg_load_to_openflow(ofpact_get_REG_LOAD(a), out);
+        break;
+
+    case OFPACT_DEC_TTL:
+        ofputil_put_NXAST_DEC_TTL(out);
+        break;
+
+    case OFPACT_SET_TUNNEL:
+        /* FIXME: Is this generic or is an openflow11 version required ? */
+        ofpact_set_tunnel_to_openflow10(ofpact_get_SET_TUNNEL(a), out);
+        break;
+
+    case OFPACT_SET_QUEUE:
+        ofputil_put_NXAST_SET_QUEUE(out)->queue_id
+            = htonl(ofpact_get_SET_QUEUE(a)->queue_id);
+        break;
+
+    case OFPACT_POP_QUEUE:
+        ofputil_put_NXAST_POP_QUEUE(out);
+        break;
+
+    case OFPACT_RESUBMIT:
+        /* FIXME: Is this generic or is an openflow11 version required ? */
+        ofpact_resubmit_to_openflow10(ofpact_get_RESUBMIT(a), out);
+        break;
+
+    case OFPACT_LEARN:
+        learn_to_openflow(ofpact_get_LEARN(a), out);
+        break;
+
+    case OFPACT_MULTIPATH:
+        multipath_to_openflow(ofpact_get_MULTIPATH(a), out);
+        break;
+
+    case OFPACT_AUTOPATH:
+        autopath_to_openflow(ofpact_get_AUTOPATH(a), out);
+        break;
+
+    case OFPACT_NOTE:
+        /* FIXME: Is this generic or is an openflow11 version required ? */
+        ofpact_note_to_openflow10(ofpact_get_NOTE(a), out);
+        break;
+
+    case OFPACT_EXIT:
+        ofputil_put_NXAST_EXIT(out);
+        break;
+
+    case OFPACT_FIN_TIMEOUT:
+        /* FIXME: Is this generic or is an openflow11 version required ? */
+        ofpact_fin_timeout_to_openflow10(ofpact_get_FIN_TIMEOUT(a), out);
+        break;
+    }
+}
+
 /* Converts the ofpacts in 'ofpacts' (terminated by OFPACT_END) into OpenFlow
  * actions in 'openflow', appending the actions to any existing data in
  * 'openflow'. */
 void
-ofpacts_to_openflow(const struct ofpact ofpacts[], struct ofpbuf *openflow)
+ofpacts_to_openflow(const struct ofpact ofpacts[], struct ofpbuf *openflow,
+                    enum ofputil_protocol protocol)
 {
     const struct ofpact *a;
+    uint8_t ofp_version = ofputil_protocol_to_ofp_version(protocol);
+    static void (*f)(const struct ofpact *, struct ofpbuf *);
+
+    if (ofp_version == OFP11_VERSION || ofp_version == OFP12_VERSION) {
+        f = ofpact_to_openflow11;
+    } else if (ofp_version == OFP10_VERSION) {
+        f = ofpact_to_openflow10;
+    } else {
+        NOT_REACHED();
+    }
 
     OFPACT_FOR_EACH (a, ofpacts) {
-        ofpact_to_openflow10(a, openflow);
+        f(a, openflow);
     }
 }
 
