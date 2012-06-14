@@ -3350,7 +3350,15 @@ ofputil_encode_packet_out(const struct ofputil_packet_out *po,
         packet_len = po->packet_len;
     }
 
-    if (ofp_version == OFP10_VERSION) {
+    if (ofp_version == OFP11_VERSION || ofp_version == OFP12_VERSION) {
+        struct ofp11_packet_out *opo;
+
+        msg = ofpbuf_new(packet_len + sizeof *opo);
+        opo = put_openflow(sizeof *opo, ofp_version, OFPT11_PACKET_OUT, msg);
+        opo->buffer_id = htonl(po->buffer_id);
+        opo->in_port = ofputil_port_to_ofp11(po->in_port);
+        opo->actions_len = htons(msg->size - sizeof *opo);
+    } else if (ofp_version == OFP10_VERSION) {
         struct ofp_packet_out *opo;
 
         msg = ofpbuf_new(packet_len + sizeof *opo);
