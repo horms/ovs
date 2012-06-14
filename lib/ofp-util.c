@@ -834,18 +834,38 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
         MIN_SIZE,                               \
         EXTRA_MULTIPLE                          \
     }
+    OFPT12(OFPT_HELLO,              OFPT_HELLO,
+           sizeof(struct ofp_hello), 1),
+    OFPT12(OFPT_ECHO_REQUEST,       OFPT_ECHO_REQUEST,
+           sizeof(struct ofp_header), 1),
+    OFPT12(OFPT_ECHO_REPLY,         OFPT_ECHO_REPLY,
+           sizeof(struct ofp_header), 1),
+    OFPT12(OFPT_FEATURES_REQUEST,   OFPT_FEATURES_REQUEST,
+           sizeof(struct ofp_header), 0),
     OFPT12(OFPT_FEATURES_REPLY, OFPT_FEATURES_REPLY,
            sizeof(struct ofp_switch_features), sizeof(struct ofp11_port)),
+    OFPT12(OFPT_GET_CONFIG_REQUEST, OFPT_GET_CONFIG_REQUEST,
+           sizeof(struct ofp_header), 0),
+    OFPT12(OFPT_GET_CONFIG_REPLY,   OFPT_GET_CONFIG_REPLY,
+           sizeof(struct ofp_switch_config), 0),
+    OFPT12(OFPT_SET_CONFIG,         OFPT_SET_CONFIG,
+           sizeof(struct ofp_switch_config), 0),
     OFPT12(OFPT_FLOW_REMOVED,       OFPT_FLOW_REMOVED,
            sizeof(struct ofp12_flow_removed), 0),
     OFPT12(OFPT_PACKET_IN,          OFPT_PACKET_IN,
            offsetof(struct ofp_packet_in, data), 1),
     OFPT12(OFPT_PACKET_OUT,     OFPT11_PACKET_OUT,
            sizeof(struct ofp11_packet_out), 1),
+    OFPT12(OFPT_SET_CONFIG,         OFPT_SET_CONFIG,
+           sizeof(struct ofp_switch_config), 0),
     OFPT12(OFPT11_FLOW_MOD,     OFPT11_FLOW_MOD,
            sizeof(struct ofp11_flow_mod), 1),
     OFPT12(OFPT_PORT_MOD,       OFPT11_PORT_MOD,
            sizeof(struct ofp11_port_mod), 0),
+    OFPT12(OFPT_BARRIER_REQUEST,    OFPT11_BARRIER_REQUEST,
+           sizeof(struct ofp_header), 0),
+    OFPT12(OFPT_BARRIER_REPLY,      OFPT11_BARRIER_REPLY,
+           sizeof(struct ofp_header), 0),
 #undef OPFT12
 
 #define OFPST10_REQUEST(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
@@ -869,6 +889,32 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
     OFPST10_REQUEST(OFPST_PORT_DESC, OFPST_PORT_DESC, 0, 0),
 #undef OFPST10_REQUEST
 
+#define OFPST11_REQUEST(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
+    {                                                           \
+        OFPUTIL_##STAT##_REQUEST,                               \
+        { OFP11_VERSION, OFPT11_STATS_REQUEST, RAW_STAT, 0, 0 },\
+        "OFPST_" #STAT " request",                              \
+        sizeof(struct ofp11_stats_msg) + (MIN_SIZE),            \
+        EXTRA_MULTIPLE                                          \
+    }
+    OFPST11_REQUEST(OFPST_DESC, OFPST_DESC, 0, 0),
+    OFPST11_REQUEST(OFPST_TABLE, OFPST_TABLE, 0, 0),
+    OFPST11_REQUEST(OFPST_PORT_DESC, OFPST_PORT_DESC, 0, 0),
+#undef OFPST11_REQUEST
+
+#define OFPST12_REQUEST(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
+    {                                                           \
+        OFPUTIL_##STAT##_REQUEST,                               \
+        { OFP12_VERSION, OFPT11_STATS_REQUEST, RAW_STAT, 0, 0 },\
+        "OFPST_" #STAT " request",                              \
+        sizeof(struct ofp11_stats_msg) + (MIN_SIZE),            \
+        EXTRA_MULTIPLE                                          \
+    }
+    OFPST12_REQUEST(OFPST_DESC, OFPST_DESC, 0, 0),
+    OFPST12_REQUEST(OFPST_TABLE, OFPST_TABLE, 0, 0),
+    OFPST12_REQUEST(OFPST_PORT_DESC, OFPST_PORT_DESC, 0, 0),
+#undef OFPST12_REQUEST
+
 #define OFPST10_REPLY(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
     {                                                       \
         OFPUTIL_##STAT##_REPLY,                             \
@@ -891,6 +937,34 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
     OFPST10_REPLY(OFPST_PORT_DESC, OFPST_PORT_DESC,
                   0, sizeof(struct ofp10_phy_port)),
 #undef OFPST10_REPLY
+
+#define OFPST11_REPLY(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
+    {                                                       \
+        OFPUTIL_##STAT##_REPLY,                             \
+        { OFP11_VERSION, OFPT11_STATS_REPLY, RAW_STAT, 0, 0 },  \
+        "OFPST_" #STAT " reply",                            \
+        sizeof(struct ofp11_stats_msg) + (MIN_SIZE),        \
+        EXTRA_MULTIPLE                                      \
+    }
+    OFPST11_REPLY(OFPST_DESC, OFPST_DESC,
+                  sizeof(struct ofp_desc_stats), 0),
+    OFPST11_REPLY(OFPST_PORT_DESC, OFPST_PORT_DESC,
+                  0, sizeof(struct ofp11_port)),
+#undef OFPST11_REPLY
+
+#define OFPST12_REPLY(STAT, RAW_STAT, MIN_SIZE, EXTRA_MULTIPLE)  \
+    {                                                       \
+        OFPUTIL_##STAT##_REPLY,                             \
+        { OFP12_VERSION, OFPT11_STATS_REPLY, RAW_STAT, 0, 0 },  \
+        "OFPST_" #STAT " reply",                            \
+        sizeof(struct ofp11_stats_msg) + (MIN_SIZE),        \
+        EXTRA_MULTIPLE                                      \
+    }
+    OFPST12_REPLY(OFPST_DESC, OFPST_DESC,
+                  sizeof(struct ofp_desc_stats), 0),
+    OFPST12_REPLY(OFPST_PORT_DESC, OFPST_PORT_DESC,
+                  0, sizeof(struct ofp11_port)),
+#undef OFPST12_REPLY
 
 #define NXT(SUBTYPE, MIN_SIZE, EXTRA_MULTIPLE)                          \
     {                                                                   \
