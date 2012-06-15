@@ -1691,7 +1691,7 @@ ofputil_decode_flow_mod(struct ofputil_flow_mod *fm,
         ofputil_normalize_rule(&fm->cr);
 
         /* Now get the actions. */
-        error = ofpacts_pull_openflow(&b, b.size, ofpacts);
+        error = ofpacts_pull_openflow10(&b, b.size, ofpacts);
         if (error) {
             return error;
         }
@@ -1718,7 +1718,7 @@ ofputil_decode_flow_mod(struct ofputil_flow_mod *fm,
         if (error) {
             return error;
         }
-        error = ofpacts_pull_openflow(&b, b.size, ofpacts);
+        error = ofpacts_pull_openflow10(&b, b.size, ofpacts);
         if (error) {
             return error;
         }
@@ -2039,7 +2039,7 @@ ofputil_decode_flow_stats_reply(struct ofputil_flow_stats *fs,
             return EINVAL;
         }
 
-        if (ofpacts_pull_openflow(msg, length - sizeof *ofs, ofpacts)) {
+        if (ofpacts_pull_openflow10(msg, length - sizeof *ofs, ofpacts)) {
             return EINVAL;
         }
 
@@ -2079,7 +2079,7 @@ ofputil_decode_flow_stats_reply(struct ofputil_flow_stats *fs,
         }
 
         actions_len = length - sizeof *nfs - ROUND_UP(match_len, 8);
-        if (ofpacts_pull_openflow(msg, actions_len, ofpacts)) {
+        if (ofpacts_pull_openflow10(msg, actions_len, ofpacts)) {
             return EINVAL;
         }
 
@@ -2534,7 +2534,7 @@ ofputil_decode_packet_out(struct ofputil_packet_out *po,
     ofpbuf_use_const(&b, opo, ntohs(opo->header.length));
     ofpbuf_pull(&b, sizeof *opo);
 
-    error = ofpacts_pull_openflow(&b, ntohs(opo->actions_len), ofpacts);
+    error = ofpacts_pull_openflow10(&b, ntohs(opo->actions_len), ofpacts);
     if (error) {
         return error;
     }
@@ -3660,7 +3660,8 @@ ofputil_action_code_from_name(const char *name)
 {
     static const char *names[OFPUTIL_N_ACTIONS] = {
         NULL,
-#define OFPAT10_ACTION(ENUM, STRUCT, NAME)             NAME,
+#define OFPAT10_ACTION(ENUM, STRUCT, NAME)           NAME,
+#define OFPAT11_ACTION(ENUM, STRUCT, NAME)           NAME,
 #define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME) NAME,
 #include "ofp-util.def"
     };
@@ -3689,6 +3690,7 @@ ofputil_put_action(enum ofputil_action_code code, struct ofpbuf *buf)
 
 #define OFPAT10_ACTION(ENUM, STRUCT, NAME)                    \
     case OFPUTIL_##ENUM: return ofputil_put_##ENUM(buf);
+#define OFPAT11_ACTION OFPAT10_ACTION
 #define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME)        \
     case OFPUTIL_##ENUM: return ofputil_put_##ENUM(buf);
 #include "ofp-util.def"
@@ -3712,6 +3714,7 @@ ofputil_put_action(enum ofputil_action_code code, struct ofpbuf *buf)
         ofputil_init_##ENUM(s);                                 \
         return s;                                               \
     }
+#define OFPAT11_ACTION OFPAT10_ACTION
 #define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME)            \
     void                                                        \
     ofputil_init_##ENUM(struct STRUCT *s)                       \

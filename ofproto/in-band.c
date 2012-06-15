@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008, 2009, 2010, 2011 Nicira, Inc.
+ * Copyright (c) 2008, 2009, 2010, 2011, 2012 Nicira, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -411,11 +411,13 @@ in_band_run(struct in_band *ib)
 
     struct in_band_rule *rule, *next;
 
+    /* XXX Should use ofpacts here */
+
     memset(&actions, 0, sizeof actions);
-    actions.oa.output.type = htons(OFPAT10_OUTPUT);
-    actions.oa.output.len = htons(sizeof actions.oa);
-    actions.oa.output.port = htons(OFPP_NORMAL);
-    actions.oa.output.max_len = htons(0);
+    actions.oa.output10.type = htons(OFPAT10_OUTPUT);
+    actions.oa.output10.len = htons(sizeof actions.oa);
+    actions.oa.output10.port = htons(OFPP_NORMAL);
+    actions.oa.output10.max_len = htons(0);
     if (ib->queue_id < 0) {
         a = &actions.oa;
         na = sizeof actions.oa / sizeof(union ofp_action);

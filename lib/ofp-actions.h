@@ -379,9 +379,12 @@ struct ofpact_note {
 };
 
 /* Converting OpenFlow to ofpacts. */
-enum ofperr ofpacts_pull_openflow(struct ofpbuf *openflow,
-                                  unsigned int actions_len,
-                                  struct ofpbuf *ofpacts);
+enum ofperr ofpacts_pull_openflow10(struct ofpbuf *openflow,
+                                    unsigned int actions_len,
+                                    struct ofpbuf *ofpacts);
+enum ofperr ofpacts_pull_openflow11_instructions(struct ofpbuf *openflow,
+                                                 unsigned int instructions_len,
+                                                 struct ofpbuf *ofpacts);
 enum ofperr ofpacts_check(const struct ofpact[],
                           const struct flow *, int max_ports);
 
