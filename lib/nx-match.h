@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include "flow.h"
+#include "ofp-errors.h"
 #include "openvswitch/types.h"
 #include "ofp-errors.h"
 
@@ -28,6 +29,8 @@ struct cls_rule;
 struct ds;
 struct flow;
 struct mf_subfield;
+struct ofpact_reg_move;
+struct ofpact_reg_load;
 struct ofpbuf;
 struct nx_action_reg_load;
 struct nx_action_reg_move;
@@ -49,19 +52,31 @@ int nx_put_match(struct ofpbuf *, bool oxm, const struct cls_rule *,
 char *nx_match_to_string(const uint8_t *, unsigned int match_len);
 int nx_match_from_string(const char *, struct ofpbuf *);
 
-void nxm_parse_reg_move(struct nx_action_reg_move *, const char *);
-void nxm_parse_reg_load(struct nx_action_reg_load *, const char *);
+void nxm_parse_reg_move(struct ofpact_reg_move *, const char *);
+void nxm_parse_reg_load(struct ofpact_reg_load *, const char *);
 
-void nxm_format_reg_move(const struct nx_action_reg_move *, struct ds *);
-void nxm_format_reg_load(const struct nx_action_reg_load *, struct ds *);
+void nxm_format_reg_move(const struct ofpact_reg_move *, struct ds *);
+void nxm_format_reg_load(const struct ofpact_reg_load *, struct ds *);
 
-enum ofperr nxm_check_reg_move(const struct nx_action_reg_move *,
+enum ofperr nxm_reg_move_from_openflow(const struct nx_action_reg_move *,
+                                       struct ofpbuf *ofpacts);
+enum ofperr nxm_reg_load_from_openflow(const struct nx_action_reg_load *,
+                                       struct ofpbuf *ofpacts);
+
+enum ofperr nxm_reg_move_check(const struct ofpact_reg_move *,
                                const struct flow *);
-enum ofperr nxm_check_reg_load(const struct nx_action_reg_load *,
+enum ofperr nxm_reg_load_check(const struct ofpact_reg_load *,
                                const struct flow *);
 
-void nxm_execute_reg_move(const struct nx_action_reg_move *, struct flow *);
-void nxm_execute_reg_load(const struct nx_action_reg_load *, struct flow *);
+void nxm_reg_move_to_openflow(const struct ofpact_reg_move *,
+                              struct ofpbuf *openflow);
+void nxm_reg_load_to_openflow(const struct ofpact_reg_load *,
+                              struct ofpbuf *openflow);
+
+void nxm_execute_reg_move(const struct ofpact_reg_move *, struct flow *);
+void nxm_execute_reg_load(const struct ofpact_reg_load *, struct flow *);
+void nxm_reg_load(const struct mf_subfield *, uint64_t src_data,
+                  struct flow *);
 
 int nxm_field_bytes(uint32_t header);
 int nxm_field_bits(uint32_t header);
