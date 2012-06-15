@@ -755,11 +755,13 @@ ofputil_decode_nxst_request(const struct ofp_header *oh, size_t length,
     static const struct ofputil_msg_type nxst_requests[] = {
         { OFPUTIL_NXST_FLOW_REQUEST, OFP10_VERSION,
           NXST_FLOW, "NXST_FLOW request",
-          sizeof(struct nx_flow_stats_request), 8 },
+          sizeof(struct nicira_stats_msg) + sizeof(struct nx_flow_stats_request),
+          8 },
 
         { OFPUTIL_NXST_AGGREGATE_REQUEST, OFP10_VERSION,
           NXST_AGGREGATE, "NXST_AGGREGATE request",
-          sizeof(struct nx_aggregate_stats_request), 8 },
+          sizeof(struct nicira_stats_msg) + sizeof(struct nx_aggregate_stats_request),
+          8 },
     };
 
     static const struct ofputil_msg_category nxst_request_category = {
@@ -792,7 +794,8 @@ ofputil_decode_nxst_reply(const struct ofp_header *oh, size_t length,
 
         { OFPUTIL_NXST_AGGREGATE_REPLY, OFP10_VERSION,
           NXST_AGGREGATE, "NXST_AGGREGATE reply",
-          sizeof(struct nx_aggregate_stats_reply), 0 },
+          sizeof(struct nicira_stats_msg) + sizeof(struct nx_aggregate_stats_reply),
+          0 },
     };
 
     static const struct ofputil_msg_category nxst_reply_category = {
@@ -838,11 +841,13 @@ ofputil_decode_ofpst_request(const struct ofp_header *oh, size_t length,
 
         { OFPUTIL_OFPST_FLOW_REQUEST, OFP10_VERSION,
           OFPST_FLOW, "OFPST_FLOW request",
-          sizeof(struct ofp_flow_stats_request), 0 },
+          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_flow_stats_request),
+          0 },
 
         { OFPUTIL_OFPST_AGGREGATE_REQUEST, OFP10_VERSION,
           OFPST_AGGREGATE, "OFPST_AGGREGATE request",
-          sizeof(struct ofp_flow_stats_request), 0 },
+          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_flow_stats_request),
+          0 },
 
         { OFPUTIL_OFPST_TABLE_REQUEST, OFP10_VERSION,
           OFPST_TABLE, "OFPST_TABLE request",
@@ -850,11 +855,13 @@ ofputil_decode_ofpst_request(const struct ofp_header *oh, size_t length,
 
         { OFPUTIL_OFPST_PORT_REQUEST, OFP10_VERSION,
           OFPST_PORT, "OFPST_PORT request",
-          sizeof(struct ofp_port_stats_request), 0 },
+          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_port_stats_request),
+          0 },
 
         { OFPUTIL_OFPST_QUEUE_REQUEST, OFP10_VERSION,
           OFPST_QUEUE, "OFPST_QUEUE request",
-          sizeof(struct ofp_queue_stats_request), 0 },
+          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_queue_stats_request),
+          0 },
 
         { OFPUTIL_OFPST_PORT_DESC_REQUEST, OFP10_VERSION,
           OFPST_PORT_DESC, "OFPST_PORT_DESC request",
@@ -895,7 +902,7 @@ ofputil_decode_ofpst_reply(const struct ofp_header *oh, size_t length,
     static const struct ofputil_msg_type ofpst_replies[] = {
         { OFPUTIL_OFPST_DESC_REPLY, OFP10_VERSION,
           OFPST_DESC, "OFPST_DESC reply",
-          sizeof(struct ofp_desc_stats), 0 },
+          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_desc_stats), 0 },
 
         { OFPUTIL_OFPST_FLOW_REPLY, OFP10_VERSION,
           OFPST_FLOW, "OFPST_FLOW reply",
@@ -903,7 +910,8 @@ ofputil_decode_ofpst_reply(const struct ofp_header *oh, size_t length,
 
         { OFPUTIL_OFPST_AGGREGATE_REPLY, OFP10_VERSION,
           OFPST_AGGREGATE, "OFPST_AGGREGATE reply",
-          sizeof(struct ofp_aggregate_stats_reply), 0 },
+          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_aggregate_stats_reply),
+          0 },
 
         { OFPUTIL_OFPST_TABLE_REPLY, OFP10_VERSION,
           OFPST_TABLE, "OFPST_TABLE reply",
@@ -1839,12 +1847,9 @@ ofputil_flow_mod_usable_protocols(const struct ofputil_flow_mod *fms,
 
 static enum ofperr
 ofputil_decode_ofpst_flow_request(struct ofputil_flow_stats_request *fsr,
-                                  const struct ofp_header *oh,
+                                  const struct ofp_flow_stats_request *ofsr,
                                   bool aggregate)
 {
-    const struct ofp_flow_stats_request *ofsr =
-        (const struct ofp_flow_stats_request *) oh;
-
     fsr->aggregate = aggregate;
     ofputil_cls_rule_from_ofp10_match(&ofsr->match, 0, &fsr->match);
     fsr->out_port = ntohs(ofsr->out_port);
@@ -1856,22 +1861,18 @@ ofputil_decode_ofpst_flow_request(struct ofputil_flow_stats_request *fsr,
 
 static enum ofperr
 ofputil_decode_nxst_flow_request(struct ofputil_flow_stats_request *fsr,
-                                 const struct ofp_header *oh,
-                                 bool aggregate)
+                                 struct ofpbuf *b, bool aggregate)
 {
     const struct nx_flow_stats_request *nfsr;
-    struct ofpbuf b;
     enum ofperr error;
 
-    ofpbuf_use_const(&b, oh, ntohs(oh->length));
-
-    nfsr = ofpbuf_pull(&b, sizeof *nfsr);
-    error = nx_pull_match(&b, ntohs(nfsr->match_len), 0, &fsr->match,
+    nfsr = ofpbuf_pull(b, sizeof *nfsr);
+    error = nx_pull_match(b, ntohs(nfsr->match_len), 0, &fsr->match,
                           &fsr->cookie, &fsr->cookie_mask);
     if (error) {
         return error;
     }
-    if (b.size) {
+    if (b->size) {
         return OFPERR_OFPBRC_BAD_LEN;
     }
 
@@ -1894,21 +1895,22 @@ ofputil_decode_flow_stats_request(struct ofputil_flow_stats_request *fsr,
     int code;
 
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
+    ofputil_pull_stats_msg(&b);
 
     ofputil_decode_msg_type(oh, &type);
     code = ofputil_msg_type_code(type);
     switch (code) {
     case OFPUTIL_OFPST_FLOW_REQUEST:
-        return ofputil_decode_ofpst_flow_request(fsr, oh, false);
+        return ofputil_decode_ofpst_flow_request(fsr, b.data, false);
 
     case OFPUTIL_OFPST_AGGREGATE_REQUEST:
-        return ofputil_decode_ofpst_flow_request(fsr, oh, true);
+        return ofputil_decode_ofpst_flow_request(fsr, b.data, true);
 
     case OFPUTIL_NXST_FLOW_REQUEST:
-        return ofputil_decode_nxst_flow_request(fsr, oh, false);
+        return ofputil_decode_nxst_flow_request(fsr, &b, false);
 
     case OFPUTIL_NXST_AGGREGATE_REQUEST:
-        return ofputil_decode_nxst_flow_request(fsr, oh, true);
+        return ofputil_decode_nxst_flow_request(fsr, &b, true);
 
     default:
         /* Hey, the caller lied. */
@@ -1950,7 +1952,7 @@ ofputil_encode_flow_stats_request(const struct ofputil_flow_stats_request *fsr,
         match_len = nx_put_match(msg, false, &fsr->match,
                                  fsr->cookie, fsr->cookie_mask);
 
-        nfsr = msg->data;
+        nfsr = ofputil_stats_msg_body(msg->data);
         nfsr->out_port = htons(fsr->out_port);
         nfsr->match_len = htons(match_len);
         nfsr->table_id = fsr->table_id;
@@ -2014,13 +2016,7 @@ ofputil_decode_flow_stats_reply(struct ofputil_flow_stats *fs,
     code = ofputil_msg_type_code(type);
     if (!msg->l2) {
         msg->l2 = msg->data;
-        if (code == OFPUTIL_OFPST_FLOW_REPLY) {
-            ofpbuf_pull(msg, sizeof(struct ofp_stats_msg));
-        } else if (code == OFPUTIL_NXST_FLOW_REPLY) {
-            ofpbuf_pull(msg, sizeof(struct nicira_stats_msg));
-        } else {
-            NOT_REACHED();
-        }
+        ofputil_pull_stats_msg(msg);
     }
 
     if (!msg->size) {
@@ -2195,11 +2191,15 @@ ofputil_append_flow_stats_reply(const struct ofputil_flow_stats *fs,
 struct ofpbuf *
 ofputil_encode_aggregate_stats_reply(
     const struct ofputil_aggregate_stats *stats,
-    const struct ofp_stats_msg *request)
+    const struct ofp_header *request)
 {
+    const struct ofputil_msg_type *type;
+    enum ofputil_msg_code code;
     struct ofpbuf *msg;
 
-    if (request->type == htons(OFPST_AGGREGATE)) {
+    ofputil_decode_msg_type(request, &type);
+    code = ofputil_msg_type_code(type);
+    if (code == OFPUTIL_OFPST_AGGREGATE_REQUEST) {
         struct ofp_aggregate_stats_reply *asr;
 
         asr = ofputil_make_stats_reply(sizeof *asr, request, &msg);
@@ -2208,11 +2208,10 @@ ofputil_encode_aggregate_stats_reply(
         put_32aligned_be64(&asr->byte_count,
                            htonll(unknown_to_zero(stats->byte_count)));
         asr->flow_count = htonl(stats->flow_count);
-    } else if (request->type == htons(OFPST_VENDOR)) {
+    } else if (code == OFPUTIL_NXST_AGGREGATE_REQUEST) {
         struct nx_aggregate_stats_reply *nasr;
 
         nasr = ofputil_make_stats_reply(sizeof *nasr, request, &msg);
-        assert(nasr->nsm.subtype == htonl(NXST_AGGREGATE));
         nasr->packet_count = htonll(stats->packet_count);
         nasr->byte_count = htonll(stats->byte_count);
         nasr->flow_count = htonl(stats->flow_count);
@@ -3274,61 +3273,63 @@ put_stats__(ovs_be32 xid, uint8_t ofp_type,
     }
 }
 
-/* Creates a statistics request message with total length 'openflow_len'
- * (including all headers) and the given 'ofpst_type', and stores the buffer
- * containing the new message in '*bufferp'.  If 'ofpst_type' is OFPST_VENDOR
- * then 'nxst_subtype' is used as the Nicira vendor extension statistics
- * subtype (otherwise 'nxst_subtype' is ignored).
+/* Creates a statistics request message with the given 'ofpst_type', and stores
+ * the buffer containing the new message in '*bufferp'.  If 'ofpst_type' is
+ * OFPST_VENDOR then 'nxst_subtype' is used as the Nicira vendor extension
+ * statistics subtype (otherwise 'nxst_subtype' is ignored).
  *
- * Initializes bytes following the headers to all-bits-zero.
- *
- * Returns the first byte of the new message. */
+ * Appends 'body_len' bytes of zeroes to the reply as the body and returns the
+ * first byte of the body. */
 void *
-ofputil_make_stats_request(size_t openflow_len, uint16_t ofpst_type,
+ofputil_make_stats_request(size_t body_len, uint16_t ofpst_type,
                            uint32_t nxst_subtype, struct ofpbuf **bufferp)
 {
+    enum {
+        HEADER_LEN = MAX(sizeof(struct ofp_stats_msg),
+                         sizeof(struct nicira_stats_msg))
+    };
     struct ofpbuf *msg;
 
-    msg = *bufferp = ofpbuf_new(openflow_len);
+    msg = *bufferp = ofpbuf_new(HEADER_LEN + body_len);
     put_stats__(alloc_xid(), OFPT10_STATS_REQUEST,
                 htons(ofpst_type), htonl(nxst_subtype), msg);
-    ofpbuf_padto(msg, openflow_len);
 
-    return msg->data;
+    return ofpbuf_put_zeros(msg, body_len);
 }
 
 static void
-put_stats_reply__(const struct ofp_stats_msg *request, struct ofpbuf *msg)
+put_stats_reply__(const struct ofp_header *request, struct ofpbuf *msg)
 {
-    assert(request->header.type == OFPT10_STATS_REQUEST ||
-           request->header.type == OFPT10_STATS_REPLY);
-    put_stats__(request->header.xid, OFPT10_STATS_REPLY, request->type,
-                (request->type != htons(OFPST_VENDOR)
+    const struct ofp_stats_msg *osm;
+
+    assert(request->type == OFPT10_STATS_REQUEST ||
+           request->type == OFPT10_STATS_REPLY);
+
+    osm = (const struct ofp_stats_msg *) request;
+    put_stats__(request->xid, OFPT10_STATS_REPLY, osm->type,
+                (osm->type != htons(OFPST_VENDOR)
                  ? htonl(0)
                  : ((const struct nicira_stats_msg *) request)->subtype),
                 msg);
 }
 
-/* Creates a statistics reply message with total length 'openflow_len'
- * (including all headers) and the same type (either a standard OpenFlow
- * statistics type or a Nicira extension type and subtype) as 'request', and
- * stores the buffer containing the new message in '*bufferp'.
+/* Creates a statistics reply message with the same type (either a standard
+ * OpenFlow statistics type or a Nicira extension type and subtype) as
+ * 'request', and stores the buffer containing the new message in '*bufferp'.
  *
- * Initializes bytes following the headers to all-bits-zero.
- *
- * Returns the first byte of the new message. */
+ * Appends 'body_len' bytes of zeroes to the reply as the body and returns the
+ * first byte of the body. */
 void *
-ofputil_make_stats_reply(size_t openflow_len,
-                         const struct ofp_stats_msg *request,
+ofputil_make_stats_reply(size_t body_len,
+                         const struct ofp_header *request,
                          struct ofpbuf **bufferp)
 {
     struct ofpbuf *msg;
 
-    msg = *bufferp = ofpbuf_new(openflow_len);
+    msg = *bufferp = ofpbuf_new(24 + body_len);
     put_stats_reply__(request, msg);
-    ofpbuf_padto(msg, openflow_len);
 
-    return msg->data;
+    return ofpbuf_put_zeros(msg, body_len);
 }
 
 /* Initializes 'replies' as a list of ofpbufs that will contain a series of
@@ -3337,7 +3338,7 @@ ofputil_make_stats_reply(size_t openflow_len,
  * that has only a header.  The functions ofputil_reserve_stats_reply() and
  * ofputil_append_stats_reply() may be used to add to the reply. */
 void
-ofputil_start_stats_reply(const struct ofp_stats_msg *request,
+ofputil_start_stats_reply(const struct ofp_header *request,
                           struct list *replies)
 {
     struct ofpbuf *msg;
@@ -3366,7 +3367,7 @@ ofputil_reserve_stats_reply(size_t len, struct list *replies)
         osm->flags |= htons(OFPSF_REPLY_MORE);
 
         msg = ofpbuf_new(MAX(1024, sizeof(struct nicira_stats_msg) + len));
-        put_stats_reply__(osm, msg);
+        put_stats_reply__(&osm->header, msg);
         list_push_back(replies, &msg->list_node);
     }
     return msg;
@@ -3394,36 +3395,43 @@ ofputil_postappend_stats_reply(size_t start_ofs, struct list *replies)
     }
 }
 
-/* Returns the first byte past the ofp_stats_msg header in 'oh'. */
-const void *
-ofputil_stats_body(const struct ofp_header *oh)
-{
-    assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
-    return (const struct ofp_stats_msg *) oh + 1;
-}
-
-/* Returns the number of bytes past the ofp_stats_msg header in 'oh'. */
 size_t
-ofputil_stats_body_len(const struct ofp_header *oh)
+ofputil_stats_msg_len(const struct ofp_header *oh)
 {
+    const struct ofp_stats_msg *osm;
+
     assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
-    return ntohs(oh->length) - sizeof(struct ofp_stats_msg);
+
+    osm = (const struct ofp_stats_msg *) oh;
+    return (osm->type == htons(OFPST_VENDOR)
+            ? sizeof(struct nicira_stats_msg)
+            : sizeof(struct ofp_stats_msg));
 }
 
-/* Returns the first byte past the nicira_stats_msg header in 'oh'. */
-const void *
-ofputil_nxstats_body(const struct ofp_header *oh)
+void
+ofputil_pull_stats_msg(struct ofpbuf *msg)
 {
-    assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
-    return ((const struct nicira_stats_msg *) oh) + 1;
+    ofpbuf_pull(msg, ofputil_stats_msg_len(msg->data));
 }
 
-/* Returns the number of bytes past the nicira_stats_msg header in 'oh'. */
-size_t
-ofputil_nxstats_body_len(const struct ofp_header *oh)
+void *
+ofputil_stats_msg_body(const struct ofp_header *oh)
+{
+    return (uint8_t *) oh + ofputil_stats_msg_len(oh);
+}
+
+uint16_t
+ofputil_decode_stats_msg_type(const struct ofp_header *oh)
 {
     assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
-    return ntohs(oh->length) - sizeof(struct nicira_stats_msg);
+    return ntohs(((const struct ofp_stats_msg *) oh)->type);
+}
+
+uint16_t
+ofputil_decode_stats_msg_flags(const struct ofp_header *oh)
+{
+    assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
+    return ntohs(((const struct ofp_stats_msg *) oh)->flags);
 }
 
 /* Creates and returns an OFPT_ECHO_REQUEST message with an empty payload. */

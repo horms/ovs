@@ -1838,7 +1838,6 @@ OFP_ASSERT(sizeof(struct nx_flow_removed) == 56);
  * NXM_NX_COOKIE and NXM_NX_COOKIE_W matches.
  */
 struct nx_flow_stats_request {
-    struct nicira_stats_msg nsm;
     ovs_be16 out_port;        /* Require matching entries to include this
                                  as an output port.  A value of OFPP_NONE
                                  indicates no restriction. */
@@ -1853,7 +1852,7 @@ struct nx_flow_stats_request {
      *     message.
      */
 };
-OFP_ASSERT(sizeof(struct nx_flow_stats_request) == 32);
+OFP_ASSERT(sizeof(struct nx_flow_stats_request) == 8);
 
 /* Body for Nicira vendor stats reply of type NXST_FLOW (analogous to
  * OFPST_FLOW reply).
@@ -1907,7 +1906,6 @@ OFP_ASSERT(sizeof(struct nx_flow_stats) == 48);
 /* Nicira vendor stats request of type NXST_AGGREGATE (analogous to
  * OFPST_AGGREGATE request). */
 struct nx_aggregate_stats_request {
-    struct nicira_stats_msg nsm;
     ovs_be16 out_port;        /* Require matching entries to include this
                                  as an output port.  A value of OFPP_NONE
                                  indicates no restriction. */
@@ -1922,18 +1920,17 @@ struct nx_aggregate_stats_request {
      *     message.
      */
 };
-OFP_ASSERT(sizeof(struct nx_aggregate_stats_request) == 32);
+OFP_ASSERT(sizeof(struct nx_aggregate_stats_request) == 8);
 
 /* Body for nicira_stats_msg reply of type NXST_AGGREGATE (analogous to
  * OFPST_AGGREGATE reply). */
 struct nx_aggregate_stats_reply {
-    struct nicira_stats_msg nsm;
     ovs_be64 packet_count;     /* Number of packets, UINT64_MAX if unknown. */
     ovs_be64 byte_count;       /* Number of bytes, UINT64_MAX if unknown. */
     ovs_be32 flow_count;       /* Number of flows. */
     uint8_t pad[4];            /* Align to 64 bits. */
 };
-OFP_ASSERT(sizeof(struct nx_aggregate_stats_reply) == 48);
+OFP_ASSERT(sizeof(struct nx_aggregate_stats_reply) == 24);
 
 /* NXT_SET_CONTROLLER_ID.
  *

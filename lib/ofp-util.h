@@ -301,7 +301,7 @@ struct ofputil_aggregate_stats {
 
 struct ofpbuf *ofputil_encode_aggregate_stats_reply(
     const struct ofputil_aggregate_stats *stats,
-    const struct ofp_stats_msg *request);
+    const struct ofp_header *request);
 
 /* Flow removed message, independent of protocol. */
 struct ofputil_flow_removed {
@@ -525,13 +525,14 @@ void *put_nxmsg_xid(size_t openflow_len, uint32_t subtype, ovs_be32 xid,
 
 void update_openflow_length(struct ofpbuf *);
 
-void *ofputil_make_stats_request(size_t openflow_len, uint16_t type,
+/* Encoding OpenFlow stats messages. */
+void *ofputil_make_stats_request(size_t body_len, uint16_t type,
                                  uint32_t subtype, struct ofpbuf **);
-void *ofputil_make_stats_reply(size_t openflow_len,
-                               const struct ofp_stats_msg *request,
+void *ofputil_make_stats_reply(size_t body_len,
+                               const struct ofp_header *request,
                                struct ofpbuf **);
 
-void ofputil_start_stats_reply(const struct ofp_stats_msg *request,
+void ofputil_start_stats_reply(const struct ofp_header *request,
                                struct list *);
 struct ofpbuf *ofputil_reserve_stats_reply(size_t len, struct list *);
 void *ofputil_append_stats_reply(size_t len, struct list *);
@@ -541,13 +542,14 @@ void ofputil_append_port_desc_stats_reply(uint8_t ofp_version,
                                           const struct ofputil_phy_port *pp,
                                           struct list *replies);
 
-const void *ofputil_stats_body(const struct ofp_header *);
-size_t ofputil_stats_body_len(const struct ofp_header *);
+/* Decoding OpenFlow stats messages. */
+size_t ofputil_stats_msg_len(const struct ofp_header *);
+void ofputil_pull_stats_msg(struct ofpbuf *msg);
+void *ofputil_stats_msg_body(const struct ofp_header *);
+uint16_t ofputil_decode_stats_msg_type(const struct ofp_header *);
+uint16_t ofputil_decode_stats_msg_flags(const struct ofp_header *);
 
-const void *ofputil_nxstats_body(const struct ofp_header *);
-size_t ofputil_nxstats_body_len(const struct ofp_header *);
-
-/*  */
+/* Encoding simple OpenFlow messages. */
 struct ofpbuf *make_echo_request(void);
 struct ofpbuf *make_echo_reply(const struct ofp_header *rq);
 

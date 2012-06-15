@@ -336,17 +336,6 @@ open_vconn(const char *name, struct vconn **vconnp)
     return open_vconn__(name, "mgmt", vconnp);
 }
 
-static void *
-alloc_stats_request(size_t rq_len, uint16_t type, struct ofpbuf **bufferp)
-{
-    struct ofp_stats_msg *rq;
-
-    rq = make_openflow(rq_len, OFPT10_STATS_REQUEST, bufferp);
-    rq->type = htons(type);
-    rq->flags = htons(0);
-    return rq;
-}
-
 static void
 send_openflow_buffer(struct vconn *vconn, struct ofpbuf *buffer)
 {
@@ -411,7 +400,8 @@ static void
 dump_trivial_stats_transaction(const char *vconn_name, uint8_t stats_type)
 {
     struct ofpbuf *request;
-    alloc_stats_request(sizeof(struct ofp_stats_msg), stats_type, &request);
+
+    ofputil_make_stats_request(0, stats_type, 0, &request);
     dump_stats_transaction(vconn_name, request);
 }
 
@@ -597,8 +587,7 @@ fetch_port_by_stats(const char *vconn_name,
     bool done = false;
     bool found = false;
 
-    alloc_stats_request(sizeof(struct ofp_stats_msg), OFPST_PORT_DESC,
-                        &request);
+    ofputil_make_stats_request(0, OFPST_PORT_DESC, 0, &request);
     send_xid = ((struct ofp_header *) request->data)->xid;
 
     open_vconn(vconn_name, &vconn);
@@ -611,7 +600,8 @@ fetch_port_by_stats(const char *vconn_name,
         recv_xid = ((struct ofp_header *) reply->data)->xid;
         if (send_xid == recv_xid) {
             const struct ofputil_msg_type *type;
-            struct ofp_stats_msg *osm;
+            struct ofp_header *oh;
+            uint16_t flags;
 
             ofputil_decode_msg_type(reply->data, &type);
             if (ofputil_msg_type_code(type) != OFPUTIL_OFPST_PORT_DESC_REPLY) {
@@ -620,8 +610,9 @@ fetch_port_by_stats(const char *vconn_name,
                                         verbosity + 1));
             }
 
-            osm = ofpbuf_at_assert(reply, 0, sizeof *osm);
-            done = !(ntohs(osm->flags) & OFPSF_REPLY_MORE);
+            oh = reply->data;
+            flags = ofputil_decode_stats_msg_flags(oh);
+            done = !(flags & OFPSF_REPLY_MORE);
 
             if (found) {
                 /* We've already found the port, but we need to drain
@@ -629,10 +620,10 @@ fetch_port_by_stats(const char *vconn_name,
                 continue;
             }
 
-            ofpbuf_use_const(&b, &osm->header, ntohs(osm->header.length));
-            ofpbuf_pull(&b, sizeof(struct ofp_stats_msg));
+            ofpbuf_use_const(&b, oh, ntohs(oh->length));
+            ofputil_pull_stats_msg(&b);
 
-            while (!ofputil_pull_phy_port(osm->header.version, &b, pp)) {
+            while (!ofputil_pull_phy_port(oh->version, &b, pp)) {
                 if (port_no != UINT_MAX ? port_no == pp->port_no
                                         : !strcmp(pp->name, port_name)) {
                     found = true;
@@ -789,7 +780,7 @@ do_queue_stats(int argc, char *argv[])
     struct ofp_queue_stats_request *req;
     struct ofpbuf *request;
 
-    req = alloc_stats_request(sizeof *req, OFPST_QUEUE, &request);
+    req = ofputil_make_stats_request(sizeof *req, OFPST_QUEUE, 0, &request);
 
     if (argc > 2 && argv[2][0] && strcasecmp(argv[2], "all")) {
         req->port_no = htons(str_to_port_no(argv[1], argv[2]));
@@ -1200,7 +1191,7 @@ do_dump_ports(int argc, char *argv[])
     struct ofpbuf *request;
     uint16_t port;
 
-    req = alloc_stats_request(sizeof *req, OFPST_PORT, &request);
+    req = ofputil_make_stats_request(sizeof *req, OFPST_PORT, 0, &request);
     port = argc > 2 ? str_to_port_no(argv[1], argv[2]) : OFPP_NONE;
     req->port_no = htons(port);
     dump_stats_transaction(argv[1], request);
@@ -1663,8 +1654,8 @@ read_flows_from_switch(struct vconn *vconn,
         recv_xid = ((struct ofp_header *) reply->data)->xid;
         if (send_xid == recv_xid) {
             const struct ofputil_msg_type *type;
-            const struct ofp_stats_msg *osm;
             enum ofputil_msg_code code;
+            uint16_t flags;
 
             ofputil_decode_msg_type(reply->data, &type);
             code = ofputil_msg_type_code(type);
@@ -1675,8 +1666,8 @@ read_flows_from_switch(struct vconn *vconn,
                                         verbosity + 1));
             }
 
-            osm = reply->data;
-            if (!(osm->flags & htons(OFPSF_REPLY_MORE))) {
+            flags = ofputil_decode_stats_msg_flags(reply->data);
+            if (!(flags & OFPSF_REPLY_MORE)) {
                 done = true;
             }
 

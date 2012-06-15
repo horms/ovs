@@ -264,7 +264,6 @@ enum ofp12_queue_properties {
 
 /* Body of reply to OFPST_TABLE request. */
 struct ofp12_table_stats {
-    struct ofp11_stats_msg osm;
     uint8_t table_id;        /* Identifier of table.  Lower numbered tables
                                 are consulted first. */
     uint8_t pad[7];          /* Align to 64-bits. */
@@ -290,17 +289,16 @@ struct ofp12_table_stats {
     ovs_be64 lookup_count;   /* Number of packets looked up in table. */
     ovs_be64 matched_count;  /* Number of packets that hit table. */
 };
-OFP_ASSERT(sizeof(struct ofp12_table_stats) == 144);
+OFP_ASSERT(sizeof(struct ofp12_table_stats) == 128);
 
 /* Body of reply to OFPST12_GROUP_FEATURES request. Group features. */
 struct ofp12_group_features_stats {
-    struct ofp11_stats_msg osm;
     ovs_be32  types;           /* Bitmap of OFPGT_* values supported. */
     ovs_be32  capabilities;    /* Bitmap of OFPGFC12_* capability supported. */
     ovs_be32  max_groups[4];   /* Maximum number of groups for each type. */
     ovs_be32  actions[4];      /* Bitmaps of OFPAT_* that are supported. */
 };
-OFP_ASSERT(sizeof(struct ofp12_group_features_stats) == 56);
+OFP_ASSERT(sizeof(struct ofp12_group_features_stats) == 40);
 
 /* Group configuration flags */
 enum ofp12_group_capabilities {

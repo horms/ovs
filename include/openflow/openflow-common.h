@@ -244,39 +244,39 @@ OFP_ASSERT(sizeof(struct ofp_port_status) == 16);
 
 enum ofp_stats_types {
     /* Description of this OpenFlow switch. (OFPMP_DESC)
-     * The OF1.0 request is struct ofp_stats_msg.
-     * The OF1.0 reply is struct ofp_desc_stats. */
+     * The OF1.0 request body is empty.
+     * The OF1.0 reply body is struct ofp_desc_stats. */
     OFPST_DESC = 0,
 
     /* Individual flow statistics. (OFPMP_FLOW)
-     * The OF1.0 request is struct ofp_flow_stats_request.
+     * The OF1.0 request body is struct ofp_flow_stats_request.
      * The OF1.0 reply body is an array of struct ofp_flow_stats. */
     OFPST_FLOW = 1,
 
     /* Aggregate flow statistics. (OFPMP_AGGREGATE)
-     * The OF1.0 request is struct ofp_flow_stats_request.
-     * The OF1.0 reply is struct ofp_aggregate_stats_reply. */
+     * The OF1.0 request body is struct ofp_flow_stats_request.
+     * The OF1.0 reply body is struct ofp_aggregate_stats_reply. */
     OFPST_AGGREGATE = 2,
 
     /* Flow table statistics. (OFPMP_TABLE)
-     * The OF1.0 request is struct ofp_stats_msg.
+     * The OF1.0 request body is struct ofp_stats_msg.
      * The OF1.0 reply body is an array of struct ofp_table_stats. */
     OFPST_TABLE = 3,
 
     /* Physical port statistics. (OFPMP_PORT_STATS)
-     * The OF1.0 request is struct ofp_port_stats_request.
+     * The OF1.0 request body is struct ofp_port_stats_request.
      * The OF1.0 reply body is an array of struct ofp_port_stats. */
     OFPST_PORT = 4,
 
     /* Queue statistics for a port. (OFPMP_QUEUE)
-     * The OF1.0 request is struct ofp_stats_msg.
+     * The OF1.0 request body is empty.
      * The OF1.0 reply body is an array of struct ofp_queue_stats. */
     OFPST_QUEUE = 5,
 
     /* Port description. (OFPMP_PORT_DESC)
      * This was introduced as part of OF1.3, but is useful for bridges
      * with many ports, so we support it with OF1.0, too.
-     * The OF1.0 request is struct ofp_stats_msg.
+     * The OF1.0 request body is empty.
      * The OF1.0 reply body is an array of struct ofp10_phy_port. */
     OFPST_PORT_DESC = 13,
 

@@ -2100,7 +2100,7 @@ handle_port_mod(struct ofconn *ofconn, const struct ofp_header *oh)
 
 static enum ofperr
 handle_desc_stats_request(struct ofconn *ofconn,
-                          const struct ofp_stats_msg *request)
+                          const struct ofp_header *request)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
     struct ofp_desc_stats *ods;
@@ -2119,14 +2119,14 @@ handle_desc_stats_request(struct ofconn *ofconn,
 
 static enum ofperr
 handle_table_stats_request(struct ofconn *ofconn,
-                           const struct ofp_stats_msg *request)
+                           const struct ofp_header *request)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
     struct ofp_table_stats *ots;
     struct ofpbuf *msg;
     size_t i;
 
-    ofputil_make_stats_reply(sizeof(struct ofp_stats_msg), request, &msg);
+    ofputil_make_stats_reply(0, request, &msg);
 
     ots = ofpbuf_put_zeros(msg, sizeof *ots * p->n_tables);
     for (i = 0; i < p->n_tables; i++) {
@@ -2185,13 +2185,14 @@ append_port_stat(struct ofport *port, struct list *replies)
 
 static enum ofperr
 handle_port_stats_request(struct ofconn *ofconn,
-                          const struct ofp_port_stats_request *psr)
+                          const struct ofp_header *request)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
+    struct ofp_port_stats_request *psr = ofputil_stats_msg_body(request);
     struct ofport *port;
     struct list replies;
 
-    ofputil_start_stats_reply(&psr->osm, &replies);
+    ofputil_start_stats_reply(request, &replies);
     if (psr->port_no != htons(OFPP_NONE)) {
         port = ofproto_get_port(p, ntohs(psr->port_no));
         if (port) {
@@ -2209,13 +2210,13 @@ handle_port_stats_request(struct ofconn *ofconn,
 
 static enum ofperr
 handle_port_desc_stats_request(struct ofconn *ofconn,
-                               const struct ofp_stats_msg *osm)
+                               const struct ofp_header *request)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
     struct ofport *port;
     struct list replies;
 
-    ofputil_start_stats_reply(osm, &replies);
+    ofputil_start_stats_reply(request, &replies);
 
     HMAP_FOR_EACH (port, hmap_node, &p->ports) {
         ofputil_append_port_desc_stats_reply(ofconn_get_protocol(ofconn),
@@ -2403,7 +2404,7 @@ age_secs(long long int age_ms)
 
 static enum ofperr
 handle_flow_stats_request(struct ofconn *ofconn,
-                          const struct ofp_stats_msg *osm)
+                          const struct ofp_header *request)
 {
     struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
     struct ofputil_flow_stats_request fsr;
@@ -2412,7 +2413,7 @@ handle_flow_stats_request(struct ofconn *ofconn,
     struct rule *rule;
     enum ofperr error;
 
-    error = ofputil_decode_flow_stats_request(&fsr, &osm->header);
+    error = ofputil_decode_flow_stats_request(&fsr, request);
     if (error) {
         return error;
     }
@@ -2424,7 +2425,7 @@ handle_flow_stats_request(struct ofconn *ofconn,
         return error;
     }
 
-    ofputil_start_stats_reply(osm, &replies);
+    ofputil_start_stats_reply(request, &replies);
     LIST_FOR_EACH (rule, ofproto_node, &rules) {
         long long int now = time_msec();
         struct ofputil_flow_stats fs;
@@ -2548,7 +2549,7 @@ ofproto_port_get_cfm_health(const struct ofproto *ofproto, uint16_t ofp_port)
 
 static enum ofperr
 handle_aggregate_stats_request(struct ofconn *ofconn,
-                               const struct ofp_stats_msg *osm)
+                               const struct ofp_header *oh)
 {
     struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
     struct ofputil_flow_stats_request request;
@@ -2559,7 +2560,7 @@ handle_aggregate_stats_request(struct ofconn *ofconn,
     struct rule *rule;
     enum ofperr error;
 
-    error = ofputil_decode_flow_stats_request(&request, &osm->header);
+    error = ofputil_decode_flow_stats_request(&request, oh);
     if (error) {
         return error;
     }
@@ -2601,7 +2602,7 @@ handle_aggregate_stats_request(struct ofconn *ofconn,
         stats.byte_count = UINT64_MAX;
     }
 
-    reply = ofputil_encode_aggregate_stats_reply(&stats, osm);
+    reply = ofputil_encode_aggregate_stats_reply(&stats, oh);
     ofconn_send_reply(ofconn, reply);
 
     return 0;
@@ -2656,9 +2657,10 @@ handle_queue_stats_for_port(struct ofport *port, uint32_t queue_id,
 
 static enum ofperr
 handle_queue_stats_request(struct ofconn *ofconn,
-                           const struct ofp_queue_stats_request *qsr)
+                           const struct ofp_header *rq)
 {
     struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
+    const struct ofp_queue_stats_request *qsr = ofputil_stats_msg_body(rq);
     struct queue_stats_cbdata cbdata;
     struct ofport *port;
     unsigned int port_no;
@@ -2666,7 +2668,7 @@ handle_queue_stats_request(struct ofconn *ofconn,
 
     COVERAGE_INC(ofproto_queue_req);
 
-    ofputil_start_stats_reply(&qsr->osm, &cbdata.replies);
+    ofputil_start_stats_reply(rq, &cbdata.replies);
 
     port_no = ntohs(qsr->port_no);
     queue_id = ntohl(qsr->queue_id);

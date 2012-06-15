@@ -543,7 +543,6 @@ OFP_ASSERT(sizeof(struct ofp11_stats_msg) == 16);
 
 /* Stats request of type OFPST_FLOW. */
 struct ofp11_flow_stats_request {
-    struct ofp11_stats_msg osm;
     uint8_t table_id;         /* ID of table to read (from ofp_table_stats),
                                  0xff for all tables. */
     uint8_t pad[3];           /* Align to 64 bits. */
@@ -561,7 +560,7 @@ struct ofp11_flow_stats_request {
                                  no restriction. */
     struct ofp11_match match; /* Fields to match. */
 };
-OFP_ASSERT(sizeof(struct ofp11_flow_stats_request) == 136);
+OFP_ASSERT(sizeof(struct ofp11_flow_stats_request) == 120);
 
 /* Body of reply to OFPST_FLOW request. */
 struct ofp11_flow_stats {
@@ -589,7 +588,6 @@ OFP_ASSERT(sizeof(struct ofp11_flow_stats) == 48);
 
 /* Body of reply to OFPST_TABLE request. */
 struct ofp11_table_stats {
-    struct ofp11_stats_msg osm;
     uint8_t table_id;        /* Identifier of table. Lower numbered tables
                                 are consulted first. */
     uint8_t pad[7];          /* Align to 64-bits. */
@@ -609,23 +607,21 @@ struct ofp11_table_stats {
     ovs_be64 lookup_count;   /* Number of packets looked up in table. */
     ovs_be64 matched_count;  /* Number of packets that hit table. */
 };
-OFP_ASSERT(sizeof(struct ofp11_table_stats) == 104);
+OFP_ASSERT(sizeof(struct ofp11_table_stats) == 88);
 
 /* Body for ofp_stats_request of type OFPST_PORT. */
 struct ofp11_port_stats_request {
-    struct ofp11_stats_msg osm;
     ovs_be32 port_no;        /* OFPST_PORT message must request statistics
                               * either for a single port (specified in
                               * port_no) or for all ports (if port_no ==
                               * OFPP_ANY). */
     uint8_t pad[4];
 };
-OFP_ASSERT(sizeof(struct ofp11_port_stats_request) == 24);
+OFP_ASSERT(sizeof(struct ofp11_port_stats_request) == 8);
 
 /* Body of reply to OFPST_PORT request. If a counter is unsupported, set
  * the field to all ones. */
 struct ofp11_port_stats {
-    struct ofp11_stats_msg osm;
     ovs_be32 port_no;
     uint8_t pad[4];           /* Align to 64-bits. */
     ovs_be64 rx_packets;      /* Number of received packets. */
@@ -645,31 +641,28 @@ struct ofp11_port_stats {
     ovs_be64 rx_crc_err;      /* Number of CRC errors. */
     ovs_be64 collisions;      /* Number of collisions. */
 };
-OFP_ASSERT(sizeof(struct ofp11_port_stats) == 120);
+OFP_ASSERT(sizeof(struct ofp11_port_stats) == 104);
 
 struct ofp11_queue_stats_request {
-    struct ofp11_stats_msg osm;
     ovs_be32 port_no;         /* All ports if OFPP_ANY. */
     ovs_be32 queue_id;        /* All queues if OFPQ_ALL. */
 };
-OFP_ASSERT(sizeof(struct ofp11_queue_stats_request) == 24);
+OFP_ASSERT(sizeof(struct ofp11_queue_stats_request) == 8);
 
 struct ofp11_queue_stats {
-    struct ofp11_stats_msg osm;
     ovs_be32 port_no;
     ovs_be32 queue_id;         /* Queue id. */
     ovs_be64 tx_bytes;         /* Number of transmitted bytes. */
     ovs_be64 tx_packets;       /* Number of transmitted packets. */
     ovs_be64 tx_errors;        /* # of packets dropped due to overrun. */
 };
-OFP_ASSERT(sizeof(struct ofp11_queue_stats) == 48);
+OFP_ASSERT(sizeof(struct ofp11_queue_stats) == 32);
 
 struct ofp11_group_stats_request {
-    struct ofp11_stats_msg osm;
     ovs_be32 group_id;         /* All groups if OFPG_ALL. */
     uint8_t pad[4];            /* Align to 64 bits. */
 };
-OFP_ASSERT(sizeof(struct ofp11_group_stats_request) == 24);
+OFP_ASSERT(sizeof(struct ofp11_group_stats_request) == 8);
 
 /* Body of reply to OFPST11_GROUP request */
 struct ofp11_group_stats {
