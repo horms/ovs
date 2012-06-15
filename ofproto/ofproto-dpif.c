@@ -1112,7 +1112,7 @@ get_features(struct ofproto *ofproto_ OVS_UNUSED,
 }
 
 static void
-get_tables(struct ofproto *ofproto_, struct ofp_table_stats *ots)
+get_tables(struct ofproto *ofproto_, struct ofp10_table_stats *ots)
 {
     struct ofproto_dpif *ofproto = ofproto_dpif_cast(ofproto_);
     struct dpif_dp_stats s;

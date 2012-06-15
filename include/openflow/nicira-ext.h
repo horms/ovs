@@ -120,14 +120,14 @@ enum nicira_type {
 };
 
 /* Header for Nicira vendor stats request and reply messages. */
-struct nicira_stats_msg {
-    struct ofp_vendor_stats_msg vsm; /* Vendor NX_VENDOR_ID. */
+struct nicira10_stats_msg {
+    struct ofp10_vendor_stats_msg vsm; /* Vendor NX_VENDOR_ID. */
     ovs_be32 subtype;           /* One of NXST_* below. */
     uint8_t pad[4];             /* Align to 64-bits. */
 };
-OFP_ASSERT(sizeof(struct nicira_stats_msg) == 24);
+OFP_ASSERT(sizeof(struct nicira10_stats_msg) == 24);
 
-/* Values for the 'subtype' member of struct nicira_stats_msg. */
+/* Values for the 'subtype' member of struct nicira10_stats_msg. */
 enum nicira_stats_type {
     /* Flexible flow specification (aka NXM = Nicira Extended Match). */
     NXST_FLOW,                  /* Analogous to OFPST_FLOW. */
@@ -1922,7 +1922,7 @@ struct nx_aggregate_stats_request {
 };
 OFP_ASSERT(sizeof(struct nx_aggregate_stats_request) == 8);
 
-/* Body for nicira_stats_msg reply of type NXST_AGGREGATE (analogous to
+/* Body for nicira10_stats_msg reply of type NXST_AGGREGATE (analogous to
  * OFPST_AGGREGATE reply). */
 struct nx_aggregate_stats_reply {
     ovs_be64 packet_count;     /* Number of packets, UINT64_MAX if unknown. */

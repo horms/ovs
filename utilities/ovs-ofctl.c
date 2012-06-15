@@ -381,7 +381,7 @@ dump_stats_transaction(const char *vconn_name, struct ofpbuf *request)
         run(vconn_recv_block(vconn, &reply), "OpenFlow packet receive failed");
         recv_xid = ((struct ofp_header *) reply->data)->xid;
         if (send_xid == recv_xid) {
-            struct ofp_stats_msg *osm;
+            struct ofp10_stats_msg *osm;
 
             ofp_print(stdout, reply->data, reply->size, verbosity + 1);
 
@@ -777,7 +777,7 @@ do_dump_aggregate(int argc, char *argv[])
 static void
 do_queue_stats(int argc, char *argv[])
 {
-    struct ofp_queue_stats_request *req;
+    struct ofp10_queue_stats_request *req;
     struct ofpbuf *request;
 
     req = ofputil_make_stats_request(sizeof *req, OFPST_QUEUE, 0, &request);
@@ -1187,7 +1187,7 @@ do_snoop(int argc OVS_UNUSED, char *argv[])
 static void
 do_dump_ports(int argc, char *argv[])
 {
-    struct ofp_port_stats_request *req;
+    struct ofp10_port_stats_request *req;
     struct ofpbuf *request;
     uint16_t port;
 

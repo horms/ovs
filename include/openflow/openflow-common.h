@@ -244,39 +244,39 @@ OFP_ASSERT(sizeof(struct ofp_port_status) == 16);
 
 enum ofp_stats_types {
     /* Description of this OpenFlow switch. (OFPMP_DESC)
-     * The OF1.0 request body is empty.
-     * The OF1.0 reply body is struct ofp_desc_stats. */
+     * The request body is empty.
+     * The reply body is struct ofp_desc_stats. */
     OFPST_DESC = 0,
 
     /* Individual flow statistics. (OFPMP_FLOW)
-     * The OF1.0 request body is struct ofp_flow_stats_request.
-     * The OF1.0 reply body is an array of struct ofp_flow_stats. */
+     * The OF1.0 request body is struct ofp10_flow_stats_request.
+     * The OF1.0 reply body is an array of struct ofp10_flow_stats. */
     OFPST_FLOW = 1,
 
     /* Aggregate flow statistics. (OFPMP_AGGREGATE)
-     * The OF1.0 request body is struct ofp_flow_stats_request.
-     * The OF1.0 reply body is struct ofp_aggregate_stats_reply. */
+     * The OF1.0 request body is struct ofp10_flow_stats_request.
+     * The reply body is struct ofp_aggregate_stats_reply. */
     OFPST_AGGREGATE = 2,
 
     /* Flow table statistics. (OFPMP_TABLE)
-     * The OF1.0 request body is struct ofp_stats_msg.
-     * The OF1.0 reply body is an array of struct ofp_table_stats. */
+     * The OF1.0 request body is struct ofp10_stats_msg.
+     * The OF1.0 reply body is an array of struct ofp10_table_stats. */
     OFPST_TABLE = 3,
 
     /* Physical port statistics. (OFPMP_PORT_STATS)
-     * The OF1.0 request body is struct ofp_port_stats_request.
-     * The OF1.0 reply body is an array of struct ofp_port_stats. */
+     * The OF1.0 request body is struct ofp10_port_stats_request.
+     * The OF1.0 reply body is an array of struct ofp10_port_stats. */
     OFPST_PORT = 4,
 
     /* Queue statistics for a port. (OFPMP_QUEUE)
-     * The OF1.0 request body is empty.
-     * The OF1.0 reply body is an array of struct ofp_queue_stats. */
+     * The OF1.0 request body is struct ofp10_queue_stats_request.
+     * The OF1.0 reply body is an array of struct ofp10_queue_stats. */
     OFPST_QUEUE = 5,
 
     /* Port description. (OFPMP_PORT_DESC)
      * This was introduced as part of OF1.3, but is useful for bridges
      * with many ports, so we support it with OF1.0, too.
-     * The OF1.0 request body is empty.
+     * The request body is empty.
      * The OF1.0 reply body is an array of struct ofp10_phy_port. */
     OFPST_PORT_DESC = 13,
 
@@ -284,6 +284,29 @@ enum ofp_stats_types {
      * The OF1.0 request and reply begin with struct ofp_vendor_stats. */
     OFPST_VENDOR = 0xffff
 };
+
+#define DESC_STR_LEN   256
+#define SERIAL_NUM_LEN 32
+/* Body of reply to OFPST_DESC request.  Each entry is a NULL-terminated ASCII
+ * string. */
+struct ofp_desc_stats {
+    char mfr_desc[DESC_STR_LEN];       /* Manufacturer description. */
+    char hw_desc[DESC_STR_LEN];        /* Hardware description. */
+    char sw_desc[DESC_STR_LEN];        /* Software description. */
+    char serial_num[SERIAL_NUM_LEN];   /* Serial number. */
+    char dp_desc[DESC_STR_LEN];        /* Human readable description of
+                                          the datapath. */
+};
+OFP_ASSERT(sizeof(struct ofp_desc_stats) == 1056);
+
+/* Reply to OFPST_AGGREGATE request. */
+struct ofp_aggregate_stats_reply {
+    ovs_32aligned_be64 packet_count; /* Number of packets in flows. */
+    ovs_32aligned_be64 byte_count;   /* Number of bytes in flows. */
+    ovs_be32 flow_count;      /* Number of flows. */
+    uint8_t pad[4];           /* Align to 64 bits. */
+};
+OFP_ASSERT(sizeof(struct ofp_aggregate_stats_reply) == 24);
 
 /* The match type indicates the match structure (set of fields that compose the
  * match) in use. The match type is placed in the type field at the beginning

@@ -721,10 +721,10 @@ ofputil_decode_vendor(const struct ofp_header *oh, size_t length,
 static enum ofperr
 check_nxstats_msg(const struct ofp_header *oh, size_t length)
 {
-    const struct ofp_stats_msg *osm = (const struct ofp_stats_msg *) oh;
+    const struct ofp10_stats_msg *osm = (const struct ofp10_stats_msg *) oh;
     ovs_be32 vendor;
 
-    if (length < sizeof(struct ofp_vendor_stats_msg)) {
+    if (length < sizeof(struct ofp10_vendor_stats_msg)) {
         if (length == ntohs(oh->length)) {
             VLOG_WARN_RL(&bad_ofmsg_rl, "truncated vendor stats message");
         }
@@ -738,7 +738,7 @@ check_nxstats_msg(const struct ofp_header *oh, size_t length)
         return OFPERR_OFPBRC_BAD_VENDOR;
     }
 
-    if (length < sizeof(struct nicira_stats_msg)) {
+    if (length < sizeof(struct nicira10_stats_msg)) {
         if (length == ntohs(osm->header.length)) {
             VLOG_WARN_RL(&bad_ofmsg_rl, "truncated Nicira stats message");
         }
@@ -755,12 +755,12 @@ ofputil_decode_nxst_request(const struct ofp_header *oh, size_t length,
     static const struct ofputil_msg_type nxst_requests[] = {
         { OFPUTIL_NXST_FLOW_REQUEST, OFP10_VERSION,
           NXST_FLOW, "NXST_FLOW request",
-          sizeof(struct nicira_stats_msg) + sizeof(struct nx_flow_stats_request),
+          sizeof(struct nicira10_stats_msg) + sizeof(struct nx_flow_stats_request),
           8 },
 
         { OFPUTIL_NXST_AGGREGATE_REQUEST, OFP10_VERSION,
           NXST_AGGREGATE, "NXST_AGGREGATE request",
-          sizeof(struct nicira_stats_msg) + sizeof(struct nx_aggregate_stats_request),
+          sizeof(struct nicira10_stats_msg) + sizeof(struct nx_aggregate_stats_request),
           8 },
     };
 
@@ -770,7 +770,7 @@ ofputil_decode_nxst_request(const struct ofp_header *oh, size_t length,
         OFPERR_OFPBRC_BAD_SUBTYPE
     };
 
-    const struct nicira_stats_msg *nsm;
+    const struct nicira10_stats_msg *nsm;
     enum ofperr error;
 
     error = check_nxstats_msg(oh, length);
@@ -778,7 +778,7 @@ ofputil_decode_nxst_request(const struct ofp_header *oh, size_t length,
         return error;
     }
 
-    nsm = (struct nicira_stats_msg *) oh;
+    nsm = (struct nicira10_stats_msg *) oh;
     return ofputil_lookup_openflow_message(&nxst_request_category, oh->version,
                                            ntohl(nsm->subtype), typep);
 }
@@ -790,11 +790,11 @@ ofputil_decode_nxst_reply(const struct ofp_header *oh, size_t length,
     static const struct ofputil_msg_type nxst_replies[] = {
         { OFPUTIL_NXST_FLOW_REPLY, OFP10_VERSION,
           NXST_FLOW, "NXST_FLOW reply",
-          sizeof(struct nicira_stats_msg), 8 },
+          sizeof(struct nicira10_stats_msg), 8 },
 
         { OFPUTIL_NXST_AGGREGATE_REPLY, OFP10_VERSION,
           NXST_AGGREGATE, "NXST_AGGREGATE reply",
-          sizeof(struct nicira_stats_msg) + sizeof(struct nx_aggregate_stats_reply),
+          sizeof(struct nicira10_stats_msg) + sizeof(struct nx_aggregate_stats_reply),
           0 },
     };
 
@@ -804,7 +804,7 @@ ofputil_decode_nxst_reply(const struct ofp_header *oh, size_t length,
         OFPERR_OFPBRC_BAD_SUBTYPE
     };
 
-    const struct nicira_stats_msg *nsm;
+    const struct nicira10_stats_msg *nsm;
     enum ofperr error;
 
     error = check_nxstats_msg(oh, length);
@@ -812,7 +812,7 @@ ofputil_decode_nxst_reply(const struct ofp_header *oh, size_t length,
         return error;
     }
 
-    nsm = (struct nicira_stats_msg *) oh;
+    nsm = (struct nicira10_stats_msg *) oh;
     return ofputil_lookup_openflow_message(&nxst_reply_category, oh->version,
                                            ntohl(nsm->subtype), typep);
 }
@@ -820,7 +820,7 @@ ofputil_decode_nxst_reply(const struct ofp_header *oh, size_t length,
 static enum ofperr
 check_stats_msg(const struct ofp_header *oh, size_t length)
 {
-    if (length < sizeof(struct ofp_stats_msg)) {
+    if (length < sizeof(struct ofp10_stats_msg)) {
         if (length == ntohs(oh->length)) {
             VLOG_WARN_RL(&bad_ofmsg_rl, "truncated stats message");
         }
@@ -837,39 +837,39 @@ ofputil_decode_ofpst_request(const struct ofp_header *oh, size_t length,
     static const struct ofputil_msg_type ofpst_requests[] = {
         { OFPUTIL_OFPST_DESC_REQUEST, OFP10_VERSION,
           OFPST_DESC, "OFPST_DESC request",
-          sizeof(struct ofp_stats_msg), 0 },
+          sizeof(struct ofp10_stats_msg), 0 },
 
         { OFPUTIL_OFPST_FLOW_REQUEST, OFP10_VERSION,
           OFPST_FLOW, "OFPST_FLOW request",
-          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_flow_stats_request),
+          sizeof(struct ofp10_stats_msg) + sizeof(struct ofp10_flow_stats_request),
           0 },
 
         { OFPUTIL_OFPST_AGGREGATE_REQUEST, OFP10_VERSION,
           OFPST_AGGREGATE, "OFPST_AGGREGATE request",
-          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_flow_stats_request),
+          sizeof(struct ofp10_stats_msg) + sizeof(struct ofp10_flow_stats_request),
           0 },
 
         { OFPUTIL_OFPST_TABLE_REQUEST, OFP10_VERSION,
           OFPST_TABLE, "OFPST_TABLE request",
-          sizeof(struct ofp_stats_msg), 0 },
+          sizeof(struct ofp10_stats_msg), 0 },
 
         { OFPUTIL_OFPST_PORT_REQUEST, OFP10_VERSION,
           OFPST_PORT, "OFPST_PORT request",
-          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_port_stats_request),
+          sizeof(struct ofp10_stats_msg) + sizeof(struct ofp10_port_stats_request),
           0 },
 
         { OFPUTIL_OFPST_QUEUE_REQUEST, OFP10_VERSION,
           OFPST_QUEUE, "OFPST_QUEUE request",
-          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_queue_stats_request),
+          sizeof(struct ofp10_stats_msg) + sizeof(struct ofp10_queue_stats_request),
           0 },
 
         { OFPUTIL_OFPST_PORT_DESC_REQUEST, OFP10_VERSION,
           OFPST_PORT_DESC, "OFPST_PORT_DESC request",
-          sizeof(struct ofp_stats_msg), 0 },
+          sizeof(struct ofp10_stats_msg), 0 },
 
         { 0, 0,
           OFPST_VENDOR, "OFPST_VENDOR request",
-          sizeof(struct ofp_vendor_stats_msg), 1 },
+          sizeof(struct ofp10_vendor_stats_msg), 1 },
     };
 
     static const struct ofputil_msg_category ofpst_request_category = {
@@ -878,7 +878,7 @@ ofputil_decode_ofpst_request(const struct ofp_header *oh, size_t length,
         OFPERR_OFPBRC_BAD_STAT
     };
 
-    const struct ofp_stats_msg *request = (const struct ofp_stats_msg *) oh;
+    const struct ofp10_stats_msg *request = (const struct ofp10_stats_msg *) oh;
     enum ofperr error;
 
     error = check_stats_msg(oh, length);
@@ -902,36 +902,36 @@ ofputil_decode_ofpst_reply(const struct ofp_header *oh, size_t length,
     static const struct ofputil_msg_type ofpst_replies[] = {
         { OFPUTIL_OFPST_DESC_REPLY, OFP10_VERSION,
           OFPST_DESC, "OFPST_DESC reply",
-          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_desc_stats), 0 },
+          sizeof(struct ofp10_stats_msg) + sizeof(struct ofp_desc_stats), 0 },
 
         { OFPUTIL_OFPST_FLOW_REPLY, OFP10_VERSION,
           OFPST_FLOW, "OFPST_FLOW reply",
-          sizeof(struct ofp_stats_msg), 1 },
+          sizeof(struct ofp10_stats_msg), 1 },
 
         { OFPUTIL_OFPST_AGGREGATE_REPLY, OFP10_VERSION,
           OFPST_AGGREGATE, "OFPST_AGGREGATE reply",
-          sizeof(struct ofp_stats_msg) + sizeof(struct ofp_aggregate_stats_reply),
+          sizeof(struct ofp10_stats_msg) + sizeof(struct ofp_aggregate_stats_reply),
           0 },
 
         { OFPUTIL_OFPST_TABLE_REPLY, OFP10_VERSION,
           OFPST_TABLE, "OFPST_TABLE reply",
-          sizeof(struct ofp_stats_msg), sizeof(struct ofp_table_stats) },
+          sizeof(struct ofp10_stats_msg), sizeof(struct ofp10_table_stats) },
 
         { OFPUTIL_OFPST_PORT_REPLY, OFP10_VERSION,
           OFPST_PORT, "OFPST_PORT reply",
-          sizeof(struct ofp_stats_msg), sizeof(struct ofp_port_stats) },
+          sizeof(struct ofp10_stats_msg), sizeof(struct ofp10_port_stats) },
 
         { OFPUTIL_OFPST_QUEUE_REPLY, OFP10_VERSION,
           OFPST_QUEUE, "OFPST_QUEUE reply",
-          sizeof(struct ofp_stats_msg), sizeof(struct ofp_queue_stats) },
+          sizeof(struct ofp10_stats_msg), sizeof(struct ofp10_queue_stats) },
 
         { OFPUTIL_OFPST_PORT_DESC_REPLY, OFP10_VERSION,
           OFPST_PORT_DESC, "OFPST_PORT_DESC reply",
-          sizeof(struct ofp_stats_msg), sizeof(struct ofp10_phy_port) },
+          sizeof(struct ofp10_stats_msg), sizeof(struct ofp10_phy_port) },
 
         { 0, 0,
           OFPST_VENDOR, "OFPST_VENDOR reply",
-          sizeof(struct ofp_vendor_stats_msg), 1 },
+          sizeof(struct ofp10_vendor_stats_msg), 1 },
     };
 
     static const struct ofputil_msg_category ofpst_reply_category = {
@@ -940,7 +940,7 @@ ofputil_decode_ofpst_reply(const struct ofp_header *oh, size_t length,
         OFPERR_OFPBRC_BAD_STAT
     };
 
-    const struct ofp_stats_msg *reply = (const struct ofp_stats_msg *) oh;
+    const struct ofp10_stats_msg *reply = (const struct ofp10_stats_msg *) oh;
     enum ofperr error;
 
     error = check_stats_msg(oh, length);
@@ -1032,11 +1032,11 @@ ofputil_decode_msg_type__(const struct ofp_header *oh, size_t length,
 
         { 0, OFP10_VERSION,
           OFPT10_STATS_REQUEST, "OFPT_STATS_REQUEST",
-          sizeof(struct ofp_stats_msg), 1 },
+          sizeof(struct ofp10_stats_msg), 1 },
 
         { 0, OFP10_VERSION,
           OFPT10_STATS_REPLY, "OFPT_STATS_REPLY",
-          sizeof(struct ofp_stats_msg), 1 },
+          sizeof(struct ofp10_stats_msg), 1 },
 
         { OFPUTIL_OFPT_BARRIER_REQUEST, OFP10_VERSION,
           OFPT10_BARRIER_REQUEST, "OFPT_BARRIER_REQUEST",
@@ -1847,7 +1847,7 @@ ofputil_flow_mod_usable_protocols(const struct ofputil_flow_mod *fms,
 
 static enum ofperr
 ofputil_decode_ofpst_flow_request(struct ofputil_flow_stats_request *fsr,
-                                  const struct ofp_flow_stats_request *ofsr,
+                                  const struct ofp10_flow_stats_request *ofsr,
                                   bool aggregate)
 {
     fsr->aggregate = aggregate;
@@ -1930,7 +1930,7 @@ ofputil_encode_flow_stats_request(const struct ofputil_flow_stats_request *fsr,
     switch (protocol) {
     case OFPUTIL_P_OF10:
     case OFPUTIL_P_OF10_TID: {
-        struct ofp_flow_stats_request *ofsr;
+        struct ofp10_flow_stats_request *ofsr;
         int type;
 
         type = fsr->aggregate ? OFPST_AGGREGATE : OFPST_FLOW;
@@ -2022,7 +2022,7 @@ ofputil_decode_flow_stats_reply(struct ofputil_flow_stats *fs,
     if (!msg->size) {
         return EOF;
     } else if (code == OFPUTIL_OFPST_FLOW_REPLY) {
-        const struct ofp_flow_stats *ofs;
+        const struct ofp10_flow_stats *ofs;
         size_t length;
 
         ofs = ofpbuf_try_pull(msg, sizeof *ofs);
@@ -2129,11 +2129,11 @@ ofputil_append_flow_stats_reply(const struct ofputil_flow_stats *fs,
                                 struct list *replies)
 {
     struct ofpbuf *reply = ofpbuf_from_list(list_back(replies));
-    const struct ofp_stats_msg *osm = reply->data;
+    const struct ofp10_stats_msg *osm = reply->data;
     size_t start_ofs = reply->size;
 
     if (osm->type == htons(OFPST_FLOW)) {
-        struct ofp_flow_stats *ofs;
+        struct ofp10_flow_stats *ofs;
 
         ofs = ofpbuf_put_uninit(reply, sizeof *ofs);
         ofs->table_id = fs->table_id;
@@ -3259,14 +3259,14 @@ put_stats__(ovs_be32 xid, uint8_t ofp_type,
             struct ofpbuf *msg)
 {
     if (ofpst_type == htons(OFPST_VENDOR)) {
-        struct nicira_stats_msg *nsm;
+        struct nicira10_stats_msg *nsm;
 
         nsm = put_openflow_xid(sizeof *nsm, ofp_type, xid, msg);
         nsm->vsm.osm.type = ofpst_type;
         nsm->vsm.vendor = htonl(NX_VENDOR_ID);
         nsm->subtype = nxst_subtype;
     } else {
-        struct ofp_stats_msg *osm;
+        struct ofp10_stats_msg *osm;
 
         osm = put_openflow_xid(sizeof *osm, ofp_type, xid, msg);
         osm->type = ofpst_type;
@@ -3285,8 +3285,9 @@ ofputil_make_stats_request(size_t body_len, uint16_t ofpst_type,
                            uint32_t nxst_subtype, struct ofpbuf **bufferp)
 {
     enum {
-        HEADER_LEN = MAX(sizeof(struct ofp_stats_msg),
-                         sizeof(struct nicira_stats_msg))
+        HEADER_LEN = MAX(MAX(sizeof(struct ofp10_stats_msg),
+                             sizeof(struct ofp11_stats_msg)),
+                         sizeof(struct nicira10_stats_msg))
     };
     struct ofpbuf *msg;
 
@@ -3300,16 +3301,16 @@ ofputil_make_stats_request(size_t body_len, uint16_t ofpst_type,
 static void
 put_stats_reply__(const struct ofp_header *request, struct ofpbuf *msg)
 {
-    const struct ofp_stats_msg *osm;
+    const struct ofp10_stats_msg *osm;
 
     assert(request->type == OFPT10_STATS_REQUEST ||
            request->type == OFPT10_STATS_REPLY);
 
-    osm = (const struct ofp_stats_msg *) request;
+    osm = (const struct ofp10_stats_msg *) request;
     put_stats__(request->xid, OFPT10_STATS_REPLY, osm->type,
                 (osm->type != htons(OFPST_VENDOR)
                  ? htonl(0)
-                 : ((const struct nicira_stats_msg *) request)->subtype),
+                 : ((const struct nicira10_stats_msg *) request)->subtype),
                 msg);
 }
 
@@ -3359,14 +3360,14 @@ struct ofpbuf *
 ofputil_reserve_stats_reply(size_t len, struct list *replies)
 {
     struct ofpbuf *msg = ofpbuf_from_list(list_back(replies));
-    struct ofp_stats_msg *osm = msg->data;
+    struct ofp10_stats_msg *osm = msg->data;
 
     if (msg->size + len <= UINT16_MAX) {
         ofpbuf_prealloc_tailroom(msg, len);
     } else {
         osm->flags |= htons(OFPSF_REPLY_MORE);
 
-        msg = ofpbuf_new(MAX(1024, sizeof(struct nicira_stats_msg) + len));
+        msg = ofpbuf_new(MAX(1024, sizeof(struct nicira10_stats_msg) + len));
         put_stats_reply__(&osm->header, msg);
         list_push_back(replies, &msg->list_node);
     }
@@ -3398,14 +3399,14 @@ ofputil_postappend_stats_reply(size_t start_ofs, struct list *replies)
 size_t
 ofputil_stats_msg_len(const struct ofp_header *oh)
 {
-    const struct ofp_stats_msg *osm;
+    const struct ofp10_stats_msg *osm;
 
     assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
 
-    osm = (const struct ofp_stats_msg *) oh;
+    osm = (const struct ofp10_stats_msg *) oh;
     return (osm->type == htons(OFPST_VENDOR)
-            ? sizeof(struct nicira_stats_msg)
-            : sizeof(struct ofp_stats_msg));
+            ? sizeof(struct nicira10_stats_msg)
+            : sizeof(struct ofp10_stats_msg));
 }
 
 void
@@ -3424,14 +3425,14 @@ uint16_t
 ofputil_decode_stats_msg_type(const struct ofp_header *oh)
 {
     assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
-    return ntohs(((const struct ofp_stats_msg *) oh)->type);
+    return ntohs(((const struct ofp10_stats_msg *) oh)->type);
 }
 
 uint16_t
 ofputil_decode_stats_msg_flags(const struct ofp_header *oh)
 {
     assert(oh->type == OFPT10_STATS_REQUEST || oh->type == OFPT10_STATS_REPLY);
-    return ntohs(((const struct ofp_stats_msg *) oh)->flags);
+    return ntohs(((const struct ofp10_stats_msg *) oh)->flags);
 }
 
 /* Creates and returns an OFPT_ECHO_REQUEST message with an empty payload. */
