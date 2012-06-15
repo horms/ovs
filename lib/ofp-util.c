@@ -1808,7 +1808,7 @@ ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
     }
 
     if (fm->ofpacts) {
-        ofpacts_to_openflow(fm->ofpacts, msg, protocol);
+        ofpacts_to_openflow10(fm->ofpacts, msg);
     }
     update_openflow_length(msg);
     return msg;
@@ -2150,7 +2150,7 @@ ofputil_append_flow_stats_reply(const struct ofputil_flow_stats *fs,
                            htonll(unknown_to_zero(fs->packet_count)));
         put_32aligned_be64(&ofs->byte_count,
                            htonll(unknown_to_zero(fs->byte_count)));
-        ofpacts_to_openflow(fs->ofpacts, reply, OFPUTIL_P_OF10);
+        ofpacts_to_openflow10(fs->ofpacts, reply);
 
         ofs = ofpbuf_at_assert(reply, start_ofs, sizeof *ofs);
         ofs->length = htons(reply->size - start_ofs);
@@ -2175,7 +2175,7 @@ ofputil_append_flow_stats_reply(const struct ofputil_flow_stats *fs,
         nfs->cookie = fs->cookie;
         nfs->packet_count = htonll(fs->packet_count);
         nfs->byte_count = htonll(fs->byte_count);
-        ofpacts_to_openflow(fs->ofpacts, reply, OFPUTIL_P_NXM);
+        ofpacts_to_openflow10(fs->ofpacts, reply);
 
         nfs = ofpbuf_at_assert(reply, start_ofs, sizeof *nfs);
         nfs->length = htons(reply->size - start_ofs);
@@ -3095,7 +3095,7 @@ ofputil_encode_packet_out(const struct ofputil_packet_out *po)
 
     msg = ofpbuf_new(size);
     put_openflow(sizeof *opo, OFPT10_PACKET_OUT, msg);
-    ofpacts_to_openflow(po->ofpacts, msg, OFPUTIL_P_OF10);
+    ofpacts_to_openflow10(po->ofpacts, msg);
 
     opo = msg->data;
     opo->buffer_id = htonl(po->buffer_id);
