@@ -90,8 +90,8 @@ nx_entry_ok(const void *p, unsigned int match_len)
 }
 
 static enum ofperr
-nx_pull_match__(struct ofpbuf *b, unsigned int match_len, bool strict,
-                uint16_t priority, struct cls_rule *rule,
+nx_pull_match__(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
+                bool strict, uint16_t priority, struct cls_rule *rule,
                 ovs_be64 *cookie, ovs_be64 *cookie_mask)
 {
     uint32_t header;
@@ -99,7 +99,7 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, bool strict,
 
     assert((cookie != NULL) == (cookie_mask != NULL));
 
-    p = ofpbuf_try_pull(b, ROUND_UP(match_len, 8));
+    p = ofpbuf_try_pull(b, nx_padded_match_len(match_len, hdr_len));
     if (!p) {
         VLOG_DBG_RL(&rl, "nx_match length %u, rounded up to a "
                     "multiple of 8, is longer than space in message (max "
@@ -203,23 +203,23 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, bool strict,
  *
  * Returns 0 if successful, otherwise an OpenFlow error code. */
 enum ofperr
-nx_pull_match(struct ofpbuf *b, unsigned int match_len,
+nx_pull_match(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
               uint16_t priority, struct cls_rule *rule,
               ovs_be64 *cookie, ovs_be64 *cookie_mask)
 {
-    return nx_pull_match__(b, match_len, true, priority, rule, cookie,
-                           cookie_mask);
+    return nx_pull_match__(b, match_len, hdr_len, true, priority, rule,
+                           cookie, cookie_mask);
 }
 
 /* Behaves the same as nx_pull_match() with one exception.  Skips over unknown
  * NXM headers instead of failing with an error when they are encountered. */
 enum ofperr
-nx_pull_match_loose(struct ofpbuf *b, unsigned int match_len,
+nx_pull_match_loose(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
                     uint16_t priority, struct cls_rule *rule,
                     ovs_be64 *cookie, ovs_be64 *cookie_mask)
 {
-    return nx_pull_match__(b, match_len, false, priority, rule, cookie,
-                           cookie_mask);
+    return nx_pull_match__(b, match_len, hdr_len, false, priority, rule,
+                           cookie, cookie_mask);
 }
 
 /* nx_put_match() and helpers.
@@ -485,6 +485,7 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
     const flow_wildcards_t wc = cr->wc.wildcards;
     const struct flow *flow = &cr->flow;
     const size_t start_len = b->size;
+    size_t pad_len, hdr_len;
     int match_len;
     int i;
 
@@ -589,7 +590,9 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
     nxm_put_64m(b, NXM_NX_COOKIE, cookie, cookie_mask);
 
     match_len = b->size - start_len;
-    ofpbuf_put_zeros(b, ROUND_UP(match_len, 8) - match_len);
+    hdr_len = oxm ? sizeof(struct ofp11_match_header) : 0;
+    pad_len = nx_padded_match_len(match_len, hdr_len) - match_len;
+    ofpbuf_put_zeros(b, pad_len);
     return match_len;
 }
 
@@ -725,7 +728,7 @@ parse_nxm_field_name(const char *name, int name_len)
 /* nx_match_from_string(). */
 
 int
-nx_match_from_string(const char *s, struct ofpbuf *b)
+nx_match_from_string(const char *s, struct ofpbuf *b, size_t hdr_len)
 {
     const char *full_s = s;
     const size_t start_len = b->size;
@@ -782,7 +785,7 @@ nx_match_from_string(const char *s, struct ofpbuf *b)
     }
 
     match_len = b->size - start_len;
-    ofpbuf_put_zeros(b, ROUND_UP(match_len, 8) - match_len);
+    ofpbuf_put_zeros(b, ROUND_UP(match_len + hdr_len, 8) - match_len - hdr_len);
     return match_len;
 }
 

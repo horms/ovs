@@ -40,17 +40,23 @@ struct nx_action_reg_move;
  * See include/openflow/nicira-ext.h for NXM specification.
  */
 
+static inline size_t nx_padded_match_len(size_t match_len, size_t hdr_len)
+{
+    return ROUND_UP(match_len + hdr_len, 8) - hdr_len;
+}
+
 enum ofperr nx_pull_match(struct ofpbuf *, unsigned int match_len,
-                          uint16_t priority, struct cls_rule *,
+                          size_t hdr_len, uint16_t priority, struct cls_rule *,
                           ovs_be64 *cookie, ovs_be64 *cookie_mask);
 enum ofperr nx_pull_match_loose(struct ofpbuf *, unsigned int match_len,
-                                uint16_t priority, struct cls_rule *,
-                                ovs_be64 *cookie, ovs_be64 *cookie_mask);
+                                size_t hdr_len, uint16_t priority,
+                                struct cls_rule *, ovs_be64 *cookie,
+                                ovs_be64 *cookie_mask);
 int nx_put_match(struct ofpbuf *, bool oxm, const struct cls_rule *,
                  ovs_be64 cookie, ovs_be64 cookie_mask);
 
 char *nx_match_to_string(const uint8_t *, unsigned int match_len);
-int nx_match_from_string(const char *, struct ofpbuf *);
+int nx_match_from_string(const char *, struct ofpbuf *, size_t hdr_len);
 
 void nxm_parse_reg_move(struct ofpact_reg_move *, const char *);
 void nxm_parse_reg_load(struct ofpact_reg_load *, const char *);

@@ -1924,17 +1924,18 @@ do_parse_nxm__(bool oxm)
         ovs_be64 cookie, cookie_mask;
         enum ofperr error;
         int match_len;
+        size_t hdr_len = oxm ? sizeof(struct ofp11_match_header) : 0;
 
         /* Convert string to nx_match. */
         ofpbuf_init(&nx_match, 0);
-        match_len = nx_match_from_string(ds_cstr(&in), &nx_match);
+        match_len = nx_match_from_string(ds_cstr(&in), &nx_match, hdr_len);
 
         /* Convert nx_match to cls_rule. */
         if (strict) {
-            error = nx_pull_match(&nx_match, match_len, 0, &rule,
+            error = nx_pull_match(&nx_match, match_len, hdr_len, 0, &rule,
                                   &cookie, &cookie_mask);
         } else {
-            error = nx_pull_match_loose(&nx_match, match_len, 0, &rule,
+            error = nx_pull_match_loose(&nx_match, match_len, hdr_len, 0, &rule,
                                         &cookie, &cookie_mask);
         }
 

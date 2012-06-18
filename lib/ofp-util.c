@@ -1624,8 +1624,9 @@ ofputil_decode_flow_mod(struct ofputil_flow_mod *fm,
 
             /* Dissect the message. */
             nfm = ofpbuf_pull(&b, sizeof *nfm);
-            error = nx_pull_match(&b, ntohs(nfm->match_len), ntohs(nfm->priority),
-                                  &fm->cr, &fm->cookie, &fm->cookie_mask);
+            error = nx_pull_match(&b, ntohs(nfm->match_len), 0,
+                                  ntohs(nfm->priority), &fm->cr,
+                                  &fm->cookie, &fm->cookie_mask);
             if (error) {
                 return error;
             }
@@ -1780,7 +1781,7 @@ ofputil_decode_nxst_flow_request(struct ofputil_flow_stats_request *fsr,
     enum ofperr error;
 
     nfsr = ofpbuf_pull(b, sizeof *nfsr);
-    error = nx_pull_match(b, ntohs(nfsr->match_len), 0, &fsr->match,
+    error = nx_pull_match(b, ntohs(nfsr->match_len), 0, 0, &fsr->match,
                           &fsr->cookie, &fsr->cookie_mask);
     if (error) {
         return error;
@@ -1986,7 +1987,7 @@ ofputil_decode_flow_stats_reply(struct ofputil_flow_stats *fs,
                          "claims invalid length %zu", match_len, length);
             return EINVAL;
         }
-        if (nx_pull_match(msg, match_len, ntohs(nfs->priority), &fs->rule,
+        if (nx_pull_match(msg, match_len, 0, ntohs(nfs->priority), &fs->rule,
                           NULL, NULL)) {
             return EINVAL;
         }
@@ -2168,8 +2169,8 @@ ofputil_decode_flow_removed(struct ofputil_flow_removed *fr,
         ofpbuf_use_const(&b, oh, ntohs(oh->length));
 
         nfr = ofpbuf_pull(&b, sizeof *nfr);
-        error = nx_pull_match(&b, ntohs(nfr->match_len), ntohs(nfr->priority),
-                              &fr->rule, NULL, NULL);
+        error = nx_pull_match(&b, ntohs(nfr->match_len), 0,
+                              ntohs(nfr->priority), &fr->rule, NULL, NULL);
         if (error) {
             return error;
         }
@@ -2278,8 +2279,8 @@ ofputil_decode_packet_in(struct ofputil_packet_in *pin,
         ofpbuf_use_const(&b, oh, ntohs(oh->length));
 
         npi = ofpbuf_pull(&b, sizeof *npi);
-        error = nx_pull_match_loose(&b, ntohs(npi->match_len), 0, &rule, NULL,
-                                    NULL);
+        error = nx_pull_match_loose(&b, ntohs(npi->match_len), 0, 0,
+                                    &rule, NULL, NULL);
         if (error) {
             return error;
         }
