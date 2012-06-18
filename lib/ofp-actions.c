@@ -1371,12 +1371,42 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
  * 1.1 actions in 'openflow', appending the actions to any existing data in
  * 'openflow'. */
 void
-ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow)
+ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow,
+                      enum ofp11_instruction_type type)
 {
     const struct ofpact *a;
 
-    OFPACT_FOR_EACH (a, ofpacts) {
-        ofpact_to_openflow11(a, openflow);
+    switch (type) {
+    case OFPIT11_GOTO_TABLE:
+    case OFPIT11_WRITE_METADATA:
+    case OFPIT11_WRITE_ACTIONS:
+        /* FIXME: Implementation needed */
+        NOT_REACHED();
+
+    case OFPIT11_APPLY_ACTIONS: {
+        struct ofp11_instruction_actions *oia;
+        size_t start_len = openflow->size;
+
+        ofpbuf_put_uninit(openflow, sizeof *oia);
+        OFPACT_FOR_EACH (a, ofpacts) {
+            ofpact_to_openflow11(a, openflow);
+        }
+        oia = (struct ofp11_instruction_actions *)((char *)openflow->data +
+                                                   start_len);
+        oia->type = htons(type);
+        oia->len = htons(openflow->size - start_len);
+        memset(oia->pad, 0, sizeof oia->pad);
+
+        break;
+    }
+
+    case OFPIT11_CLEAR_ACTIONS:
+    case OFPIT11_EXPERIMENTER:
+        /* FIXME: Implementation needed */
+        NOT_REACHED();
+
+    default:
+        NOT_REACHED();
     }
 }
 
