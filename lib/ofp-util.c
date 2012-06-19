@@ -1023,7 +1023,7 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
         EXTRA_MULTIPLE                                      \
     }
     NXST_REPLY(FLOW, 0, 8),
-    NXST_REPLY(AGGREGATE, sizeof(struct nx_aggregate_stats_reply), 0),
+    NXST_REPLY(AGGREGATE, sizeof(struct ofp11_aggregate_stats_reply), 0),
 #undef NXST_REPLY
 };
 
@@ -2460,6 +2460,19 @@ ofputil_append_flow_stats_reply(uint8_t ofp_version,
     ofputil_postappend_stats_reply(start_ofs, replies);
 }
 
+static void
+ofputil_encode_aggregate_stats_reply__(
+    const struct ofputil_aggregate_stats *stats,
+    const struct ofp_header *request, struct ofpbuf **msg)
+{
+    struct ofp11_aggregate_stats_reply *asr;
+
+    asr = ofputil_make_stats_reply(sizeof *asr, request, msg);
+    asr->packet_count = htonll(unknown_to_zero(stats->packet_count));
+    asr->byte_count = htonll(unknown_to_zero(stats->byte_count));
+    asr->flow_count = htonl(stats->flow_count);
+}
+
 /* Converts abstract ofputil_aggregate_stats 'stats' into an OFPST_AGGREGATE or
  * NXST_AGGREGATE reply according to 'protocol', and returns the message. */
 struct ofpbuf *
@@ -2473,14 +2486,9 @@ ofputil_encode_aggregate_stats_reply(
 
     ofputil_decode_msg_type(request, &type);
     code = ofputil_msg_type_code(type);
-    if (code == OFPUTIL_OFPST11_AGGREGATE_REQUEST) {
-        struct ofp11_stats_msg *osm;
-        struct ofp11_aggregate_stats_reply *asr;
-
-        asr = ofputil_make_stats_reply(sizeof *asr, request, &msg);
-        asr->packet_count = htonll(unknown_to_zero(stats->packet_count));
-        asr->byte_count = htonll(unknown_to_zero(stats->byte_count));
-        asr->flow_count = htonl(stats->flow_count);
+    if (code == OFPUTIL_OFPST11_AGGREGATE_REQUEST ||
+        code == OFPUTIL_NXST_AGGREGATE_REQUEST) {
+        ofputil_encode_aggregate_stats_reply__(stats, request, &msg);
     } else if (code == OFPUTIL_OFPST10_AGGREGATE_REQUEST) {
         struct ofp10_aggregate_stats_reply *asr;
 
@@ -2490,13 +2498,6 @@ ofputil_encode_aggregate_stats_reply(
         put_32aligned_be64(&asr->byte_count,
                            htonll(unknown_to_zero(stats->byte_count)));
         asr->flow_count = htonl(stats->flow_count);
-    } else if (code == OFPUTIL_NXST_AGGREGATE_REQUEST) {
-        struct nx_aggregate_stats_reply *nasr;
-
-        nasr = ofputil_make_stats_reply(sizeof *nasr, request, &msg);
-        nasr->packet_count = htonll(stats->packet_count);
-        nasr->byte_count = htonll(stats->byte_count);
-        nasr->flow_count = htonl(stats->flow_count);
     } else {
         NOT_REACHED();
     }

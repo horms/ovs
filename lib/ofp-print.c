@@ -1001,6 +1001,15 @@ ofp_print_flow_stats_reply(struct ds *string, const struct ofp_header *oh)
 }
 
 static void
+ofp_print_ofpst_aggregate_reply__(struct ds *string,
+                                  const struct ofp11_aggregate_stats_reply *asr)
+{
+    ds_put_format(string, " packet_count=%"PRIu64, ntohll(asr->packet_count));
+    ds_put_format(string, " byte_count=%"PRIu64, ntohll(asr->byte_count));
+    ds_put_format(string, " flow_count=%"PRIu32, ntohl(asr->flow_count));
+}
+
+static void
 ofp_print_ofpst_aggregate_reply(struct ds *string, const struct ofp_header *oh)
 {
     struct ofp11_aggregate_stats_reply asr;
@@ -1029,19 +1038,15 @@ ofp_print_ofpst_aggregate_reply(struct ds *string, const struct ofp_header *oh)
         NOT_REACHED();
     }
 
-    ds_put_format(string, " packet_count=%"PRIu64, ntohll(asr->packet_count));
-    ds_put_format(string, " byte_count=%"PRIu64, ntohll(asr->byte_count));
-    ds_put_format(string, " flow_count=%"PRIu32, ntohl(asr->flow_count));
+    ofp_print_ofpst_aggregate_reply__(string, &asr);
 }
 
 static void
 ofp_print_nxst_aggregate_reply(struct ds *string, const struct ofp_header *oh)
 {
-    const struct nx_aggregate_stats_reply *nasr = ofputil_stats_msg_body(oh);
+    const struct ofp11_aggregate_stats_reply *asr = ofputil_stats_msg_body(oh);
 
-    ds_put_format(string, " packet_count=%"PRIu64, ntohll(nasr->packet_count));
-    ds_put_format(string, " byte_count=%"PRIu64, ntohll(nasr->byte_count));
-    ds_put_format(string, " flow_count=%"PRIu32, ntohl(nasr->flow_count));
+    ofp_print_ofpst_aggregate_reply__(string, asr);
 }
 
 static void print_port_stat(struct ds *string, const char *leader,

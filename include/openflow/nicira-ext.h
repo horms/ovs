@@ -1931,16 +1931,6 @@ struct nx_aggregate_stats_request {
      */
 };
 OFP_ASSERT(sizeof(struct nx_aggregate_stats_request) == 8);
-
-/* Body for nicira10_stats_msg reply of type NXST_AGGREGATE (analogous to
- * OFPST_AGGREGATE reply). */
-struct nx_aggregate_stats_reply {
-    ovs_be64 packet_count;     /* Number of packets, UINT64_MAX if unknown. */
-    ovs_be64 byte_count;       /* Number of bytes, UINT64_MAX if unknown. */
-    ovs_be32 flow_count;       /* Number of flows. */
-    uint8_t pad[4];            /* Align to 64 bits. */
-};
-OFP_ASSERT(sizeof(struct nx_aggregate_stats_reply) == 24);
 
 /* NXT_SET_CONTROLLER_ID.
  *
