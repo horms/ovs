@@ -931,7 +931,7 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
                   sizeof(struct ofp_desc_stats), 0),
     OFPST10_REPLY(OFPST10_FLOW, OFPST_FLOW, 0, 1),
     OFPST10_REPLY(OFPST10_AGGREGATE, OFPST_AGGREGATE,
-                  sizeof(struct ofp_aggregate_stats_reply), 0),
+                  sizeof(struct ofp10_aggregate_stats_reply), 0),
     OFPST10_REPLY(OFPST_TABLE, OFPST_TABLE,
                   0, sizeof(struct ofp10_table_stats)),
     OFPST10_REPLY(OFPST_PORT, OFPST_PORT,
@@ -2470,7 +2470,7 @@ ofputil_encode_aggregate_stats_reply(
     ofputil_decode_msg_type(request, &type);
     code = ofputil_msg_type_code(type);
     if (code == OFPUTIL_OFPST10_AGGREGATE_REQUEST) {
-        struct ofp_aggregate_stats_reply *asr;
+        struct ofp10_aggregate_stats_reply *asr;
 
         asr = ofputil_make_stats_reply(sizeof *asr, request, &msg);
         put_32aligned_be64(&asr->packet_count,

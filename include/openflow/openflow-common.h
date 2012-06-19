@@ -367,13 +367,13 @@ struct ofp_desc_stats {
 OFP_ASSERT(sizeof(struct ofp_desc_stats) == 1056);
 
 /* Reply to OFPST_AGGREGATE request. */
-struct ofp_aggregate_stats_reply {
+struct ofp10_aggregate_stats_reply {
     ovs_32aligned_be64 packet_count; /* Number of packets in flows. */
     ovs_32aligned_be64 byte_count;   /* Number of bytes in flows. */
     ovs_be32 flow_count;      /* Number of flows. */
     uint8_t pad[4];           /* Align to 64 bits. */
 };
-OFP_ASSERT(sizeof(struct ofp_aggregate_stats_reply) == 24);
+OFP_ASSERT(sizeof(struct ofp10_aggregate_stats_reply) == 24);
 
 /* The match type indicates the match structure (set of fields that compose the
  * match) in use. The match type is placed in the type field at the beginning

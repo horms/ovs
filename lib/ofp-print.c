@@ -1003,8 +1003,9 @@ ofp_print_flow_stats_reply(struct ds *string, const struct ofp_header *oh)
 static void
 ofp_print_ofpst_aggregate_reply(struct ds *string, const struct ofp_header *oh)
 {
-    const struct ofp_aggregate_stats_reply *asr = ofputil_stats_msg_body(oh);
+    const struct ofp10_aggregate_stats_reply *asr;
 
+    asr = ofputil_stats_msg_body(oh);
     ds_put_format(string, " packet_count=%"PRIu64,
                   ntohll(get_32aligned_be64(&asr->packet_count)));
     ds_put_format(string, " byte_count=%"PRIu64,
