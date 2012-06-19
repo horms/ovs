@@ -116,6 +116,35 @@ enum oxm12_ofb_match_fields {
     OFPXMT12_OFB_MPLS_TC,        /* MPLS TC. */
 };
 
+#define OFPXMT12_SUPPORTED  OFPXMT12_OFB_IN_PORT |          \
+                            OFPXMT12_OFB_ETH_DST |          \
+                            OFPXMT12_OFB_ETH_SRC |          \
+                            OFPXMT12_OFB_ETH_TYPE |         \
+                            OFPXMT12_OFB_IP_DSCP |          \
+                            OFPXMT12_OFB_IP_ECN |           \
+                            OFPXMT12_OFB_IP_PROTO |         \
+                            OFPXMT12_OFB_IPV4_SRC |         \
+                            OFPXMT12_OFB_IPV4_DST |         \
+                            OFPXMT12_OFB_TCP_SRC |          \
+                            OFPXMT12_OFB_TCP_DST |          \
+                            OFPXMT12_OFB_UDP_SRC |          \
+                            OFPXMT12_OFB_UDP_DST |          \
+                            OFPXMT12_OFB_ICMPV4_TYPE |      \
+                            OFPXMT12_OFB_ICMPV4_CODE |      \
+                            OFPXMT12_OFB_ARP_OP |           \
+                            OFPXMT12_OFB_ARP_SPA |          \
+                            OFPXMT12_OFB_ARP_TPA |          \
+                            OFPXMT12_OFB_ARP_SHA |          \
+                            OFPXMT12_OFB_ARP_THA |          \
+                            OFPXMT12_OFB_IPV6_SRC |         \
+                            OFPXMT12_OFB_IPV6_DST |         \
+                            OFPXMT12_OFB_IPV6_FLABEL |      \
+                            OFPXMT12_OFB_ICMPV6_TYPE |      \
+                            OFPXMT12_OFB_ICMPV6_CODE |      \
+                            OFPXMT12_OFB_IPV6_ND_TARGET |   \
+                            OFPXMT12_OFB_IPV6_ND_SLL |      \
+                            OFPXMT12_OFB_IPV6_ND_TLL
+
 /* OXM implementation makes use of NXM as they are the same format
  * with different field definitions
  */

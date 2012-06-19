@@ -2120,16 +2120,24 @@ handle_desc_stats_request(struct ofconn *ofconn,
     return 0;
 }
 
-static enum ofperr
-handle_table_stats_request(struct ofconn *ofconn,
-                           const struct ofp_header *request)
+static void
+stats_request_finish(const struct oftable *table,
+                     char *name, size_t namelen, ovs_be32 *max_entries) {
+    if (table->name) {
+        ovs_strzcpy(name, table->name, namelen);
+    }
+
+    if (table->max_flows < ntohl(*max_entries)) {
+        *max_entries = htonl(table->max_flows);
+    }
+}
+
+static void
+handle_table_stats_request10(struct ofconn *ofconn, struct ofpbuf *msg)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
     struct ofp10_table_stats *ots;
-    struct ofpbuf *msg;
     size_t i;
-
-    ofputil_make_stats_reply(0, request, &msg);
 
     ots = ofpbuf_put_zeros(msg, sizeof *ots * p->n_tables);
     for (i = 0; i < p->n_tables; i++) {
@@ -2140,18 +2148,113 @@ handle_table_stats_request(struct ofconn *ofconn,
         ots[i].active_count = htonl(classifier_count(&p->tables[i].cls));
     }
 
-    p->ofproto_class->get_tables(p, ots);
+    {
+        struct ofproto_table_stats ts = {
+            .ofp_version = OFP10_VERSION,
+            .o10ts = ots
+        };
+        p->ofproto_class->get_tables(p, &ts);
+    }
 
     for (i = 0; i < p->n_tables; i++) {
-        const struct oftable *table = &p->tables[i];
+        stats_request_finish(p->tables + i, ots[i].name, sizeof ots[i].name,
+                             &ots[i].max_entries);
+    }
+}
 
-        if (table->name) {
-            ovs_strzcpy(ots[i].name, table->name, sizeof ots[i].name);
-        }
+static void
+handle_table_stats_request11(struct ofconn *ofconn, struct ofpbuf *msg)
+{
+    struct ofproto *p = ofconn_get_ofproto(ofconn);
+    struct ofp11_stats_msg *osm;
+    struct ofp11_table_stats *ots;
+    size_t i;
 
-        if (table->max_flows < ntohl(ots[i].max_entries)) {
-            ots[i].max_entries = htonl(table->max_flows);
-        }
+    ots = ofpbuf_put_zeros(msg, sizeof *ots * p->n_tables);
+    for (i = 0; i < p->n_tables; i++) {
+        ots[i].table_id = i;
+        sprintf(ots[i].name, "table%zu", i);
+        ots[i].wildcards = ots[i].match = htonl(OFPFW11_ALL);
+        ots[i].instructions = htonl(OFPIT11_ALL);
+        ots[i].write_actions = ots[i].apply_actions = htonl(OFPAT11_OUTPUT);
+        ots[i].config = ots[i].apply_actions = htonl(0);
+        ots[i].max_entries = htonl(1000000); /* An arbitrary big number. */
+        ots[i].active_count = htonl(classifier_count(&p->tables[i].cls));
+    }
+
+    {
+        struct ofproto_table_stats ts = {
+            .ofp_version = OFP11_VERSION,
+            .o11ts = ots
+        };
+        p->ofproto_class->get_tables(p, &ts);
+    }
+
+    for (i = 0; i < p->n_tables; i++) {
+        stats_request_finish(p->tables + i, ots[i].name, sizeof ots[i].name,
+                             &ots[i].max_entries);
+    }
+}
+
+static void
+handle_table_stats_request12(struct ofconn *ofconn, struct ofpbuf *msg)
+{
+    struct ofproto *p = ofconn_get_ofproto(ofconn);
+    struct ofp11_stats_msg *osm;
+    struct ofp12_table_stats *ots;
+    size_t i;
+
+    ots = ofpbuf_put_zeros(msg, sizeof *ots * p->n_tables);
+    for (i = 0; i < p->n_tables; i++) {
+        ots[i].table_id = i;
+        sprintf(ots[i].name, "table%zu", i);
+        ots[i].wildcards = ots[i].match = htonl(OFPFW11_ALL);
+        ots[i].write_actions = ots[i].apply_actions = htonl(OFPAT12_OUTPUT);
+        ots[i].write_setfields = ots[i].apply_setfields =
+            htonl(OFPXMT12_SUPPORTED);
+        ots[i].instructions = htonl(OFPIT11_ALL);
+        ots[i].config = ots[i].apply_actions = htonl(0);
+        ots[i].max_entries = htonl(1000000); /* An arbitrary big number. */
+        ots[i].active_count = htonl(classifier_count(&p->tables[i].cls));
+    }
+
+    {
+        struct ofproto_table_stats ts = {
+            .ofp_version = OFP12_VERSION,
+            .o12ts = ots
+        };
+        p->ofproto_class->get_tables(p, &ts);
+    }
+
+    for (i = 0; i < p->n_tables; i++) {
+        stats_request_finish(p->tables + i, ots[i].name, sizeof ots[i].name,
+                             &ots[i].max_entries);
+    }
+}
+
+static enum ofperr
+handle_table_stats_request(struct ofconn *ofconn,
+                           const struct ofp_header *request)
+{
+    struct ofpbuf *msg;
+
+    ofputil_make_stats_reply(0, request, &msg);
+
+    switch (request->version) {
+    case OFP12_VERSION:
+        handle_table_stats_request12(ofconn, msg);
+        break;
+
+    case OFP11_VERSION:
+        handle_table_stats_request11(ofconn, msg);
+        break;
+
+    case OFP10_VERSION:
+        handle_table_stats_request10(ofconn, msg);
+        break;
+
+    default:
+        NOT_REACHED();
     }
 
     ofconn_send_reply(ofconn, msg);

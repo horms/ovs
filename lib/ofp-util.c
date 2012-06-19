@@ -954,6 +954,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
                   sizeof(struct ofp_desc_stats), 0),
     OFPST11_REPLY(OFPST11_AGGREGATE, OFPST_AGGREGATE,
                   sizeof(struct ofp11_aggregate_stats_reply), 0),
+    OFPST11_REPLY(OFPST_TABLE, OFPST_TABLE,
+                  0, sizeof(struct ofp11_table_stats)),
     OFPST11_REPLY(OFPST_PORT_DESC, OFPST_PORT_DESC,
                   0, sizeof(struct ofp11_port)),
 #undef OFPST11_REPLY
@@ -971,6 +973,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
     OFPST12_REPLY(OFPST11_FLOW, OFPST_FLOW, 0, 1),
     OFPST12_REPLY(OFPST11_AGGREGATE, OFPST_AGGREGATE,
                   sizeof(struct ofp11_aggregate_stats_reply), 0),
+    OFPST12_REPLY(OFPST_TABLE, OFPST_TABLE,
+                  0, sizeof(struct ofp12_table_stats)),
     OFPST12_REPLY(OFPST_PORT_DESC, OFPST_PORT_DESC,
                   0, sizeof(struct ofp11_port)),
 #undef OFPST12_REPLY

@@ -183,6 +183,15 @@ struct rule {
     unsigned int ofpacts_len;    /* Size of 'ofpacts', in bytes. */
 };
 
+struct ofproto_table_stats {
+    uint8_t ofp_version;
+    union {
+        struct ofp10_table_stats *o10ts;
+        struct ofp11_table_stats *o11ts;
+        struct ofp12_table_stats *o12ts;
+    };
+};
+
 static inline struct rule *
 rule_from_cls_rule(const struct cls_rule *cls_rule)
 {
@@ -429,14 +438,48 @@ struct ofproto_class {
 
     /* Helper for the OpenFlow OFPST_TABLE statistics request.
      *
-     * The 'ots' array contains 'ofproto->n_tables' elements.  Each element is
-     * initialized as:
+     * The 'ots' structure contains two elements
+     *
+     *  - 'ofp_version' the OpenFLow version in use, set to one of:
+     *                  OFP10_VERSION, OFP11_VERSION, OFP12_VERSION.
+     *                  These values denote OpenFLow 1.0, 1.1 and 1.2
+     *                  respectively.
+     *
+     *  - A union of 'o10ts', 'o11ts' and 'o12ts'.
+     *
+     *    This is an array of OpenFLow version-specific table statistics
+     *    elements.
+     *
+     *    'o10ts' should be used for OpenFLow 1.0.
+     *    'o11ts' should be used for OpenFLow 1.1.
+     *    'o12ts' should be used for OpenFLow 1.2.
+     *
+     * The 'o1Xts' array contains 'ofproto->n_tables' elements.
+     * Each element is initialized as:
      *
      *   - 'table_id' to the array index.
      *
      *   - 'name' to "table#" where # is the table ID.
      *
-     *   - 'wildcards' to OFPFW10_ALL.
+     *   - 'wildcards' to OFPFW10_ALL (OpenFLow 1.0) or
+     *                    OFPFW11_ALL (OpenFLow 1.1 and 1.2).
+     *
+     *   - 'instructions' to OFPIT11_ALL (OpenFLow 1.1 and 1.2).
+     *                    Not present in OpenFLow 1.0.
+     *
+     *   - 'write_actions' to OFPAT11_OUTPUT (OpenFLow 1.1) or
+     *                        OFPAT12_OUTPUT (OpenFLow 1.2).
+     *                     Not present in OpenFLow 1.0.
+     *
+     *   - 'apply_actions' to OFPAT11_OUTPUT (OpenFLow 1.1) or
+     *                        OFPAT12_OUTPUT (OpenFLow 1.2).
+     *                     Not present in OpenFLow 1.0.
+     *
+     *   - 'write_setfields' to OFPXMT12_SUPPORTED (OpenFLow 1.2).
+     *                       Not present in OpenFLow 1.0 or 1.1.
+     *
+     *   - 'apply_setfields' to OFPXMT12_SUPPORTED (OpenFLow 1.2).
+     *                       Not present in OpenFLow 1.0 or 1.1.
      *
      *   - 'max_entries' to 1,000,000.
      *
@@ -452,6 +495,21 @@ struct ofproto_class {
      *   - 'wildcards' to the set of wildcards actually supported by the table
      *     (if it doesn't support all OpenFlow wildcards).
      *
+     *   - 'instructions' to set the instructions actually supported by
+     *     the table.
+     *
+     *   - 'write_actions' to set the write actions actually supported by
+     *     the table (if it doesn't support all OpenFlow actions).
+     *
+     *   - 'apply_actions' to set the apply actions actually supported by
+     *     the table (if it doesn't support all OpenFlow actions).
+     *
+     *   - 'write_setfields' to set the write setfields actually supported by
+     *     the table.
+     *
+     *   - 'apply_setfields' to set the apply setfields actually supported by
+     *     the table.
+     *
      *   - 'max_entries' to the maximum number of flows actually supported by
      *     the hardware.
      *
@@ -461,10 +519,11 @@ struct ofproto_class {
      *   - 'matched_count' to the number of packets looked up in this flow
      *     table so far that matched one of the flow entries.
      *
-     * Keep in mind that all of the members of struct ofp10_table_stats are in
-     * network byte order.
+     * Keep in mind that all of the members of elements of the oXts array
+     * are in network byte order.
      */
-    void (*get_tables)(struct ofproto *ofproto, struct ofp10_table_stats *ots);
+    void (*get_tables)(struct ofproto *ofproto,
+                       struct ofproto_table_stats *ots);
 
 /* ## ---------------- ## */
 /* ## ofport Functions ## */
