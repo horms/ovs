@@ -617,6 +617,16 @@ OFP_ASSERT(sizeof(struct ofp11_flow_stats) == 48);
 /* Body for ofp_stats_request of type OFPST_AGGREGATE. */
 /* Identical to ofp11_flow_stats_request */
 
+/* Reply to OFPST_AGGREGATE request. */
+/* Same elements as ofp10_aggregate_stats_reply but different alignment */
+struct ofp11_aggregate_stats_reply {
+    ovs_be64 packet_count;    /* Number of packets in flows. */
+    ovs_be64 byte_count;      /* Number of bytes in flows. */
+    ovs_be32 flow_count;      /* Number of flows. */
+    uint8_t pad[4];           /* Align to 64 bits. */
+};
+OFP_ASSERT(sizeof(struct ofp11_aggregate_stats_reply) == 24);
+
 /* Body of reply to OFPST_TABLE request. */
 struct ofp11_table_stats {
     uint8_t table_id;        /* Identifier of table. Lower numbered tables
