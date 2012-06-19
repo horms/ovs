@@ -305,7 +305,8 @@ int ofputil_decode_flow_stats_reply(struct ofputil_flow_stats *,
                                     struct ofpbuf *msg,
                                     bool flow_age_extension,
                                     struct ofpbuf *ofpacts);
-void ofputil_append_flow_stats_reply(const struct ofputil_flow_stats *,
+void ofputil_append_flow_stats_reply(uint8_t ofp_version,
+                                     const struct ofputil_flow_stats *,
                                      struct list *replies);
 
 /* Aggregate stats reply, independent of protocol. */

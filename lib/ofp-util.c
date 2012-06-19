@@ -2299,14 +2299,34 @@ unknown_to_zero(uint64_t count)
  * those already present in the list of ofpbufs in 'replies'.  'replies' should
  * have been initialized with ofputil_start_stats_reply(). */
 void
-ofputil_append_flow_stats_reply(const struct ofputil_flow_stats *fs,
+ofputil_append_flow_stats_reply(uint8_t ofp_version,
+                                const struct ofputil_flow_stats *fs,
                                 struct list *replies)
 {
     struct ofpbuf *reply = ofpbuf_from_list(list_back(replies));
     const struct ofp10_stats_msg *osm = reply->data;
     size_t start_ofs = reply->size;
 
-    if (osm->type == htons(OFPST_FLOW)) {
+    if (osm->type == htons(OFPST_FLOW) && ofp_version == OFP12_VERSION) {
+        struct ofp11_flow_stats *ofs;
+
+        ofs = ofpbuf_put_uninit(reply, sizeof *ofs);
+        ofs->table_id = fs->table_id;
+        ofs->pad = 0;
+        ofs->duration_sec = htonl(fs->duration_sec);
+        ofs->duration_nsec = htonl(fs->duration_nsec);
+        ofs->priority = htons(fs->rule.priority);
+        ofs->idle_timeout = htons(fs->idle_timeout);
+        ofs->hard_timeout = htons(fs->hard_timeout);
+        memset(ofs->pad2, 0, sizeof ofs->pad2);
+        ofs->cookie = fs->cookie;
+        ofs->packet_count = htonll(unknown_to_zero(fs->packet_count));
+        ofs->byte_count = htonll(unknown_to_zero(fs->byte_count));
+        ofputil_put_match(reply, &fs->rule, 0, 0, OFPUTIL_P_OF12);
+        ofpacts_to_openflow11(fs->ofpacts, reply, OFPIT11_APPLY_ACTIONS);
+        ofs = ofpbuf_at_assert(reply, start_ofs, sizeof *ofs);
+        ofs->length = htons(reply->size - start_ofs);
+    } else if (osm->type == htons(OFPST_FLOW) && ofp_version == OFP10_VERSION) {
         struct ofp10_flow_stats *ofs;
 
         ofs = ofpbuf_put_uninit(reply, sizeof *ofs);

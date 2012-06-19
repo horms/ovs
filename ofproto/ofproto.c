@@ -2445,7 +2445,7 @@ handle_flow_stats_request(struct ofconn *ofconn,
         ofproto->ofproto_class->rule_get_stats(rule, &fs.packet_count,
                                                &fs.byte_count);
         fs.ofpacts = rule->ofpacts;
-        ofputil_append_flow_stats_reply(&fs, &replies);
+        ofputil_append_flow_stats_reply(request->version, &fs, &replies);
     }
     ofconn_send_replies(ofconn, &replies);
 
