@@ -1003,13 +1003,34 @@ ofp_print_flow_stats_reply(struct ds *string, const struct ofp_header *oh)
 static void
 ofp_print_ofpst_aggregate_reply(struct ds *string, const struct ofp_header *oh)
 {
-    const struct ofp10_aggregate_stats_reply *asr;
+    struct ofp11_aggregate_stats_reply asr;
 
-    asr = ofputil_stats_msg_body(oh);
-    ds_put_format(string, " packet_count=%"PRIu64,
-                  ntohll(get_32aligned_be64(&asr->packet_count)));
-    ds_put_format(string, " byte_count=%"PRIu64,
-                  ntohll(get_32aligned_be64(&asr->byte_count)));
+    switch (oh->version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION: {
+        const struct ofp11_aggregate_stats_reply *asr11;
+
+        asr11 = ofputil_stats_msg_body(oh);
+        asr = *asr11;
+        break;
+    }
+
+    case OFP10_VERSION: {
+        const struct ofp10_aggregate_stats_reply *asr10;
+
+        asr10 = ofputil_stats_msg_body(oh);
+        asr.packet_count = get_32aligned_be64(&asr10->packet_count);
+        asr.byte_count = get_32aligned_be64(&asr10->byte_count);
+        asr.flow_count = asr10->flow_count;
+        break;
+    }
+
+    default:
+        NOT_REACHED();
+    }
+
+    ds_put_format(string, " packet_count=%"PRIu64, ntohll(asr->packet_count));
+    ds_put_format(string, " byte_count=%"PRIu64, ntohll(asr->byte_count));
     ds_put_format(string, " flow_count=%"PRIu32, ntohl(asr->flow_count));
 }
 
