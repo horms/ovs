@@ -500,7 +500,7 @@ enum ofperr ofperr_from_name(const char *);
 
 enum ofperr ofperr_decode_msg(const struct ofp_header *, size_t *payload_ofs);
 struct ofpbuf *ofperr_encode_reply(enum ofperr, const struct ofp_header *);
-struct ofpbuf *ofperr_encode_hello(enum ofperr, const struct ofperr_domain *,
+struct ofpbuf *ofperr_encode_hello(enum ofperr, uint8_t ofp_version,
                                    const char *);
 int ofperr_get_type(enum ofperr, const struct ofperr_domain *);
 int ofperr_get_code(enum ofperr, const struct ofperr_domain *);

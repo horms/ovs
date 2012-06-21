@@ -144,13 +144,15 @@ ofperr_get_pair__(enum ofperr error, const struct ofperr_domain *domain)
 }
 
 static struct ofpbuf *
-ofperr_encode_msg__(enum ofperr error, const struct ofperr_domain *domain,
+ofperr_encode_msg__(enum ofperr error, uint8_t ofp_version,
                     ovs_be32 xid, const void *data, size_t data_len)
 {
     struct ofp_error_msg *oem;
     const struct pair *pair;
     struct ofpbuf *buf;
+    const struct ofperr_domain *domain;
 
+    domain = ofperr_domain_from_version(ofp_version);
     if (!domain) {
         return NULL;
     }
@@ -176,7 +178,7 @@ ofperr_encode_msg__(enum ofperr error, const struct ofperr_domain *domain,
 
     pair = ofperr_get_pair__(error, domain);
     if (!ofperr_is_nx_extension(error)) {
-        oem = make_openflow_xid(data_len + sizeof *oem, OFP10_VERSION,
+        oem = make_openflow_xid(data_len + sizeof *oem, ofp_version,
                                 OFPT_ERROR, xid, &buf);
         oem->type = htons(pair->type);
         oem->code = htons(pair->code);
@@ -184,7 +186,7 @@ ofperr_encode_msg__(enum ofperr error, const struct ofperr_domain *domain,
         struct nx_vendor_error *nve;
 
         oem = make_openflow_xid(data_len + sizeof *oem + sizeof *nve,
-                                OFP10_VERSION, OFPT_ERROR, xid, &buf);
+                                ofp_version, OFPT_ERROR, xid, &buf);
         oem->type = htons(NXET_VENDOR);
         oem->code = htons(NXVC_VENDOR_ERROR);
 
@@ -217,31 +219,35 @@ ofperr_encode_msg__(enum ofperr error, const struct ofperr_domain *domain,
 struct ofpbuf *
 ofperr_encode_reply(enum ofperr error, const struct ofp_header *oh)
 {
-    const struct ofperr_domain *domain;
     uint16_t len = ntohs(oh->length);
 
-    domain = ofperr_domain_from_version(oh->version);
-    return ofperr_encode_msg__(error, domain, oh->xid, oh, MIN(len, 64));
+    return ofperr_encode_msg__(error, oh->version, oh->xid, oh, MIN(len, 64));
 }
 
 /* Creates and returns an OpenFlow message of type OFPT_ERROR that conveys the
  * given 'error', in the error domain 'domain'.  The error message will include
  * the additional null-terminated text string 's'.
  *
- * If 'domain' is NULL, uses the OpenFlow 1.0 error domain.  OFPET_HELLO_FAILED
- * error messages are supposed to be backward-compatible, so in theory this
- * should work.
+ * If 'version' is an unknown version then OFP10_VERSION is used.
+ * OFPET_HELLO_FAILED error messages are supposed to be backward-compatible,
+ * so in theory this should work.
  *
  * Returns NULL if 'error' is not an OpenFlow error code or if 'error' cannot
  * be encoded in 'domain'. */
 struct ofpbuf *
-ofperr_encode_hello(enum ofperr error, const struct ofperr_domain *domain,
-                    const char *s)
+ofperr_encode_hello(enum ofperr error, uint8_t ofp_version, const char *s)
 {
-    if (!domain) {
-        domain = &ofperr_of10;
+    switch (ofp_version) {
+    case OFP10_VERSION:
+    case OFP11_VERSION:
+    case OFP12_VERSION:
+        break;
+
+    default:
+        ofp_version = OFP10_VERSION;
     }
-    return ofperr_encode_msg__(error, domain, htonl(0), s, strlen(s));
+
+    return ofperr_encode_msg__(error, ofp_version, htonl(0), s, strlen(s));
 }
 
 /* Returns the value that would go into an OFPT_ERROR message's 'type' for
