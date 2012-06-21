@@ -2221,14 +2221,16 @@ ofputil_encode_flow_removed(const struct ofputil_flow_removed *fr,
                             enum ofputil_protocol protocol)
 {
     struct ofpbuf *msg;
+    uint8_t ofp_version = ofputil_protocol_to_ofp_version(protocol);
 
     switch (protocol) {
+
     case OFPUTIL_P_OF10:
     case OFPUTIL_P_OF10_TID: {
         struct ofp_flow_removed *ofr;
 
-        ofr = make_openflow_xid(sizeof *ofr, OFPT_FLOW_REMOVED, htonl(0),
-                                &msg);
+        ofr = make_openflow_xid(sizeof *ofr, ofp_version,
+                                OFPT_FLOW_REMOVED, htonl(0), &msg);
         ofputil_cls_rule_to_ofp10_match(&fr->rule, &ofr->match);
         ofr->cookie = fr->cookie;
         ofr->priority = htons(fr->rule.priority);
@@ -2858,7 +2860,9 @@ ofputil_encode_switch_features(const struct ofputil_switch_features *features,
     struct ofp_switch_features *osf;
     struct ofpbuf *b;
 
-    osf = make_openflow_xid(sizeof *osf, OFPT_FEATURES_REPLY, xid, &b);
+    osf = make_openflow_xid(sizeof *osf,
+                            ofputil_protocol_to_ofp_version(protocol),
+                            OFPT_FEATURES_REPLY, xid, &b);
     osf->header.version = ofputil_protocol_to_ofp_version(protocol);
     osf->datapath_id = htonll(features->datapath_id);
     osf->n_buffers = htonl(features->n_buffers);
@@ -3100,11 +3104,11 @@ make_nxmsg(size_t openflow_len, uint32_t subtype, struct ofpbuf **bufferp)
  *
  * Returns the header. */
 void *
-make_openflow_xid(size_t openflow_len, uint8_t type, ovs_be32 xid,
-                  struct ofpbuf **bufferp)
+make_openflow_xid(size_t openflow_len, uint8_t version, uint8_t type,
+                  ovs_be32 xid, struct ofpbuf **bufferp)
 {
     *bufferp = ofpbuf_new(openflow_len);
-    return put_openflow_xid(openflow_len, OFP10_VERSION, type, xid, *bufferp);
+    return put_openflow_xid(openflow_len, version, type, xid, *bufferp);
 }
 
 /* Similar to make_openflow_xid() but creates a Nicira vendor extension message

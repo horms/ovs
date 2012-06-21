@@ -1935,9 +1935,12 @@ handle_get_config_request(struct ofconn *ofconn, const struct ofp_header *oh)
     struct ofp_switch_config *osc;
     enum ofp_config_flags flags;
     struct ofpbuf *buf;
+    enum ofputil_protocol protocol = ofconn_get_protocol(ofconn);
 
     /* Send reply. */
-    osc = make_openflow_xid(sizeof *osc, OFPT_GET_CONFIG_REPLY, oh->xid, &buf);
+    osc = make_openflow_xid(sizeof *osc,
+                            ofputil_protocol_to_ofp_version(protocol),
+                            OFPT_GET_CONFIG_REPLY, oh->xid, &buf);
     flags = ofproto->frag_handling;
     if (ofconn_get_invalid_ttl_to_controller(ofconn)) {
         flags |= OFPC_INVALID_TTL_TO_CONTROLLER;
@@ -3273,12 +3276,14 @@ static enum ofperr
 handle_barrier_request(struct ofconn *ofconn, const struct ofp_header *oh)
 {
     struct ofpbuf *buf;
+    enum ofputil_protocol protocol = ofconn_get_protocol(ofconn);
 
     if (ofconn_has_pending_opgroups(ofconn)) {
         return OFPROTO_POSTPONE;
     }
 
-    make_openflow_xid(sizeof *oh, OFPT10_BARRIER_REPLY, oh->xid, &buf);
+    make_openflow_xid(sizeof *oh, ofputil_protocol_to_ofp_version(protocol),
+                      OFPT10_BARRIER_REPLY, oh->xid, &buf);
     ofconn_send_reply(ofconn, buf);
     return 0;
 }

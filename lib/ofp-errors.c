@@ -176,14 +176,15 @@ ofperr_encode_msg__(enum ofperr error, const struct ofperr_domain *domain,
 
     pair = ofperr_get_pair__(error, domain);
     if (!ofperr_is_nx_extension(error)) {
-        oem = make_openflow_xid(data_len + sizeof *oem, OFPT_ERROR, xid, &buf);
+        oem = make_openflow_xid(data_len + sizeof *oem, OFP10_VERSION,
+                                OFPT_ERROR, xid, &buf);
         oem->type = htons(pair->type);
         oem->code = htons(pair->code);
     } else {
         struct nx_vendor_error *nve;
 
         oem = make_openflow_xid(data_len + sizeof *oem + sizeof *nve,
-                                OFPT_ERROR, xid, &buf);
+                                OFP10_VERSION, OFPT_ERROR, xid, &buf);
         oem->type = htons(NXET_VENDOR);
         oem->code = htons(NXVC_VENDOR_ERROR);
 
