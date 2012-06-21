@@ -344,36 +344,36 @@ send_openflow_buffer(struct vconn *vconn, struct ofpbuf *buffer)
 }
 
 static void
-dump_transaction(const char *vconn_name, struct ofpbuf *request)
+dump_transaction(struct vconn *vconn, struct ofpbuf *request)
 {
-    struct vconn *vconn;
     struct ofpbuf *reply;
 
     update_openflow_length(request);
-    open_vconn(vconn_name, &vconn);
-    run(vconn_transact(vconn, request, &reply), "talking to %s", vconn_name);
+    run(vconn_transact(vconn, request, &reply), "talking to %s",
+        vconn_get_name(vconn));
     ofp_print(stdout, reply->data, reply->size, verbosity + 1);
     ofpbuf_delete(reply);
-    vconn_close(vconn);
 }
 
 static void
 dump_trivial_transaction(const char *vconn_name, uint8_t request_type)
 {
     struct ofpbuf *request;
-    make_openflow(sizeof(struct ofp_header), OFP10_VERSION, request_type,
-                  &request);
-    dump_transaction(vconn_name, request);
+    struct vconn *vconn;
+
+    open_vconn(vconn_name, &vconn);
+    make_openflow(sizeof(struct ofp_header), vconn_get_version(vconn),
+                  request_type, &request);
+    dump_transaction(vconn, request);
+    vconn_close(vconn);
 }
 
 static void
-dump_stats_transaction(const char *vconn_name, struct ofpbuf *request)
+dump_stats_transaction(struct vconn *vconn, struct ofpbuf *request)
 {
     ovs_be32 send_xid = ((struct ofp_header *) request->data)->xid;
-    struct vconn *vconn;
     bool done = false;
 
-    open_vconn(vconn_name, &vconn);
     send_openflow_buffer(vconn, request);
     while (!done) {
         ovs_be32 recv_xid;
@@ -394,16 +394,18 @@ dump_stats_transaction(const char *vconn_name, struct ofpbuf *request)
         }
         ofpbuf_delete(reply);
     }
-    vconn_close(vconn);
 }
 
 static void
 dump_trivial_stats_transaction(const char *vconn_name, uint8_t stats_type)
 {
     struct ofpbuf *request;
+    struct vconn *vconn;
 
+    open_vconn(vconn_name, &vconn);
     ofputil_make_stats_request(0, stats_type, 0, &request);
-    dump_stats_transaction(vconn_name, request);
+    dump_stats_transaction(vconn, request);
+    vconn_close(vconn);
 }
 
 /* Sends 'request', which should be a request that only has a reply if an error
@@ -590,10 +592,11 @@ fetch_port_by_stats(const char *vconn_name,
     bool done = false;
     bool found = false;
 
+    open_vconn(vconn_name, &vconn);
+
     ofputil_make_stats_request(0, OFPST_PORT_DESC, 0, &request);
     send_xid = ((struct ofp_header *) request->data)->xid;
 
-    open_vconn(vconn_name, &vconn);
     send_openflow_buffer(vconn, request);
     while (!done) {
         ovs_be32 recv_xid;
@@ -761,7 +764,7 @@ do_dump_flows__(int argc, char *argv[], bool aggregate)
     protocol = open_vconn(argv[1], &vconn);
     protocol = set_protocol_for_flow_dump(vconn, protocol, usable_protocols);
     request = ofputil_encode_flow_stats_request(&fsr, protocol);
-    dump_stats_transaction(argv[1], request);
+    dump_stats_transaction(vconn, request);
     vconn_close(vconn);
 }
 
@@ -782,6 +785,9 @@ do_queue_stats(int argc, char *argv[])
 {
     struct ofp10_queue_stats_request *req;
     struct ofpbuf *request;
+    struct vconn *vconn;
+
+    open_vconn(argv[1], &vconn);
 
     req = ofputil_make_stats_request(sizeof *req, OFPST_QUEUE, 0, &request);
 
@@ -798,7 +804,8 @@ do_queue_stats(int argc, char *argv[])
 
     memset(req->pad, 0, sizeof req->pad);
 
-    dump_stats_transaction(argv[1], request);
+    dump_stats_transaction(vconn, request);
+    vconn_close(vconn);
 }
 
 static enum ofputil_protocol
@@ -1193,11 +1200,15 @@ do_dump_ports(int argc, char *argv[])
     struct ofp10_port_stats_request *req;
     struct ofpbuf *request;
     uint16_t port;
+    struct vconn *vconn;
+
+    open_vconn(argv[1], &vconn);
 
     req = ofputil_make_stats_request(sizeof *req, OFPST_PORT, 0, &request);
     port = argc > 2 ? str_to_port_no(argv[1], argv[2]) : OFPP_NONE;
     req->port_no = htons(port);
-    dump_stats_transaction(argv[1], request);
+    dump_stats_transaction(vconn, request);
+    vconn_close(vconn);
 }
 
 static void
