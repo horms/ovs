@@ -3508,12 +3508,26 @@ make_echo_reply(const struct ofp_header *rq)
 }
 
 struct ofpbuf *
-ofputil_encode_barrier_request(void)
+ofputil_encode_barrier_request(uint8_t ofp_version)
 {
     struct ofpbuf *msg;
+    uint8_t ofp_type;
 
-    make_openflow(sizeof(struct ofp_header), OFP10_VERSION,
-                  OFPT10_BARRIER_REQUEST, &msg);
+    switch (ofp_version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION:
+        ofp_type = OFPT11_BARRIER_REQUEST;
+        break;
+
+    case OFP10_VERSION:
+        ofp_type = OFPT10_BARRIER_REQUEST;
+        break;
+
+    default:
+        NOT_REACHED();
+    }
+
+    make_openflow(sizeof(struct ofp_header), ofp_version, ofp_type, &msg);
     return msg;
 }
 
