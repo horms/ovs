@@ -3199,7 +3199,7 @@ update_openflow_length(struct ofpbuf *buffer)
 }
 
 static void
-put_stats__(ovs_be32 xid, uint8_t ofp_type,
+put_stats__(ovs_be32 xid, uint8_t ofp_version, uint8_t ofp_type,
             ovs_be16 ofpst_type, ovs_be32 nxst_subtype,
             struct ofpbuf *msg)
 {
@@ -3211,10 +3211,19 @@ put_stats__(ovs_be32 xid, uint8_t ofp_type,
         nsm->vsm.vendor = htonl(NX_VENDOR_ID);
         nsm->subtype = nxst_subtype;
     } else {
-        struct ofp10_stats_msg *osm;
+        if (ofp_version == OFP10_VERSION) {
+            struct ofp10_stats_msg *osm;
 
-        osm = put_openflow_xid(sizeof *osm, OFP10_VERSION, ofp_type, xid, msg);
-        osm->type = ofpst_type;
+            osm = put_openflow_xid(sizeof *osm, ofp_version, ofp_type,
+                                   xid, msg);
+            osm->type = ofpst_type;
+        } else {
+            struct ofp11_stats_msg *osm;
+
+            osm = put_openflow_xid(sizeof *osm, ofp_version, ofp_type,
+                                   xid, msg);
+            osm->type = ofpst_type;
+        }
     }
 }
 
@@ -3237,7 +3246,7 @@ ofputil_make_stats_request(size_t body_len, uint16_t ofpst_type,
     struct ofpbuf *msg;
 
     msg = *bufferp = ofpbuf_new(HEADER_LEN + body_len);
-    put_stats__(alloc_xid(), OFPT10_STATS_REQUEST,
+    put_stats__(alloc_xid(), OFP10_VERSION, OFPT10_STATS_REQUEST,
                 htons(ofpst_type), htonl(nxst_subtype), msg);
 
     return ofpbuf_put_zeros(msg, body_len);
@@ -3247,12 +3256,31 @@ static void
 put_stats_reply__(const struct ofp_header *request, struct ofpbuf *msg)
 {
     const struct ofp10_stats_msg *osm;
+    uint8_t ofp_type;
 
-    assert(request->type == OFPT10_STATS_REQUEST ||
-           request->type == OFPT10_STATS_REPLY);
+    switch (request->version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION:
+        ofp_type = OFPT11_STATS_REPLY;
+        assert(request->type == OFPT11_STATS_REQUEST ||
+               request->type == OFPT11_STATS_REPLY);
+        break;
 
+    case OFP10_VERSION:
+        assert(request->type == OFPT10_STATS_REQUEST ||
+               request->type == OFPT10_STATS_REPLY);
+        ofp_type = OFPT10_STATS_REPLY;
+        break;
+
+    default:
+        NOT_REACHED();
+    }
+
+    /* This is fine because the non-pad elements of
+     * struct ofp10_stats_msg and struct ofp11_stats_msg
+     * are at the same offsets */
     osm = (const struct ofp10_stats_msg *) request;
-    put_stats__(request->xid, OFPT10_STATS_REPLY, osm->type,
+    put_stats__(request->xid, request->version, ofp_type, osm->type,
                 (osm->type != htons(OFPST_VENDOR)
                  ? htonl(0)
                  : ((const struct nicira10_stats_msg *) request)->subtype),
