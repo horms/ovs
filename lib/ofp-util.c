@@ -1697,6 +1697,7 @@ ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
     struct ofp10_flow_mod *ofm;
     struct nx_flow_mod *nfm;
     struct ofpbuf *msg;
+    uint8_t ofp_version = ofputil_protocol_to_ofp_version(protocol);
     uint16_t command;
     int match_len;
 
@@ -1708,7 +1709,7 @@ ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
     case OFPUTIL_P_OF10:
     case OFPUTIL_P_OF10_TID:
         msg = ofpbuf_new(sizeof *ofm + fm->ofpacts_len);
-        ofm = put_openflow(sizeof *ofm, OFPT10_FLOW_MOD, msg);
+        ofm = put_openflow(sizeof *ofm, ofp_version, OFPT10_FLOW_MOD, msg);
         ofputil_cls_rule_to_ofp10_match(&fm->cr, &ofm->match);
         ofm->cookie = fm->new_cookie;
         ofm->command = htons(command);
@@ -3034,7 +3035,7 @@ ofputil_encode_packet_out(const struct ofputil_packet_out *po)
     }
 
     msg = ofpbuf_new(size);
-    put_openflow(sizeof *opo, OFPT10_PACKET_OUT, msg);
+    put_openflow(sizeof *opo, OFP10_VERSION, OFPT10_PACKET_OUT, msg);
     ofpacts_to_openflow10(po->ofpacts, msg);
 
     opo = msg->data;
@@ -3131,9 +3132,10 @@ make_nxmsg_xid(size_t openflow_len, uint32_t subtype, ovs_be32 xid,
  *
  * Returns the header. */
 void *
-put_openflow(size_t openflow_len, uint8_t type, struct ofpbuf *buffer)
+put_openflow(size_t openflow_len, uint8_t version, uint8_t type,
+             struct ofpbuf *buffer)
 {
-    return put_openflow_xid(openflow_len, OFP10_VERSION, type,
+    return put_openflow_xid(openflow_len, version, type,
                             alloc_xid(), buffer);
 }
 
