@@ -3483,12 +3483,12 @@ ofputil_decode_stats_msg_flags(const struct ofp_header *oh)
 
 /* Creates and returns an OFPT_ECHO_REQUEST message with an empty payload. */
 struct ofpbuf *
-make_echo_request(void)
+make_echo_request(uint8_t ofp_version)
 {
     struct ofp_header *rq;
     struct ofpbuf *out = ofpbuf_new(sizeof *rq);
     rq = ofpbuf_put_uninit(out, sizeof *rq);
-    rq->version = OFP10_VERSION;
+    rq->version = ofp_version;
     rq->type = OFPT_ECHO_REQUEST;
     rq->length = htons(sizeof *rq);
     rq->xid = htonl(0);

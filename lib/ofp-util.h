@@ -570,7 +570,7 @@ uint32_t ofputil_decode_stats_msg_subtype(const struct ofp_header *);
 uint16_t ofputil_decode_stats_msg_flags(const struct ofp_header *);
 
 /* Encoding simple OpenFlow messages. */
-struct ofpbuf *make_echo_request(void);
+struct ofpbuf *make_echo_request(uint8_t ofp_version);
 struct ofpbuf *make_echo_reply(const struct ofp_header *rq);
 
 struct ofpbuf *ofputil_encode_barrier_request(uint8_t ofp_version);
