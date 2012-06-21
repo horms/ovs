@@ -323,13 +323,18 @@ send_features_request(struct lswitch *sw, struct rconn *rconn)
     if (now >= sw->last_features_request + 1) {
         struct ofpbuf *b;
         struct ofp_switch_config *osc;
+        int ofp_version;
+
+        ofp_version = rconn_get_version(rconn);
+        assert(ofp_version >= 0 && ofp_version <= 0xff);
 
         /* Send OFPT_FEATURES_REQUEST. */
-        make_openflow(sizeof(struct ofp_header), OFPT_FEATURES_REQUEST, &b);
+        make_openflow(sizeof(struct ofp_header), ofp_version,
+                      OFPT_FEATURES_REQUEST, &b);
         queue_tx(sw, rconn, b);
 
         /* Send OFPT_SET_CONFIG. */
-        osc = make_openflow(sizeof *osc, OFPT_SET_CONFIG, &b);
+        osc = make_openflow(sizeof *osc, ofp_version, OFPT_SET_CONFIG, &b);
         osc->miss_send_len = htons(OFP_DEFAULT_MISS_SEND_LEN);
         queue_tx(sw, rconn, b);
 

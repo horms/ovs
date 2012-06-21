@@ -2995,7 +2995,7 @@ ofputil_encode_port_mod(const struct ofputil_port_mod *pm,
     if (ofp_version == OFP10_VERSION) {
         struct ofp10_port_mod *opm;
 
-        opm = make_openflow(sizeof *opm, OFPT10_PORT_MOD, &b);
+        opm = make_openflow(sizeof *opm, ofp_version, OFPT10_PORT_MOD, &b);
         opm->port_no = htons(pm->port_no);
         memcpy(opm->hw_addr, pm->hw_addr, ETH_ADDR_LEN);
         opm->config = htonl(pm->config & OFPPC10_ALL);
@@ -3004,7 +3004,7 @@ ofputil_encode_port_mod(const struct ofputil_port_mod *pm,
     } else if (ofp_version == OFP11_VERSION) {
         struct ofp11_port_mod *opm;
 
-        opm = make_openflow(sizeof *opm, OFPT11_PORT_MOD, &b);
+        opm = make_openflow(sizeof *opm, ofp_version, OFPT11_PORT_MOD, &b);
         opm->port_no = htonl(pm->port_no);
         memcpy(opm->hw_addr, pm->hw_addr, ETH_ADDR_LEN);
         opm->config = htonl(pm->config & OFPPC11_ALL);
@@ -3058,9 +3058,9 @@ ofputil_msg_type_name(const struct ofputil_msg_type *type)
 }
 
 /* Allocates and stores in '*bufferp' a new ofpbuf with a size of
- * 'openflow_len', starting with an OpenFlow header with the given 'type' and
- * an arbitrary transaction id.  Allocated bytes beyond the header, if any, are
- * zeroed.
+ * 'openflow_len', starting with an OpenFlow header with the given
+ * 'version' and 'type', and an arbitrary transaction id.  Allocated bytes
+ * beyond the header, if any, are zeroed.
  *
  * The caller is responsible for freeing '*bufferp' when it is no longer
  * needed.
@@ -3071,11 +3071,11 @@ ofputil_msg_type_name(const struct ofputil_msg_type *type)
  *
  * Returns the header. */
 void *
-make_openflow(size_t openflow_len, uint8_t type, struct ofpbuf **bufferp)
+make_openflow(size_t openflow_len, uint8_t version, uint8_t type,
+              struct ofpbuf **bufferp)
 {
     *bufferp = ofpbuf_new(openflow_len);
-    return put_openflow_xid(openflow_len, OFP10_VERSION, type,
-                            alloc_xid(), *bufferp);
+    return put_openflow_xid(openflow_len, version, type, alloc_xid(), *bufferp);
 }
 
 /* Similar to make_openflow() but creates a Nicira vendor extension message
@@ -3459,7 +3459,8 @@ ofputil_encode_barrier_request(void)
 {
     struct ofpbuf *msg;
 
-    make_openflow(sizeof(struct ofp_header), OFPT10_BARRIER_REQUEST, &msg);
+    make_openflow(sizeof(struct ofp_header), OFP10_VERSION,
+                  OFPT10_BARRIER_REQUEST, &msg);
     return msg;
 }
 

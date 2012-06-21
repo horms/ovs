@@ -361,7 +361,8 @@ static void
 dump_trivial_transaction(const char *vconn_name, uint8_t request_type)
 {
     struct ofpbuf *request;
-    make_openflow(sizeof(struct ofp_header), request_type, &request);
+    make_openflow(sizeof(struct ofp_header), OFP10_VERSION, request_type,
+                  &request);
     dump_transaction(vconn_name, request);
 }
 
@@ -451,8 +452,8 @@ fetch_switch_config(struct vconn *vconn, struct ofp_switch_config *config_)
     struct ofpbuf *request;
     struct ofpbuf *reply;
 
-    make_openflow(sizeof(struct ofp_header), OFPT_GET_CONFIG_REQUEST,
-                  &request);
+    make_openflow(sizeof(struct ofp_header), vconn_get_version(vconn),
+                  OFPT_GET_CONFIG_REQUEST, &request);
     run(vconn_transact(vconn, request, &reply),
         "talking to %s", vconn_get_name(vconn));
 
@@ -475,7 +476,8 @@ set_switch_config(struct vconn *vconn, struct ofp_switch_config *config_)
     struct ofp_header save_header;
     struct ofpbuf *request;
 
-    config = make_openflow(sizeof *config, OFPT_SET_CONFIG, &request);
+    config = make_openflow(sizeof *config, vconn_get_version(vconn),
+                           OFPT_SET_CONFIG, &request);
     save_header = config->header;
     *config = *config_;
     config->header = save_header;
@@ -492,9 +494,9 @@ do_show(int argc OVS_UNUSED, char *argv[])
     struct ofpbuf *reply;
     bool trunc;
 
-    make_openflow(sizeof(struct ofp_header), OFPT_FEATURES_REQUEST,
-                  &request);
     open_vconn(vconn_name, &vconn);
+    make_openflow(sizeof(struct ofp_header), vconn_get_version(vconn),
+                  OFPT_FEATURES_REQUEST, &request);
     run(vconn_transact(vconn, request, &reply), "talking to %s", vconn_name);
 
     trunc = ofputil_switch_features_ports_trunc(reply);
@@ -538,7 +540,8 @@ fetch_port_by_features(const char *vconn_name,
     bool found = false;
 
     /* Fetch the switch's ofp_switch_features. */
-    make_openflow(sizeof(struct ofp_header), OFPT_FEATURES_REQUEST, &request);
+    make_openflow(sizeof(struct ofp_header), vconn_get_version(vconn),
+                  OFPT_FEATURES_REQUEST, &request);
     open_vconn(vconn_name, &vconn);
     run(vconn_transact(vconn, request, &reply), "talking to %s", vconn_name);
     vconn_close(vconn);
@@ -1210,8 +1213,11 @@ do_probe(int argc OVS_UNUSED, char *argv[])
     struct vconn *vconn;
     struct ofpbuf *reply;
 
-    make_openflow(sizeof(struct ofp_header), OFPT_ECHO_REQUEST, &request);
     open_vconn(argv[1], &vconn);
+
+    make_openflow(sizeof(struct ofp_header), vconn_get_version(vconn),
+                  OFPT_ECHO_REQUEST, &request);
+
     run(vconn_transact(vconn, request, &reply), "talking to %s", argv[1]);
     if (reply->size != sizeof(struct ofp_header)) {
         ovs_fatal(0, "reply does not match request");
@@ -1383,6 +1389,7 @@ do_ping(int argc, char *argv[])
         struct ofp_header *rq_hdr, *rpy_hdr;
 
         rq_hdr = make_openflow(sizeof(struct ofp_header) + payload,
+                               vconn_get_version(vconn),
                                OFPT_ECHO_REQUEST, &request);
         random_bytes(rq_hdr + 1, payload);
 
@@ -1438,7 +1445,8 @@ do_benchmark(int argc OVS_UNUSED, char *argv[])
         struct ofpbuf *request, *reply;
         struct ofp_header *rq_hdr;
 
-        rq_hdr = make_openflow(message_size, OFPT_ECHO_REQUEST, &request);
+        rq_hdr = make_openflow(message_size, vconn_get_version(vconn),
+                               OFPT_ECHO_REQUEST, &request);
         memset(rq_hdr + 1, 0, payload_size);
         run(vconn_transact(vconn, request, &reply), "transact");
         ofpbuf_delete(reply);

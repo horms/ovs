@@ -517,7 +517,8 @@ struct ofpbuf *ofputil_encode_port_mod(const struct ofputil_port_mod *,
                                        enum ofputil_protocol);
 
 /* OpenFlow protocol utility functions. */
-void *make_openflow(size_t openflow_len, uint8_t type, struct ofpbuf **);
+void *make_openflow(size_t openflow_len, uint8_t version, uint8_t type,
+                    struct ofpbuf **);
 void *make_nxmsg(size_t openflow_len, uint32_t subtype, struct ofpbuf **);
 
 void *make_openflow_xid(size_t openflow_len, uint8_t type,

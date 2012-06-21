@@ -385,7 +385,8 @@ vcs_send_hello(struct vconn *vconn)
     struct ofpbuf *b;
     int retval;
 
-    make_openflow(sizeof(struct ofp_header), OFPT_HELLO, &b);
+    /* Note that here OFP10_VERSION is the maximum version supported */
+    make_openflow(sizeof(struct ofp_header), OFP10_VERSION, OFPT_HELLO, &b);
     retval = do_send(vconn, b);
     if (!retval) {
         vconn->state = VCS_RECV_HELLO;
