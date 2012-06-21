@@ -1862,6 +1862,7 @@ ofputil_encode_flow_stats_request(const struct ofputil_flow_stats_request *fsr,
                                   enum ofputil_protocol protocol)
 {
     struct ofpbuf *msg;
+    uint8_t ofp_version = ofputil_protocol_to_ofp_version(protocol);
 
     switch (protocol) {
     case OFPUTIL_P_OF10:
@@ -1870,7 +1871,8 @@ ofputil_encode_flow_stats_request(const struct ofputil_flow_stats_request *fsr,
         int type;
 
         type = fsr->aggregate ? OFPST_AGGREGATE : OFPST_FLOW;
-        ofsr = ofputil_make_stats_request(sizeof *ofsr, type, 0, &msg);
+        ofsr = ofputil_make_stats_request(sizeof *ofsr, ofp_version,
+                                          type, 0, &msg);
         ofputil_cls_rule_to_ofp10_match(&fsr->match, &ofsr->match);
         ofsr->table_id = fsr->table_id;
         ofsr->out_port = htons(fsr->out_port);
@@ -1884,7 +1886,8 @@ ofputil_encode_flow_stats_request(const struct ofputil_flow_stats_request *fsr,
         int subtype;
 
         subtype = fsr->aggregate ? NXST_AGGREGATE : NXST_FLOW;
-        ofputil_make_stats_request(sizeof *nfsr, OFPST_VENDOR, subtype, &msg);
+        ofputil_make_stats_request(sizeof *nfsr, ofp_version,
+                                   OFPST_VENDOR, subtype, &msg);
         match_len = nx_put_match(msg, false, &fsr->match,
                                  fsr->cookie, fsr->cookie_mask);
 
@@ -3235,8 +3238,9 @@ put_stats__(ovs_be32 xid, uint8_t ofp_version, uint8_t ofp_type,
  * Appends 'body_len' bytes of zeroes to the reply as the body and returns the
  * first byte of the body. */
 void *
-ofputil_make_stats_request(size_t body_len, uint16_t ofpst_type,
-                           uint32_t nxst_subtype, struct ofpbuf **bufferp)
+ofputil_make_stats_request(size_t body_len, uint8_t ofp_version,
+                           uint16_t ofpst_type, uint32_t nxst_subtype,
+                           struct ofpbuf **bufferp)
 {
     enum {
         HEADER_LEN = MAX(MAX(sizeof(struct ofp10_stats_msg),
@@ -3244,9 +3248,24 @@ ofputil_make_stats_request(size_t body_len, uint16_t ofpst_type,
                          sizeof(struct nicira10_stats_msg))
     };
     struct ofpbuf *msg;
+    uint8_t ofp_type;
+
+    switch (ofp_version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION:
+        ofp_type = OFPT11_STATS_REQUEST;
+        break;
+
+    case OFP10_VERSION:
+        ofp_type = OFPT10_STATS_REQUEST;
+        break;
+
+    default:
+        NOT_REACHED();
+    }
 
     msg = *bufferp = ofpbuf_new(HEADER_LEN + body_len);
-    put_stats__(alloc_xid(), OFP10_VERSION, OFPT10_STATS_REQUEST,
+    put_stats__(alloc_xid(), ofp_version, ofp_type,
                 htons(ofpst_type), htonl(nxst_subtype), msg);
 
     return ofpbuf_put_zeros(msg, body_len);

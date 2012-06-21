@@ -403,7 +403,8 @@ dump_trivial_stats_transaction(const char *vconn_name, uint8_t stats_type)
     struct vconn *vconn;
 
     open_vconn(vconn_name, &vconn);
-    ofputil_make_stats_request(0, stats_type, 0, &request);
+    ofputil_make_stats_request(0, vconn_get_version(vconn),
+                               stats_type, 0, &request);
     dump_stats_transaction(vconn, request);
     vconn_close(vconn);
 }
@@ -594,7 +595,8 @@ fetch_port_by_stats(const char *vconn_name,
 
     open_vconn(vconn_name, &vconn);
 
-    ofputil_make_stats_request(0, OFPST_PORT_DESC, 0, &request);
+    ofputil_make_stats_request(0, vconn_get_version(vconn),
+                               OFPST_PORT_DESC, 0, &request);
     send_xid = ((struct ofp_header *) request->data)->xid;
 
     send_openflow_buffer(vconn, request);
@@ -789,7 +791,8 @@ do_queue_stats(int argc, char *argv[])
 
     open_vconn(argv[1], &vconn);
 
-    req = ofputil_make_stats_request(sizeof *req, OFPST_QUEUE, 0, &request);
+    req = ofputil_make_stats_request(sizeof *req, OFP10_VERSION,
+                                     OFPST_QUEUE, 0, &request);
 
     if (argc > 2 && argv[2][0] && strcasecmp(argv[2], "all")) {
         req->port_no = htons(str_to_port_no(argv[1], argv[2]));
@@ -1204,7 +1207,8 @@ do_dump_ports(int argc, char *argv[])
 
     open_vconn(argv[1], &vconn);
 
-    req = ofputil_make_stats_request(sizeof *req, OFPST_PORT, 0, &request);
+    req = ofputil_make_stats_request(sizeof *req, OFP10_VERSION,
+                                     OFPST_PORT, 0, &request);
     port = argc > 2 ? str_to_port_no(argv[1], argv[2]) : OFPP_NONE;
     req->port_no = htons(port);
     dump_stats_transaction(vconn, request);

@@ -538,8 +538,9 @@ void *put_nxmsg_xid(size_t openflow_len, uint32_t subtype, ovs_be32 xid,
 void update_openflow_length(struct ofpbuf *);
 
 /* Encoding OpenFlow stats messages. */
-void *ofputil_make_stats_request(size_t body_len, uint16_t type,
-                                 uint32_t subtype, struct ofpbuf **);
+void *ofputil_make_stats_request(size_t body_len, uint8_t ofp_version,
+                                 uint16_t type, uint32_t subtype,
+                                 struct ofpbuf **);
 void *ofputil_make_stats_reply(size_t body_len,
                                const struct ofp_header *request,
                                struct ofpbuf **);
