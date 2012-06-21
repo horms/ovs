@@ -526,8 +526,8 @@ void *make_nxmsg_xid(size_t openflow_len, uint32_t subtype, ovs_be32 xid,
                      struct ofpbuf **);
 
 void *put_openflow(size_t openflow_len, uint8_t type, struct ofpbuf *);
-void *put_openflow_xid(size_t openflow_len, uint8_t type, ovs_be32 xid,
-                       struct ofpbuf *);
+void *put_openflow_xid(size_t openflow_len, uint8_t version,
+                       uint8_t type, ovs_be32 xid, struct ofpbuf *);
 
 void *put_nxmsg(size_t openflow_len, uint32_t subtype, struct ofpbuf *);
 void *put_nxmsg_xid(size_t openflow_len, uint32_t subtype, ovs_be32 xid,

@@ -2928,8 +2928,9 @@ ofputil_encode_port_status(const struct ofputil_port_status *ps,
     struct ofpbuf *b;
 
     b = ofpbuf_new(sizeof *ops + sizeof(struct ofp11_port));
-    ops = put_openflow_xid(sizeof *ops, OFPT_PORT_STATUS, htonl(0), b);
-    ops->header.version = ofputil_protocol_to_ofp_version(protocol);
+    ops = put_openflow_xid(sizeof *ops,
+                           ofputil_protocol_to_ofp_version(protocol),
+                           OFPT_PORT_STATUS, htonl(0), b);
     ops->reason = ps->reason;
     ofputil_put_phy_port(ops->header.version, &ps->desc, b);
     update_openflow_length(b);
@@ -3073,7 +3074,8 @@ void *
 make_openflow(size_t openflow_len, uint8_t type, struct ofpbuf **bufferp)
 {
     *bufferp = ofpbuf_new(openflow_len);
-    return put_openflow_xid(openflow_len, type, alloc_xid(), *bufferp);
+    return put_openflow_xid(openflow_len, OFP10_VERSION, type,
+                            alloc_xid(), *bufferp);
 }
 
 /* Similar to make_openflow() but creates a Nicira vendor extension message
@@ -3102,7 +3104,7 @@ make_openflow_xid(size_t openflow_len, uint8_t type, ovs_be32 xid,
                   struct ofpbuf **bufferp)
 {
     *bufferp = ofpbuf_new(openflow_len);
-    return put_openflow_xid(openflow_len, type, xid, *bufferp);
+    return put_openflow_xid(openflow_len, OFP10_VERSION, type, xid, *bufferp);
 }
 
 /* Similar to make_openflow_xid() but creates a Nicira vendor extension message
@@ -3127,7 +3129,8 @@ make_nxmsg_xid(size_t openflow_len, uint32_t subtype, ovs_be32 xid,
 void *
 put_openflow(size_t openflow_len, uint8_t type, struct ofpbuf *buffer)
 {
-    return put_openflow_xid(openflow_len, type, alloc_xid(), buffer);
+    return put_openflow_xid(openflow_len, OFP10_VERSION, type,
+                            alloc_xid(), buffer);
 }
 
 /* Appends 'openflow_len' bytes to 'buffer', starting with an OpenFlow header
@@ -3140,8 +3143,8 @@ put_openflow(size_t openflow_len, uint8_t type, struct ofpbuf *buffer)
  *
  * Returns the header. */
 void *
-put_openflow_xid(size_t openflow_len, uint8_t type, ovs_be32 xid,
-                 struct ofpbuf *buffer)
+put_openflow_xid(size_t openflow_len, uint8_t version,
+                 uint8_t type, ovs_be32 xid, struct ofpbuf *buffer)
 {
     struct ofp_header *oh;
 
@@ -3149,7 +3152,7 @@ put_openflow_xid(size_t openflow_len, uint8_t type, ovs_be32 xid,
     assert(openflow_len <= UINT16_MAX);
 
     oh = ofpbuf_put_uninit(buffer, openflow_len);
-    oh->version = OFP10_VERSION;
+    oh->version = version;
     oh->type = type;
     oh->length = htons(openflow_len);
     oh->xid = xid;
@@ -3173,7 +3176,8 @@ put_nxmsg_xid(size_t openflow_len, uint32_t subtype, ovs_be32 xid,
 {
     struct nicira_header *nxh;
 
-    nxh = put_openflow_xid(openflow_len, OFPT_VENDOR, xid, buffer);
+    nxh = put_openflow_xid(openflow_len, OFP10_VERSION, OFPT_VENDOR,
+                           xid, buffer);
     nxh->vendor = htonl(NX_VENDOR_ID);
     nxh->subtype = htonl(subtype);
     return nxh;
@@ -3196,14 +3200,14 @@ put_stats__(ovs_be32 xid, uint8_t ofp_type,
     if (ofpst_type == htons(OFPST_VENDOR)) {
         struct nicira10_stats_msg *nsm;
 
-        nsm = put_openflow_xid(sizeof *nsm, ofp_type, xid, msg);
+        nsm = put_openflow_xid(sizeof *nsm, OFP10_VERSION, ofp_type, xid, msg);
         nsm->vsm.osm.type = ofpst_type;
         nsm->vsm.vendor = htonl(NX_VENDOR_ID);
         nsm->subtype = nxst_subtype;
     } else {
         struct ofp10_stats_msg *osm;
 
-        osm = put_openflow_xid(sizeof *osm, ofp_type, xid, msg);
+        osm = put_openflow_xid(sizeof *osm, OFP10_VERSION, ofp_type, xid, msg);
         osm->type = ofpst_type;
     }
 }
