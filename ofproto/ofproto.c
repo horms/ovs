@@ -2166,7 +2166,6 @@ static void
 handle_table_stats_request11(struct ofconn *ofconn, struct ofpbuf *msg)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
-    struct ofp11_stats_msg *osm;
     struct ofp11_table_stats *ots;
     size_t i;
 
@@ -2200,7 +2199,6 @@ static void
 handle_table_stats_request12(struct ofconn *ofconn, struct ofpbuf *msg)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
-    struct ofp11_stats_msg *osm;
     struct ofp12_table_stats *ots;
     size_t i;
 
@@ -2262,15 +2260,10 @@ handle_table_stats_request(struct ofconn *ofconn,
 }
 
 static void
-append_port_stat(struct ofport *port, struct list *replies)
+append_port_stat10(struct ofport *port, struct netdev_stats stats,
+                   struct list *replies)
 {
-    struct netdev_stats stats;
     struct ofp10_port_stats *ops;
-
-    /* Intentionally ignore return value, since errors will set
-     * 'stats' to all-1s, which is correct for OpenFlow, and
-     * netdev_get_stats() will log errors. */
-    ofproto_port_get_stats(port, &stats);
 
     ops = ofputil_append_stats_reply(sizeof *ops, replies);
     ops->port_no = htons(port->pp.port_no);
@@ -2289,6 +2282,55 @@ append_port_stat(struct ofport *port, struct list *replies)
     put_32aligned_be64(&ops->collisions, htonll(stats.collisions));
 }
 
+static void
+append_port_stat11(struct ofport *port, struct netdev_stats stats,
+                   struct list *replies)
+{
+    struct ofp11_port_stats *ops;
+
+    ops = ofputil_append_stats_reply(sizeof *ops, replies);
+    ops->port_no = ofputil_port_to_ofp11(port->pp.port_no);
+    memset(ops->pad, 0, sizeof ops->pad);
+    ops->rx_packets = htonll(stats.rx_packets);
+    ops->tx_packets = htonll(stats.tx_packets);
+    ops->rx_bytes = htonll(stats.rx_bytes);
+    ops->tx_bytes = htonll(stats.tx_bytes);
+    ops->rx_dropped = htonll(stats.rx_dropped);
+    ops->tx_dropped = htonll(stats.tx_dropped);
+    ops->rx_errors = htonll(stats.rx_errors);
+    ops->tx_errors = htonll(stats.tx_errors);
+    ops->rx_frame_err = htonll(stats.rx_frame_errors);
+    ops->rx_over_err = htonll(stats.rx_over_errors);
+    ops->rx_crc_err = htonll(stats.rx_crc_errors);
+    ops->collisions = htonll(stats.collisions);
+}
+
+static void
+append_port_stat(struct ofport *port, uint8_t ofp_version,
+                 struct list *replies)
+{
+    struct netdev_stats stats;
+
+    /* Intentionally ignore return value, since errors will set
+     * 'stats' to all-1s, which is correct for OpenFlow, and
+     * netdev_get_stats() will log errors. */
+    ofproto_port_get_stats(port, &stats);
+
+    switch (ofp_version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION:
+        append_port_stat11(port, stats, replies);
+        break;
+
+    case OFP10_VERSION:
+        append_port_stat10(port, stats, replies);
+        break;
+
+    default:
+        NOT_REACHED();
+    }
+}
+
 static enum ofperr
 handle_port_stats_request(struct ofconn *ofconn,
                           const struct ofp_header *request)
@@ -2302,11 +2344,11 @@ handle_port_stats_request(struct ofconn *ofconn,
     if (psr->port_no != htons(OFPP_NONE)) {
         port = ofproto_get_port(p, ntohs(psr->port_no));
         if (port) {
-            append_port_stat(port, &replies);
+            append_port_stat(port, request->version, &replies);
         }
     } else {
         HMAP_FOR_EACH (port, hmap_node, &p->ports) {
-            append_port_stat(port, &replies);
+            append_port_stat(port, request->version, &replies);
         }
     }
 
