@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "command-line.h"
 #include "compiler.h"
@@ -224,6 +225,25 @@ new_switch(struct switch_ *sw, struct vconn *vconn)
     struct lswitch_config cfg;
 
     sw->rconn = rconn_create(60, 0, DSCP_DEFAULT);
+
+    /* This is a hack (as evident by the presence of usleep()).
+     *
+     * vconn must be connected before the lswitch_create() makes any
+     * messages otherwise the correct version to place in the header
+     * is unknown.
+     */
+    while (1) {
+        int error = vconn_connect(vconn);
+        if (!error) {
+            break;
+        }
+        if (error != EAGAIN) {
+            VLOG_ERR("Failed to connect");
+            abort();
+        }
+        usleep(100000);
+    }
+
     rconn_connect_unreliably(sw->rconn, vconn, NULL);
 
     cfg.mode = (action_normal ? LSW_NORMAL
