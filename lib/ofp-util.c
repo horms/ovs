@@ -655,7 +655,8 @@ ofputil_decode_raw_msg_type(const struct ofp_header *oh, size_t length,
                 return OFPERR_OFPBRC_BAD_VENDOR;
             }
         }
-    } else if (raw->version == OFP11_VERSION
+    } else if ((raw->version == OFP11_VERSION ||
+                raw->version == OFP12_VERSION)
                && (raw->type == OFPT11_STATS_REQUEST ||
                    raw->type == OFPT11_STATS_REPLY)) {
         const struct ofp11_stats_msg *osm;
