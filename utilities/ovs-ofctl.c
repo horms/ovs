@@ -530,14 +530,13 @@ do_dump_tables(int argc OVS_UNUSED, char *argv[])
 }
 
 static bool
-fetch_port_by_features(const char *vconn_name,
-                       const char *port_name, unsigned int port_no,
-                       struct ofputil_phy_port *pp, bool *trunc)
+fetch_port_by_features(struct vconn *vconn, const char *port_name,
+                       unsigned int port_no, struct ofputil_phy_port *pp,
+                       bool *trunc)
 {
     struct ofputil_switch_features features;
     const struct ofp_switch_features *osf;
     struct ofpbuf *request, *reply;
-    struct vconn *vconn;
     enum ofperr error;
     struct ofpbuf b;
     bool found = false;
@@ -545,14 +544,13 @@ fetch_port_by_features(const char *vconn_name,
     /* Fetch the switch's ofp_switch_features. */
     make_openflow(sizeof(struct ofp_header), vconn_get_version(vconn),
                   OFPT_FEATURES_REQUEST, &request);
-    open_vconn(vconn_name, &vconn);
-    run(vconn_transact(vconn, request, &reply), "talking to %s", vconn_name);
-    vconn_close(vconn);
+    run(vconn_transact(vconn, request, &reply), "talking to %s",
+        vconn_get_name(vconn));
 
     osf = reply->data;
     if (reply->size < sizeof *osf) {
         ovs_fatal(0, "%s: received too-short features reply (only %zu bytes)",
-                  vconn_name, reply->size);
+                  vconn_get_name(vconn), reply->size);
     }
 
     *trunc = false;
@@ -564,7 +562,7 @@ fetch_port_by_features(const char *vconn_name,
     error = ofputil_decode_switch_features(osf, &features, &b);
     if (error) {
         ovs_fatal(0, "%s: failed to decode features reply (%s)",
-                  vconn_name, ofperr_to_string(error));
+                  vconn_get_name(vconn), ofperr_to_string(error));
     }
 
     while (!ofputil_pull_phy_port(osf->header.version, &b, pp)) {
@@ -582,18 +580,14 @@ exit:
 }
 
 static bool
-fetch_port_by_stats(const char *vconn_name,
-                    const char *port_name, unsigned int port_no,
-                    struct ofputil_phy_port *pp)
+fetch_port_by_stats(struct vconn* vconn, const char *port_name,
+                    unsigned int port_no, struct ofputil_phy_port *pp)
 {
     struct ofpbuf *request;
-    struct vconn *vconn;
     ovs_be32 send_xid;
     struct ofpbuf b;
     bool done = false;
     bool found = false;
-
-    open_vconn(vconn_name, &vconn);
 
     ofputil_make_stats_request(0, vconn_get_version(vconn),
                                OFPST_PORT_DESC, 0, &request);
@@ -644,7 +638,6 @@ fetch_port_by_stats(const char *vconn_name,
         }
         ofpbuf_delete(reply);
     }
-    vconn_close(vconn);
 
     return found;
 }
@@ -654,7 +647,7 @@ fetch_port_by_stats(const char *vconn_name,
  * 'port_name' (which may be a port name or number), and copies it into
  * '*pp'. */
 static void
-fetch_ofputil_phy_port(const char *vconn_name, const char *port_name,
+fetch_ofputil_phy_port(struct vconn *vconn, const char *port_name,
                        struct ofputil_phy_port *pp)
 {
     unsigned int port_no;
@@ -669,14 +662,15 @@ fetch_ofputil_phy_port(const char *vconn_name, const char *port_name,
     /* Try to find the port based on the Features Reply.  If it looks
      * like the results may be truncated, then use the Port Description
      * stats message introduced in OVS 1.7. */
-    found = fetch_port_by_features(vconn_name, port_name, port_no, pp,
+    found = fetch_port_by_features(vconn, port_name, port_no, pp,
                                    &trunc);
     if (trunc) {
-        found = fetch_port_by_stats(vconn_name, port_name, port_no, pp);
+        found = fetch_port_by_stats(vconn, port_name, port_no, pp);
     }
 
     if (!found) {
-        ovs_fatal(0, "%s: couldn't find port `%s'", vconn_name, port_name);
+        ovs_fatal(0, "%s: couldn't find port `%s'",
+                  vconn_get_name(vconn), port_name);
     }
 }
 
@@ -713,7 +707,7 @@ str_to_port_no(struct vconn *vconn, const char *port_name)
     } else {
         struct ofputil_phy_port pp;
 
-        fetch_ofputil_phy_port(vconn_get_name(vconn), port_name, &pp);
+        fetch_ofputil_phy_port(vconn, port_name, &pp);
         return pp.port_no;
     }
 
@@ -1352,7 +1346,9 @@ do_mod_port(int argc OVS_UNUSED, char *argv[])
     const char *command;
     bool not;
 
-    fetch_ofputil_phy_port(argv[1], argv[2], &pp);
+    protocol = open_vconn(argv[1], &vconn);
+
+    fetch_ofputil_phy_port(vconn, argv[2], &pp);
 
     pm.port_no = pp.port_no;
     memcpy(pm.hw_addr, pp.hw_addr, ETH_ADDR_LEN);
@@ -1380,7 +1376,6 @@ do_mod_port(int argc OVS_UNUSED, char *argv[])
     ovs_fatal(0, "unknown mod-port command '%s'", argv[3]);
 
 found:
-    protocol = open_vconn(argv[1], &vconn);
     transact_noreply(vconn, ofputil_encode_port_mod(&pm, protocol));
     vconn_close(vconn);
 }
