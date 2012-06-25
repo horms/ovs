@@ -683,18 +683,42 @@ fetch_ofputil_phy_port(const char *vconn_name, const char *port_name,
 /* Returns the port number corresponding to 'port_name' (which may be a port
  * name or number) within the switch 'vconn_name'. */
 static uint16_t
-str_to_port_no(const char *vconn_name, const char *port_name)
+str_to_port_no(struct vconn *vconn, const char *port_name)
 {
     unsigned int port_no;
 
     if (str_to_uint(port_name, 10, &port_no)) {
-        return port_no;
+        switch (vconn_get_version(vconn)) {
+        case OFP12_VERSION:
+        case OFP11_VERSION: {
+            enum ofperr error;
+            uint16_t ofp10_port;
+
+            error = ofputil_port_from_ofp11(htonl(port_no), &ofp10_port);
+            if (!error) {
+                return ofp10_port;
+            }
+            break;
+        }
+
+        case OFP10_VERSION:
+            if (port_no <= OFPP_NONE) {
+                return port_no;
+            }
+            break;
+
+        default:
+            NOT_REACHED();
+        }
     } else {
         struct ofputil_phy_port pp;
 
-        fetch_ofputil_phy_port(vconn_name, port_name, &pp);
+        fetch_ofputil_phy_port(vconn_get_name(vconn), port_name, &pp);
         return pp.port_no;
     }
+
+    ovs_fatal(0, "%s: port out of range`%s'",
+              vconn_get_name(vconn), port_name);
 }
 
 static bool
@@ -795,7 +819,7 @@ do_queue_stats(int argc, char *argv[])
                                      OFPST_QUEUE, 0, &request);
 
     if (argc > 2 && argv[2][0] && strcasecmp(argv[2], "all")) {
-        req->port_no = htons(str_to_port_no(argv[1], argv[2]));
+        req->port_no = htons(str_to_port_no(vconn, argv[2]));
     } else {
         req->port_no = htons(OFPP_ALL);
     }
@@ -1208,7 +1232,7 @@ do_dump_ports(int argc, char *argv[])
     open_vconn(argv[1], &vconn);
     ofp_version = vconn_get_version(vconn);
 
-    port = argc > 2 ? str_to_port_no(argv[1], argv[2]) : OFPP_NONE;
+    port = argc > 2 ? str_to_port_no(vconn, argv[2]) : OFPP_NONE;
 
     switch (ofp_version) {
     case OFP12_VERSION:
@@ -1216,7 +1240,7 @@ do_dump_ports(int argc, char *argv[])
         struct ofp11_port_stats_request *req;
         req = ofputil_make_stats_request(sizeof *req, ofp_version,
                                          OFPST_PORT, 0, &request);
-        req->port_no = htons(port);
+        req->port_no = ofputil_port_to_ofp11(port);
         break;
     }
 
@@ -1277,7 +1301,7 @@ do_packet_out(int argc, char *argv[])
     po.buffer_id = UINT32_MAX;
     po.in_port = (!strcasecmp(argv[2], "none") ? OFPP_NONE
                   : !strcasecmp(argv[2], "local") ? OFPP_LOCAL
-                  : str_to_port_no(argv[1], argv[2]));
+                  : str_to_port_no(vconn, argv[2]));
     po.ofpacts = ofpacts.data;
     po.ofpacts_len = ofpacts.size;
 
