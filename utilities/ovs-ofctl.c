@@ -1200,17 +1200,38 @@ do_snoop(int argc OVS_UNUSED, char *argv[])
 static void
 do_dump_ports(int argc, char *argv[])
 {
-    struct ofp10_port_stats_request *req;
     struct ofpbuf *request;
     uint16_t port;
     struct vconn *vconn;
+    uint8_t ofp_version;
 
     open_vconn(argv[1], &vconn);
+    ofp_version = vconn_get_version(vconn);
 
-    req = ofputil_make_stats_request(sizeof *req, OFP10_VERSION,
-                                     OFPST_PORT, 0, &request);
     port = argc > 2 ? str_to_port_no(argv[1], argv[2]) : OFPP_NONE;
-    req->port_no = htons(port);
+
+    switch (ofp_version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION: {
+        struct ofp11_port_stats_request *req;
+        req = ofputil_make_stats_request(sizeof *req, ofp_version,
+                                         OFPST_PORT, 0, &request);
+        req->port_no = htons(port);
+        break;
+    }
+
+    case OFP10_VERSION: {
+        struct ofp10_port_stats_request *req;
+        req = ofputil_make_stats_request(sizeof *req, ofp_version,
+                                         OFPST_PORT, 0, &request);
+        req->port_no = htons(port);
+        break;
+    }
+
+    default:
+        NOT_REACHED();
+    }
+
     dump_stats_transaction(vconn, request);
     vconn_close(vconn);
 }
