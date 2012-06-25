@@ -5232,10 +5232,9 @@ static void
 xlate_autopath(struct action_xlate_ctx *ctx,
                const struct ofpact_autopath *ap)
 {
-    struct ofport_dpif *port;
-    uint32_t ofp_port;
+    uint32_t ofp_port = ap->port;
+    struct ofport_dpif *port = get_ofp_port(ctx->ofproto, ap->port);
 
-    port = get_ofp_port(ctx->ofproto, ap->port);
     if (!port || !port->bundle) {
         ofp_port = OFPP_NONE;
     } else if (port->bundle->bond) {
