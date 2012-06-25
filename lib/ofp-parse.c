@@ -364,6 +364,10 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         parse_enqueue(arg, ofpacts);
         break;
 
+    case OFPUTIL_OFPAT12_SET_FIELD:
+        NOT_REACHED();  /* This will be implemented by later patch */
+        break;
+
     case OFPUTIL_NXAST_RESUBMIT:
         parse_resubmit(arg, ofpacts);
         break;
