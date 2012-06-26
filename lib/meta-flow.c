@@ -56,6 +56,15 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         NXM_NX_TUN_ID, "NXM_NX_TUN_ID",
         0, NULL,
     }, {
+        MFF_METADATA, "metadata", NULL,
+        MF_FIELD_SIZES(be64),
+        MFM_FULLY, 0,
+        MFS_HEXADECIMAL,
+        MFP_NONE,
+        true, true,
+        OXM_OF_METADATA, "OXM_OF_METADATA",
+        OXM_OF_METADATA, "OXM_OF_METADATA",
+    }, {
         MFF_IN_PORT, "in_port", NULL,
         MF_FIELD_SIZES(be16),
         MFM_NONE, FWW_IN_PORT,
@@ -655,6 +664,8 @@ mf_is_all_wild(const struct mf_field *mf, const struct flow_wildcards *wc)
 
     case MFF_TUN_ID:
         return !wc->tun_id_mask;
+    case MFF_METADATA:
+        return !wc->metadata_mask;
 
     CASE_MFF_REGS:
         return !wc->reg_masks[mf->id - MFF_REG0];
@@ -755,6 +766,9 @@ mf_get_mask(const struct mf_field *mf, const struct flow_wildcards *wc,
 
     case MFF_TUN_ID:
         mask->be64 = wc->tun_id_mask;
+        break;
+    case MFF_METADATA:
+        mask->be64 = wc->metadata_mask;
         break;
 
     CASE_MFF_REGS:
@@ -944,6 +958,7 @@ mf_is_value_valid(const struct mf_field *mf, const union mf_value *value)
 {
     switch (mf->id) {
     case MFF_TUN_ID:
+    case MFF_METADATA:
     case MFF_IN_PORT:
     CASE_MFF_REGS:
     case MFF_ETH_SRC:
@@ -1025,6 +1040,9 @@ mf_get_value(const struct mf_field *mf, const struct flow *flow,
     switch (mf->id) {
     case MFF_TUN_ID:
         value->be64 = flow->tun_id;
+        break;
+    case MFF_METADATA:
+        value->be64 = flow->metadata;
         break;
 
     case MFF_IN_PORT:
@@ -1192,6 +1210,9 @@ mf_set_value(const struct mf_field *mf,
     case MFF_TUN_ID:
         cls_rule_set_tun_id(rule, value->be64);
         break;
+    case MFF_METADATA:
+        cls_rule_set_metadata(rule, value->be64);
+        break;
 
     case MFF_IN_PORT:
         cls_rule_set_in_port(rule, ntohs(value->be16));
@@ -1357,6 +1378,9 @@ mf_set_flow_value(const struct mf_field *mf,
     switch (mf->id) {
     case MFF_TUN_ID:
         flow->tun_id = value->be64;
+        break;
+    case MFF_METADATA:
+        flow->metadata = value->be64;
         break;
 
     case MFF_IN_PORT:
@@ -1533,6 +1557,8 @@ mf_set_wild(const struct mf_field *mf, struct cls_rule *rule)
     case MFF_TUN_ID:
         cls_rule_set_tun_id_masked(rule, htonll(0), htonll(0));
         break;
+    case MFF_METADATA:
+        cls_rule_set_metadata_masked(rule, htonll(0), htonll(0));
 
     case MFF_IN_PORT:
         rule->wc.wildcards |= FWW_IN_PORT;
@@ -1744,6 +1770,9 @@ mf_set(const struct mf_field *mf,
     case MFF_TUN_ID:
         cls_rule_set_tun_id_masked(rule, value->be64, mask->be64);
         break;
+    case MFF_METADATA:
+        cls_rule_set_metadata_masked(rule, value->be64, mask->be64);
+        break;
 
     CASE_MFF_REGS:
         cls_rule_set_reg_masked(rule, mf->id - MFF_REG0,
@@ -1900,6 +1929,7 @@ mf_random_value(const struct mf_field *mf, union mf_value *value)
 
     switch (mf->id) {
     case MFF_TUN_ID:
+    case MFF_METADATA:
     case MFF_IN_PORT:
     CASE_MFF_REGS:
     case MFF_ETH_SRC:

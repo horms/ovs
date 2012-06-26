@@ -540,12 +540,13 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
     const flow_wildcards_t wc = wildcards->wildcards;
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         flow->regs[i] &= wildcards->reg_masks[i];
     }
     flow->tun_id &= wildcards->tun_id_mask;
+    flow->metadata &= wildcards->metadata_mask;
     flow->nw_src &= wildcards->nw_src_mask;
     flow->nw_dst &= wildcards->nw_dst_mask;
     if (wc & FWW_IN_PORT) {
@@ -611,10 +612,13 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     fmd->tun_id = flow->tun_id;
     fmd->tun_id_mask = htonll(UINT64_MAX);
+
+    fmd->metadata = flow->metadata;
+    fmd->metadata_mask = htonll(UINT64_MAX);
 
     memcpy(fmd->regs, flow->regs, sizeof fmd->regs);
     memset(fmd->reg_masks, 0xff, sizeof fmd->reg_masks);
@@ -635,9 +639,11 @@ flow_format(struct ds *ds, const struct flow *flow)
 {
     ds_put_format(ds, "priority:%"PRIu32
                       ",tunnel:%#"PRIx64
+                      ",metadata:%#"PRIx64
                       ",in_port:%04"PRIx16,
                       flow->skb_priority,
                       ntohll(flow->tun_id),
+                      ntohll(flow->metadata),
                       flow->in_port);
 
     ds_put_format(ds, ",tci(");
@@ -720,7 +726,7 @@ flow_print(FILE *stream, const struct flow *flow)
 void
 flow_wildcards_init_catchall(struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     wc->wildcards = FWW_ALL;
     wc->tun_id_mask = htonll(0);
@@ -731,6 +737,7 @@ flow_wildcards_init_catchall(struct flow_wildcards *wc)
     wc->ipv6_label_mask = htonl(0);
     wc->nd_target_mask = in6addr_any;
     memset(wc->reg_masks, 0, sizeof wc->reg_masks);
+    wc->metadata_mask = htonll(0);
     wc->vlan_tci_mask = htons(0);
     wc->nw_frag_mask = 0;
     wc->tp_src_mask = htons(0);
@@ -747,7 +754,7 @@ flow_wildcards_init_catchall(struct flow_wildcards *wc)
 void
 flow_wildcards_init_exact(struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     wc->wildcards = 0;
     wc->tun_id_mask = htonll(UINT64_MAX);
@@ -758,6 +765,7 @@ flow_wildcards_init_exact(struct flow_wildcards *wc)
     wc->ipv6_label_mask = htonl(UINT32_MAX);
     wc->nd_target_mask = in6addr_exact;
     memset(wc->reg_masks, 0xff, sizeof wc->reg_masks);
+    wc->metadata_mask = htonll(UINT64_MAX);
     wc->vlan_tci_mask = htons(UINT16_MAX);
     wc->nw_frag_mask = UINT8_MAX;
     wc->tp_src_mask = htons(UINT16_MAX);
@@ -776,7 +784,7 @@ flow_wildcards_is_exact(const struct flow_wildcards *wc)
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     if (wc->wildcards
         || wc->tun_id_mask != htonll(UINT64_MAX)
@@ -785,6 +793,7 @@ flow_wildcards_is_exact(const struct flow_wildcards *wc)
         || wc->tp_src_mask != htons(UINT16_MAX)
         || wc->tp_dst_mask != htons(UINT16_MAX)
         || wc->vlan_tci_mask != htons(UINT16_MAX)
+        || wc->metadata_mask != htonll(UINT64_MAX)
         || !eth_mask_is_exact(wc->dl_src_mask)
         || !eth_mask_is_exact(wc->dl_dst_mask)
         || !eth_mask_is_exact(wc->arp_sha_mask)
@@ -813,7 +822,7 @@ flow_wildcards_is_catchall(const struct flow_wildcards *wc)
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     if (wc->wildcards != FWW_ALL
         || wc->tun_id_mask != htonll(0)
@@ -822,6 +831,7 @@ flow_wildcards_is_catchall(const struct flow_wildcards *wc)
         || wc->tp_src_mask != htons(0)
         || wc->tp_dst_mask != htons(0)
         || wc->vlan_tci_mask != htons(0)
+        || wc->metadata_mask != htonll(0)
         || !eth_addr_is_zero(wc->dl_src_mask)
         || !eth_addr_is_zero(wc->dl_dst_mask)
         || !eth_addr_is_zero(wc->arp_sha_mask)
@@ -853,7 +863,7 @@ flow_wildcards_combine(struct flow_wildcards *dst,
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     dst->wildcards = src1->wildcards | src2->wildcards;
     dst->tun_id_mask = src1->tun_id_mask & src2->tun_id_mask;
@@ -869,6 +879,7 @@ flow_wildcards_combine(struct flow_wildcards *dst,
     for (i = 0; i < FLOW_N_REGS; i++) {
         dst->reg_masks[i] = src1->reg_masks[i] & src2->reg_masks[i];
     }
+    dst->metadata_mask = src1->metadata_mask & src2->metadata_mask;
     dst->vlan_tci_mask = src1->vlan_tci_mask & src2->vlan_tci_mask;
     dst->tp_src_mask = src1->tp_src_mask & src2->tp_src_mask;
     dst->tp_dst_mask = src1->tp_dst_mask & src2->tp_dst_mask;
@@ -885,7 +896,7 @@ flow_wildcards_hash(const struct flow_wildcards *wc, uint32_t basis)
     /* If you change struct flow_wildcards and thereby trigger this
      * assertion, please check that the new struct flow_wildcards has no holes
      * in it before you update the assertion. */
-    BUILD_ASSERT_DECL(sizeof *wc == 104 + FLOW_N_REGS * 4);
+    BUILD_ASSERT_DECL(sizeof *wc == 112 + FLOW_N_REGS * 4);
     return hash_bytes(wc, sizeof *wc, basis);
 }
 
@@ -897,13 +908,14 @@ flow_wildcards_equal(const struct flow_wildcards *a,
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     if (a->wildcards != b->wildcards
         || a->tun_id_mask != b->tun_id_mask
         || a->nw_src_mask != b->nw_src_mask
         || a->nw_dst_mask != b->nw_dst_mask
         || a->vlan_tci_mask != b->vlan_tci_mask
+        || a->metadata_mask != b->metadata_mask
         || !ipv6_addr_equals(&a->ipv6_src_mask, &b->ipv6_src_mask)
         || !ipv6_addr_equals(&a->ipv6_dst_mask, &b->ipv6_dst_mask)
         || a->ipv6_label_mask != b->ipv6_label_mask
@@ -936,7 +948,7 @@ flow_wildcards_has_extra(const struct flow_wildcards *a,
     uint8_t eth_masked[ETH_ADDR_LEN];
     struct in6_addr ipv6_masked;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 16);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         if ((a->reg_masks[i] & b->reg_masks[i]) != b->reg_masks[i]) {
@@ -985,6 +997,7 @@ flow_wildcards_has_extra(const struct flow_wildcards *a,
             || (a->nw_dst_mask & b->nw_dst_mask) != b->nw_dst_mask
             || (a->ipv6_label_mask & b->ipv6_label_mask) != b->ipv6_label_mask
             || (a->vlan_tci_mask & b->vlan_tci_mask) != b->vlan_tci_mask
+            || (a->metadata_mask & b->metadata_mask) != b->metadata_mask
             || (a->tp_src_mask & b->tp_src_mask) != b->tp_src_mask
             || (a->tp_dst_mask & b->tp_dst_mask) != b->tp_dst_mask);
 }
