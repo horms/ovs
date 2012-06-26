@@ -83,6 +83,9 @@ set_field_mf_allowed(const struct mf_field *mf)
     case MFF_IN_PORT:
     CASE_MFF_REGS:
     case MFF_VLAN_TCI:
+    case MFF_VLAN_TPID:
+    case MFF_VLAN_QINQ_VID:
+    case MFF_VLAN_QINQ_PCP:
     case MFF_IP_TTL:
     case MFF_IP_FRAG:
     case MFF_N_IDS:

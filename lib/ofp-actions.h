@@ -82,6 +82,7 @@
     DEFINE_OFPACT(DEC_MPLS_TTL,    ofpact_null,          ofpact)    \
     DEFINE_OFPACT(PUSH_MPLS,       ofpact_push,          ofpact)    \
     DEFINE_OFPACT(POP_MPLS,        ofpact_pop_mpls,      ofpact)    \
+    DEFINE_OFPACT(PUSH_VLAN,       ofpact_push_vlan,     ofpact)    \
                                                                     \
     /* Metadata. */                                                 \
     DEFINE_OFPACT(SET_TUNNEL,      ofpact_tunnel,        ofpact)    \
@@ -445,6 +446,14 @@ struct ofpact_push {
 struct ofpact_pop_mpls {
     struct ofpact ofpact;
     ovs_be16 ethertype;
+};
+
+/* OFPACT_PUSH_VLAN
+ *
+ * used for NXAST_PUSH_VLAN */
+struct ofpact_push_vlan {
+    struct ofpact ofpact;
+    ovs_be16 tpid;
 };
 
 /* OFPACT_APPLY_ACTIONS, OFPACT_CLEAR_ACTIONS, OFPACT_WRITE_ACTIONS

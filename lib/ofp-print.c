@@ -1039,11 +1039,6 @@ ofp_print_ofpst_aggregate_reply(struct ds *string, const struct ofp_header *oh)
         break;
     }
 
-   case OFPUTIL_NXAST_PUSH_VLAN:
-        navpush = (const struct nx_action_push_vlan *) a;
-        ds_put_format(s, "push_vlan:0x%"PRIx16, ntohs(navpush->tpid));
-        break;
-
     default:
         NOT_REACHED();
     }

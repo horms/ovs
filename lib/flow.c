@@ -1107,7 +1107,7 @@ flow_set_vlan_tpid(struct flow *flow, ovs_be16 vlan_tpid)
 void
 flow_set_vlan_qinq_vid(struct flow *flow, ovs_be16 qinq_vid)
 {
-    if (qinq_vid == htons(OFP_VLAN_NONE)) {
+    if (qinq_vid == htons(OFP10_VLAN_NONE)) {
         flow->vlan_qinq_tci = htons(0);
     } else {
         qinq_vid &= htons(VLAN_VID_MASK);

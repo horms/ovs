@@ -5493,11 +5493,7 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
     ovs_be32 mpls_label;
     uint32_t mpls_tc;
     uint32_t mpls_ttl;
-#if 0
-    /* TODO:XXX VVVVVVVVVVVVVVVVVVVVVVVVVVVVV */
-    const struct nx_action_push_vlan *navpush;
-    /* TODO:XXX ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ */
-#endif
+    ovs_be16 vlan_tpid;
 
     switch (a->type) {
     case OFPACT_END:
@@ -5523,6 +5519,9 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         ctx->flow.vlan_tci &= ~htons(VLAN_VID_MASK);
         ctx->flow.vlan_tci |= (htons(ofpact_get_SET_VLAN_VID(a)->vlan_vid)
                                | htons(VLAN_CFI));
+        if (ctx->flow.vlan_tpid == htons(0)) {
+            ctx->flow.vlan_tpid = htons(ETH_TYPE_VLAN);
+        }
         break;
 
     case OFPACT_SET_VLAN_PCP:
@@ -5702,29 +5701,23 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         commit_copy_mpls_ttl_out_action(ctx);
         break;
 
-
-#if 0
-        /* TODO:XXX VVVVVVVVVVVVVVVVVVV */
-    case OFPUTIL_NXAST_PUSH_VLAN:
+    case OFPACT_PUSH_VLAN:
+        vlan_tpid = ofpact_get_PUSH_VLAN(a)->tpid;
         if (ctx->base_flow.vlan_tci != 0) {
-            navpush = (const struct nx_action_push_vlan *) ia;
             /* For actions configured as
              * strip_vlan,push_vlan:0x8100/0x88a8 - Push a new vlan header.
              * push_vlan:0x8100/0x88a8,strip_vlan - no-op. */
-            ctx->flow.vlan_tpid = navpush->tpid;
+            ctx->flow.vlan_tpid = vlan_tpid;
             if (ctx->flow.vlan_tci != htons(0)) {
                 ctx->flow.vlan_qinq_tci = ctx->base_flow.vlan_tci;
             } else {
                 ctx->flow.vlan_tci = ctx->base_flow.vlan_tci;
             }
         } else if (ctx->flow.vlan_tci != htons(0)) {
-            navpush = (const struct nx_action_push_vlan *) ia;
-            ctx->flow.vlan_tpid = navpush->tpid;
+            ctx->flow.vlan_tpid = vlan_tpid;
             ctx->flow.vlan_qinq_tci = ctx->flow.vlan_tci;
         }
         break;
-        /* TODO:XXX ^^^^^^^^^^^^^^^^^^^^^^^ */
-#endif
 
     case OFPACT_APPLY_ACTIONS:
         do_xlate_actions__(ofpact_get_APPLY_ACTIONS(a)->ofpacts, ctx);
