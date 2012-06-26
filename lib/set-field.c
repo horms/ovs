@@ -67,10 +67,9 @@ set_field_mf_allowed(const struct mf_field *mf)
     case MFF_ND_TARGET:
     case MFF_ND_SLL:
     case MFF_ND_TLL:
-#if 0
-    /* TODO: OF1.2 */
     case MFF_MPLS_LABEL:
     case MFF_MPLS_TC:
+#if 0
     /* TODO: OF1.3 */
     case MFF_MPLS_STACK:
     case MFF_PBB_ISID:
@@ -80,6 +79,7 @@ set_field_mf_allowed(const struct mf_field *mf)
         return true;
 
     case MFF_TUN_ID: /* TODO:XXX OF1.3 */
+    case MFF_MPLS_STACK: /* TODO:XXX OF1.3 */
     case MFF_IN_PORT:
     CASE_MFF_REGS:
     case MFF_VLAN_TCI:

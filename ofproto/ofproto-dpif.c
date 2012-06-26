@@ -5479,14 +5479,9 @@ static bool
 do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
 {
     struct ofpact_controller *controller;
-#if 0
-    const struct nx_action_mpls_label *naml;
-    const struct nx_action_mpls_tc *namtc;
-    const struct nx_action_mpls_ttl *namttl;
-    const struct nx_action_push_mpls *nampush;
-    const struct nx_action_pop_mpls *nampop;
     ovs_be32 mpls_label;
-#endif
+    uint32_t mpls_tc;
+    uint32_t mpls_ttl;
 
     switch (a->type) {
     case OFPACT_END:
@@ -5622,57 +5617,6 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         }
         break;
 
-#if 0
-    case OFPUTIL_NXAST_PUSH_MPLS:
-        nampush = (const struct nx_action_push_mpls *) ia;
-        commit_mpls_push_action(&ctx->flow, &ctx->base_flow, ctx->odp_actions,
-                                nampush->ethertype);
-        break;
-
-    case OFPUTIL_NXAST_POP_MPLS:
-        nampop = (const struct nx_action_pop_mpls *) ia;
-        ctx->flow.dl_type = nampop->ethertype;
-        commit_mpls_pop_action(&ctx->flow, &ctx->base_flow, ctx->odp_actions);
-        if (ctx->flow.mpls_lse != htonl(0)) {
-            ctx->flow.mpls_lse = htonl(0);
-        }
-        break;
-
-    case OFPUTIL_NXAST_SET_MPLS_LABEL:
-        naml = (const struct nx_action_mpls_label *) ia;
-        mpls_label = htonl((ntohl(naml->mpls_label) << MPLS_LABEL_SHIFT));
-        ctx->flow.mpls_lse &= ~htonl(MPLS_LABEL_MASK);
-        ctx->flow.mpls_lse |= mpls_label;
-        commit_mpls_lse_action(&ctx->flow, &ctx->base_flow, ctx->odp_actions);
-        break;
-
-    case OFPUTIL_NXAST_SET_MPLS_TC:
-        namtc = (const struct nx_action_mpls_tc *) ia;
-        ctx->flow.mpls_lse &= ~htonl(MPLS_TC_MASK);
-        ctx->flow.mpls_lse |= htonl((namtc->mpls_tc << MPLS_TC_SHIFT));
-        commit_mpls_lse_action(&ctx->flow, &ctx->base_flow, ctx->odp_actions);
-        break;
-
-    case OFPUTIL_NXAST_SET_MPLS_TTL:
-        namttl = (const struct nx_action_mpls_ttl *) ia;
-        ctx->flow.mpls_lse &= ~htonl(MPLS_TTL_MASK);
-        ctx->flow.mpls_lse |= htonl((namttl->mpls_ttl << MPLS_TTL_SHIFT));
-        commit_mpls_lse_action(&ctx->flow, &ctx->base_flow, ctx->odp_actions);
-        break;
-
-    case OFPUTIL_NXAST_DEC_MPLS_TTL:
-        commit_dec_mpls_ttl_action(ctx);
-        break;
-
-    case OFPUTIL_NXAST_COPY_TTL_IN:
-        commit_copy_mpls_ttl_in_action(ctx);
-        break;
-
-    case OFPUTIL_NXAST_COPY_TTL_OUT:
-        commit_copy_mpls_ttl_out_action(ctx);
-        break;
-#endif
-
     case OFPACT_EXIT:
         ctx->exit = true;
         break;
@@ -5680,6 +5624,58 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
     case OFPACT_FIN_TIMEOUT:
         ctx->has_fin_timeout = true;
         xlate_fin_timeout(ctx, ofpact_get_FIN_TIMEOUT(a));
+        break;
+
+    case OFPACT_PUSH_MPLS:
+        commit_mpls_push_action(&ctx->flow, &ctx->base_flow,
+                                ctx->odp_actions,
+                                ofpact_get_PUSH_MPLS(a)->ethertype);
+        break;
+
+    case OFPACT_POP_MPLS:
+        ctx->flow.dl_type = ofpact_get_POP_MPLS(a)->ethertype;
+        commit_mpls_pop_action(&ctx->flow, &ctx->base_flow,
+                               ctx->odp_actions);
+        if (ctx->flow.mpls_lse != htonl(0)) {
+            ctx->flow.mpls_lse = htonl(0);
+        }
+        break;
+
+    case OFPACT_SET_MPLS_LABEL:
+        mpls_label = ofpact_get_SET_MPLS_LABEL(a)->mpls_label;
+        mpls_label = htonl(ntohl(mpls_label) << MPLS_LABEL_SHIFT);
+        ctx->flow.mpls_lse &= ~htonl(MPLS_LABEL_MASK);
+        ctx->flow.mpls_lse |= mpls_label;
+        commit_mpls_lse_action(&ctx->flow, &ctx->base_flow,
+                               ctx->odp_actions);
+        break;
+
+    case OFPACT_SET_MPLS_TC:
+        mpls_tc = ofpact_get_SET_MPLS_TC(a)->mpls_tc;
+        ctx->flow.mpls_lse &= ~htonl(MPLS_TC_MASK);
+        ctx->flow.mpls_lse |= htonl(mpls_tc << MPLS_TC_SHIFT);
+        commit_mpls_lse_action(&ctx->flow, &ctx->base_flow,
+                               ctx->odp_actions);
+        break;
+
+    case OFPACT_SET_MPLS_TTL:
+        mpls_ttl = ofpact_get_SET_MPLS_TTL(a)->mpls_ttl;
+        ctx->flow.mpls_lse &= ~htonl(MPLS_TTL_MASK);
+        ctx->flow.mpls_lse |= htonl(mpls_ttl << MPLS_TTL_SHIFT);
+        commit_mpls_lse_action(&ctx->flow, &ctx->base_flow,
+                               ctx->odp_actions);
+        break;
+
+    case OFPACT_DEC_MPLS_TTL:
+        commit_dec_mpls_ttl_action(ctx);
+        break;
+
+    case OFPACT_COPY_TTL_IN:
+        commit_copy_mpls_ttl_in_action(ctx);
+        break;
+
+    case OFPACT_COPY_TTL_OUT:
+        commit_copy_mpls_ttl_out_action(ctx);
         break;
 
     case OFPACT_APPLY_ACTIONS:

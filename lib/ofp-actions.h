@@ -74,6 +74,14 @@
     DEFINE_OFPACT(REG_MOVE,        ofpact_reg_move,      ofpact)    \
     DEFINE_OFPACT(REG_LOAD,        ofpact_reg_load,      ofpact)    \
     DEFINE_OFPACT(DEC_TTL,         ofpact_null,          ofpact)    \
+    DEFINE_OFPACT(COPY_TTL_OUT,    ofpact_null,          ofpact)    \
+    DEFINE_OFPACT(COPY_TTL_IN,     ofpact_null,          ofpact)    \
+    DEFINE_OFPACT(SET_MPLS_LABEL,  ofpact_mpls_label,    ofpact)    \
+    DEFINE_OFPACT(SET_MPLS_TC,     ofpact_mpls_tc,       ofpact)    \
+    DEFINE_OFPACT(SET_MPLS_TTL,    ofpact_mpls_ttl,      ofpact)    \
+    DEFINE_OFPACT(DEC_MPLS_TTL,    ofpact_null,          ofpact)    \
+    DEFINE_OFPACT(PUSH_MPLS,       ofpact_push,          ofpact)    \
+    DEFINE_OFPACT(POP_MPLS,        ofpact_pop_mpls,      ofpact)    \
                                                                     \
     /* Metadata. */                                                 \
     DEFINE_OFPACT(SET_TUNNEL,      ofpact_tunnel,        ofpact)    \
@@ -389,6 +397,54 @@ struct ofpact_note {
     struct ofpact ofpact;
     size_t length;
     uint8_t data[];
+};
+
+/* OFPACT_SET_MPLS_LABEL
+ *
+ * used for NXAST_SET_MPLS_LABEL */
+struct ofpact_mpls_label {
+    struct ofpact ofpact;
+    ovs_be32 mpls_label;        /* lower 20 bits */
+};
+
+/* OFPACT_SET_MPLS_TC
+ *
+ * used for NXAST_SET_MPLS_TC */
+struct ofpact_mpls_tc {
+    struct ofpact ofpact;
+    uint8_t mpls_tc;           /* lower 3 bits */
+};
+
+/* OFPACT_SET_MPLS_STACK
+ *
+ * used for NXAST_SET_MPLS_STACK */
+struct ofpact_mpls_stack {
+    struct ofpact ofpact;
+    uint8_t mpls_stack;         /* lower 1 bits */
+};
+
+/* OFPACT_SET_MPLS_TTL
+ *
+ * used for NXAST_SET_MPLS_TTL */
+struct ofpact_mpls_ttl {
+    struct ofpact ofpact;
+    uint8_t mpls_ttl;           /* 8 bits */
+};
+
+/* OFPACT_PUSH_VLAN/MPLS/PBB
+ *
+ * used for NXAST_PUSH_MPLS, OFPAT13_PUSH_VLAN/MPSL/BPP */
+struct ofpact_push {
+    struct ofpact ofpact;
+    ovs_be16 ethertype;
+};
+
+/* OFPACT_POP_MPLS
+ *
+ * used for NXAST_POP_MPLS */
+struct ofpact_pop_mpls {
+    struct ofpact ofpact;
+    ovs_be16 ethertype;
 };
 
 /* OFPACT_APPLY_ACTIONS, OFPACT_CLEAR_ACTIONS, OFPACT_WRITE_ACTIONS
