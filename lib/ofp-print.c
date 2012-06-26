@@ -1065,12 +1065,6 @@ static void ofp_print_port_stat(struct ds *string, const char *leader,
     }
 }
 
-static void print_port_stat(struct ds *string, const char *leader,
-                            const ovs_32aligned_be64 *statp, int more)
-{
-    ofp_print_port_stat(string, leader, get_32aligned_be64(statp), more);
-}
-
 static void
 ofp_print_ofpst_port_request(struct ds *string, const struct ofp_header *oh)
 {
@@ -1370,34 +1364,71 @@ static void
 ofp_print_ofpst_queue_reply(struct ds *string, const struct ofp_header *oh,
                             int verbosity)
 {
-    struct ofp10_queue_stats *qs;
     struct ofpbuf b;
     size_t n;
+    struct ofp11_queue_stats qs;
 
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
     ofputil_pull_stats_msg(&b);
 
-    n = b.size / sizeof *qs;
+    /* This calculation is correct because
+     * struct ofp10_queue_stats and struct ofp11_queue_stats
+     * are the same size.
+     */
+    n = b.size / sizeof qs;
     ds_put_format(string, " %zu queues\n", n);
     if (verbosity < 1) {
         return;
     }
 
     for (;;) {
-        qs = ofpbuf_try_pull(&b, sizeof *qs);
-        if (!qs) {
-            return;
+        uint16_t port_no;
+
+        switch (oh->version) {
+        case OFP11_VERSION:
+        case OFP12_VERSION: {
+            const struct ofp11_queue_stats *qs11;
+
+            qs11 = ofpbuf_try_pull(&b, sizeof *qs11);
+            if (!qs11) {
+                return;
+            }
+            if (ofputil_port_from_ofp11(qs11->port_no, &port_no)) {
+                ds_put_cstr(string, "*** parse error: invalid port ***\n");
+                return;
+            }
+            qs = *qs11;
+            break;
+        }
+
+        case OFP10_VERSION: {
+            const struct ofp10_queue_stats *qs10;
+
+            qs10 = ofpbuf_try_pull(&b, sizeof *qs10);
+            if (!qs10) {
+                return;
+            }
+            port_no = ntohs(qs10->port_no);
+            qs.queue_id = qs10->queue_id;
+            qs.tx_bytes = get_32aligned_be64(&qs10->tx_bytes);
+            qs.tx_packets = get_32aligned_be64(&qs10->tx_packets);
+            qs.tx_errors = get_32aligned_be64(&qs10->tx_errors);
+            break;
+        }
+
+        default:
+            NOT_REACHED();
         }
 
         ds_put_cstr(string, "  port ");
-        ofputil_format_port(ntohs(qs->port_no), string);
+        ofputil_format_port(port_no, string);
         ds_put_cstr(string, " queue ");
-        ofp_print_queue_name(string, ntohl(qs->queue_id));
+        ofp_print_queue_name(string, ntohl(qs.queue_id));
         ds_put_cstr(string, ": ");
 
-        print_port_stat(string, "bytes=", &qs->tx_bytes, 1);
-        print_port_stat(string, "pkts=", &qs->tx_packets, 1);
-        print_port_stat(string, "errors=", &qs->tx_errors, 0);
+        ofp_print_port_stat(string, "bytes=", qs.tx_bytes, 1);
+        ofp_print_port_stat(string, "pkts=", qs.tx_packets, 1);
+        ofp_print_port_stat(string, "errors=", qs.tx_errors, 0);
     }
 }
 
