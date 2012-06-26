@@ -403,26 +403,9 @@ ofpact_from_openflow10(const union ofp_action *a, struct ofpbuf *out)
                                         out);
         break;
 
-    case OFPUTIL_NXAST_RESUBMIT:
-    case OFPUTIL_NXAST_SET_TUNNEL:
-    case OFPUTIL_NXAST_SET_QUEUE:
-    case OFPUTIL_NXAST_POP_QUEUE:
-    case OFPUTIL_NXAST_REG_MOVE:
-    case OFPUTIL_NXAST_REG_LOAD:
-    case OFPUTIL_NXAST_NOTE:
-    case OFPUTIL_NXAST_SET_TUNNEL64:
-    case OFPUTIL_NXAST_MULTIPATH:
-    case OFPUTIL_NXAST_AUTOPATH:
-    case OFPUTIL_NXAST_BUNDLE:
-    case OFPUTIL_NXAST_BUNDLE_LOAD:
-    case OFPUTIL_NXAST_OUTPUT_REG:
-    case OFPUTIL_NXAST_RESUBMIT_TABLE:
-    case OFPUTIL_NXAST_LEARN:
-    case OFPUTIL_NXAST_EXIT:
-    case OFPUTIL_NXAST_DEC_TTL:
-    case OFPUTIL_NXAST_FIN_TIMEOUT:
-    case OFPUTIL_NXAST_CONTROLLER:
-        return ofpact_from_nxast(a, code, out);
+#define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME) case OFPUTIL_##ENUM:
+#include "ofp-util.def"
+	return ofpact_from_nxast(a, code, out);
     }
 
     return error;
@@ -636,28 +619,10 @@ ofpact_from_openflow11(const union ofp_action *a, struct ofpbuf *out)
 
     case OFPUTIL_OFPAT11_SET_TP_DST:
         ofpact_put_SET_L4_DST_PORT(out)->port = ntohs(a->tp_port.tp_port);
-
         break;
 
-    case OFPUTIL_NXAST_RESUBMIT:
-    case OFPUTIL_NXAST_SET_TUNNEL:
-    case OFPUTIL_NXAST_SET_QUEUE:
-    case OFPUTIL_NXAST_POP_QUEUE:
-    case OFPUTIL_NXAST_REG_MOVE:
-    case OFPUTIL_NXAST_REG_LOAD:
-    case OFPUTIL_NXAST_NOTE:
-    case OFPUTIL_NXAST_SET_TUNNEL64:
-    case OFPUTIL_NXAST_MULTIPATH:
-    case OFPUTIL_NXAST_AUTOPATH:
-    case OFPUTIL_NXAST_BUNDLE:
-    case OFPUTIL_NXAST_BUNDLE_LOAD:
-    case OFPUTIL_NXAST_OUTPUT_REG:
-    case OFPUTIL_NXAST_RESUBMIT_TABLE:
-    case OFPUTIL_NXAST_LEARN:
-    case OFPUTIL_NXAST_EXIT:
-    case OFPUTIL_NXAST_DEC_TTL:
-    case OFPUTIL_NXAST_FIN_TIMEOUT:
-    case OFPUTIL_NXAST_CONTROLLER:
+#define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME) case OFPUTIL_##ENUM:
+#include "ofp-util.def"
         return ofpact_from_nxast(a, code, out);
     }
 
