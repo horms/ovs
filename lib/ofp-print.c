@@ -1049,14 +1049,12 @@ ofp_print_nxst_aggregate_reply(struct ds *string, const struct ofp_header *oh)
     ofp_print_ofpst_aggregate_reply__(string, asr);
 }
 
-static void print_port_stat(struct ds *string, const char *leader,
-                            const ovs_32aligned_be64 *statp, int more)
+static void ofp_print_port_stat(struct ds *string, const char *leader,
+                                ovs_be64 stat, int more)
 {
-    uint64_t stat = ntohll(get_32aligned_be64(statp));
-
     ds_put_cstr(string, leader);
     if (stat != UINT64_MAX) {
-        ds_put_format(string, "%"PRIu64, stat);
+        ds_put_format(string, "%"PRIu64, ntohll(stat));
     } else {
         ds_put_char(string, '?');
     }
@@ -1065,6 +1063,12 @@ static void print_port_stat(struct ds *string, const char *leader,
     } else {
         ds_put_cstr(string, "\n");
     }
+}
+
+static void print_port_stat(struct ds *string, const char *leader,
+                            const ovs_32aligned_be64 *statp, int more)
+{
+    ofp_print_port_stat(string, leader, get_32aligned_be64(statp), more);
 }
 
 static void
@@ -1078,42 +1082,77 @@ static void
 ofp_print_ofpst_port_reply(struct ds *string, const struct ofp_header *oh,
                            int verbosity)
 {
-    struct ofp10_port_stats *ps;
     struct ofpbuf b;
     size_t n;
+    struct ofp11_port_stats ps;
 
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
     ofputil_pull_stats_msg(&b);
 
-    n = b.size / sizeof *ps;
+    /* struct ofp10_port_stats and struct ofp11_port_stats are the
+     * same size.
+     */
+    n = b.size / sizeof ps;
     ds_put_format(string, " %zu ports\n", n);
     if (verbosity < 1) {
         return;
     }
 
     for (;;) {
-        ps = ofpbuf_try_pull(&b, sizeof *ps);
-        if (!ps) {
-            return;
+
+        switch (oh->version) {
+        case OFP12_VERSION:
+        case OFP11_VERSION: {
+            struct ofp11_port_stats *ps11 = ofpbuf_try_pull(&b, sizeof *ps11);
+            if (!ps11) {
+                return;
+            }
+            ds_put_format(string, "  port %2"PRIu32": ", ntohl(ps11->port_no));
+            ps = *ps11;
+            break;
         }
 
-        ds_put_format(string, "  port %2"PRIu16": ", ntohs(ps->port_no));
+        case OFP10_VERSION: {
+            struct ofp10_port_stats *ps10 = ofpbuf_try_pull(&b, sizeof *ps10);
+            if (!ps10) {
+                return;
+            }
+
+            ds_put_format(string, "  port %2"PRIu16": ", ntohs(ps.port_no));
+            ps.rx_packets = get_32aligned_be64(&ps10->rx_packets);
+            ps.rx_bytes = get_32aligned_be64(&ps10->rx_bytes);
+            ps.rx_dropped = get_32aligned_be64(&ps10->rx_dropped);
+            ps.rx_errors = get_32aligned_be64(&ps10->rx_errors);
+            ps.rx_frame_err = get_32aligned_be64(&ps10->rx_frame_err);
+            ps.rx_over_err = get_32aligned_be64(&ps10->rx_over_err);
+            ps.rx_crc_err = get_32aligned_be64(&ps10->rx_crc_err);
+            ps.tx_packets = get_32aligned_be64(&ps10->tx_packets);
+            ps.tx_bytes = get_32aligned_be64(&ps10->tx_bytes);
+            ps.tx_dropped = get_32aligned_be64(&ps10->tx_dropped);
+            ps.tx_errors = get_32aligned_be64(&ps10->tx_errors);
+            ps.collisions = get_32aligned_be64(&ps10->collisions);
+            break;
+        }
+
+        default:
+            NOT_REACHED();
+        }
 
         ds_put_cstr(string, "rx ");
-        print_port_stat(string, "pkts=", &ps->rx_packets, 1);
-        print_port_stat(string, "bytes=", &ps->rx_bytes, 1);
-        print_port_stat(string, "drop=", &ps->rx_dropped, 1);
-        print_port_stat(string, "errs=", &ps->rx_errors, 1);
-        print_port_stat(string, "frame=", &ps->rx_frame_err, 1);
-        print_port_stat(string, "over=", &ps->rx_over_err, 1);
-        print_port_stat(string, "crc=", &ps->rx_crc_err, 0);
+        ofp_print_port_stat(string, "pkts=", ps.rx_packets, 1);
+        ofp_print_port_stat(string, "bytes=", ps.rx_bytes, 1);
+        ofp_print_port_stat(string, "drop=", ps.rx_dropped, 1);
+        ofp_print_port_stat(string, "errs=", ps.rx_errors, 1);
+        ofp_print_port_stat(string, "frame=", ps.rx_frame_err, 1);
+        ofp_print_port_stat(string, "over=", ps.rx_over_err, 1);
+        ofp_print_port_stat(string, "crc=", ps.rx_crc_err, 0);
 
         ds_put_cstr(string, "           tx ");
-        print_port_stat(string, "pkts=", &ps->tx_packets, 1);
-        print_port_stat(string, "bytes=", &ps->tx_bytes, 1);
-        print_port_stat(string, "drop=", &ps->tx_dropped, 1);
-        print_port_stat(string, "errs=", &ps->tx_errors, 1);
-        print_port_stat(string, "coll=", &ps->collisions, 0);
+        ofp_print_port_stat(string, "pkts=", ps.tx_packets, 1);
+        ofp_print_port_stat(string, "bytes=", ps.tx_bytes, 1);
+        ofp_print_port_stat(string, "drop=", ps.tx_dropped, 1);
+        ofp_print_port_stat(string, "errs=", ps.tx_errors, 1);
+        ofp_print_port_stat(string, "coll=", ps.collisions, 0);
     }
 }
 
