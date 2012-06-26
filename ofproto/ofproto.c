@@ -2336,13 +2336,34 @@ handle_port_stats_request(struct ofconn *ofconn,
                           const struct ofp_header *request)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
-    struct ofp10_port_stats_request *psr = ofputil_stats_msg_body(request);
     struct ofport *port;
     struct list replies;
+    uint16_t port_no;
+
+    switch (request->version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION: {
+        struct ofp11_port_stats_request *psr = ofputil_stats_msg_body(request);
+        enum ofperr error = ofputil_port_from_ofp11(psr->port_no, &port_no);
+        if (error) {
+            return error;
+        }
+        break;
+    }
+
+    case OFP10_VERSION: {
+        struct ofp10_port_stats_request *psr = ofputil_stats_msg_body(request);
+        port_no = ntohs(psr->port_no);
+        break;
+    }
+
+    default:
+        NOT_REACHED();
+    }
 
     ofputil_start_stats_reply(request, &replies);
-    if (psr->port_no != htons(OFPP_NONE)) {
-        port = ofproto_get_port(p, ntohs(psr->port_no));
+    if (port_no != OFPP_NONE) {
+        port = ofproto_get_port(p, port_no);
         if (port) {
             append_port_stat(port, request->version, &replies);
         }
