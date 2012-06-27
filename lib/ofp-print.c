@@ -1074,8 +1074,23 @@ static void print_port_stat(struct ds *string, const char *leader,
 static void
 ofp_print_ofpst_port_request(struct ds *string, const struct ofp_header *oh)
 {
-    const struct ofp10_port_stats_request *psr = ofputil_stats_msg_body(oh);
-    ds_put_format(string, " port_no=%"PRIu16, ntohs(psr->port_no));
+    switch (oh->version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION: {
+        const struct ofp11_port_stats_request *psr = ofputil_stats_msg_body(oh);
+        ds_put_format(string, " port_no=%"PRIu32, ntohl(psr->port_no));
+        break;
+    }
+
+    case OFP10_VERSION: {
+        const struct ofp10_port_stats_request *psr = ofputil_stats_msg_body(oh);
+        ds_put_format(string, " port_no=%"PRIu16, ntohs(psr->port_no));
+        break;
+    }
+
+    default:
+        NOT_REACHED();
+    }
 }
 
 static void
