@@ -269,11 +269,12 @@ struct ofpact_reg_move {
 
 /* OFPACT_REG_LOAD.
  *
- * Used for NXAST_REG_LOAD. */
+ * Used for NXAST_REG_LOAD, OFPAT12_SET_FIELD. */
 struct ofpact_reg_load {
     struct ofpact ofpact;
     struct mf_subfield dst;
-    uint64_t value;
+    /* OFPAT12_SET_FIELD requires more than 64 bits */
+    union mf_value value;
 };
 
 /* OFPACT_SET_TUNNEL.

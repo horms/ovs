@@ -839,7 +839,7 @@ nxm_parse_reg_load(struct ofpact_reg_load *load, const char *s)
 {
     const char *full_s = s;
 
-    load->value = strtoull(s, (char **) &s, 0);
+    load->value.be64 = htonll(strtoull(s, (char **) &s, 0));
     if (strncmp(s, "->", 2)) {
         ovs_fatal(0, "%s: missing `->' following value", full_s);
     }
@@ -849,9 +849,10 @@ nxm_parse_reg_load(struct ofpact_reg_load *load, const char *s)
         ovs_fatal(0, "%s: trailing garbage following destination", full_s);
     }
 
-    if (load->dst.n_bits < 64 && (load->value >> load->dst.n_bits) != 0) {
+    if (load->dst.n_bits < 64 &&
+        (ntohll(load->value.be64) >> load->dst.n_bits) != 0) {
         ovs_fatal(0, "%s: value %"PRIu64" does not fit into %d bits",
-                  full_s, load->value, load->dst.n_bits);
+                  full_s, ntohll(load->value.be64), load->dst.n_bits);
     }
 }
 
@@ -869,7 +870,7 @@ nxm_format_reg_move(const struct ofpact_reg_move *move, struct ds *s)
 void
 nxm_format_reg_load(const struct ofpact_reg_load *load, struct ds *s)
 {
-    ds_put_format(s, "load:%#"PRIx64"->", load->value);
+    ds_put_format(s, "load:%#"PRIx64"->", ntohll(load->value.be64));
     mf_format_subfield(&load->dst, s);
 }
 
@@ -900,11 +901,11 @@ nxm_reg_load_from_openflow(const struct nx_action_reg_load *narl,
     load->dst.field = mf_from_nxm_header(ntohl(narl->dst));
     load->dst.ofs = nxm_decode_ofs(narl->ofs_nbits);
     load->dst.n_bits = nxm_decode_n_bits(narl->ofs_nbits);
-    load->value = ntohll(narl->value);
+    load->value.be64 = narl->value;
 
     /* Reject 'narl' if a bit numbered 'n_bits' or higher is set to 1 in
      * narl->value. */
-    if (load->dst.n_bits < 64 && load->value >> load->dst.n_bits) {
+    if (load->dst.n_bits < 64 && ntohll(load->value.be64) >> load->dst.n_bits) {
         return OFPERR_OFPBAC_BAD_ARGUMENT;
     }
 
@@ -953,7 +954,7 @@ nxm_reg_load_to_openflow(const struct ofpact_reg_load *load,
     narl = ofputil_put_NXAST_REG_LOAD(openflow);
     narl->ofs_nbits = nxm_encode_ofs_nbits(load->dst.ofs, load->dst.n_bits);
     narl->dst = htonl(load->dst.field->nxm_header);
-    narl->value = htonll(load->value);
+    narl->value = load->value.be64;
 }
 
 /* nxm_execute_reg_move(), nxm_execute_reg_load(). */
@@ -976,7 +977,7 @@ nxm_execute_reg_move(const struct ofpact_reg_move *move,
 void
 nxm_execute_reg_load(const struct ofpact_reg_load *load, struct flow *flow)
 {
-    nxm_reg_load(&load->dst, load->value, flow);
+    nxm_reg_load(&load->dst, ntohll(load->value.be64), flow);
 }
 
 void

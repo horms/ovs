@@ -350,7 +350,7 @@ learn_execute(const struct ofpact_learn *learn, const struct flow *flow,
                 bitwise_copy(&value, sizeof value, ofs,
                              &value_be, sizeof value_be, 0,
                              chunk);
-                load->value = ntohll(value_be);
+                load->value.be64 = value_be;
             }
             break;
 
