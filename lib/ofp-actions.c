@@ -435,14 +435,16 @@ action_is_valid(const union ofp_action *a, size_t n_actions)
           (ITER) = action_next(ITER)))
 
 static enum ofperr
-ofpacts_from_openflow10(const union ofp_action *in, size_t n_in,
-                        struct ofpbuf *out)
+ofpacts_from_openflow(const union ofp_action *in, size_t n_in,
+                      struct ofpbuf *out,
+                      enum ofperr (ofpact_from_openflow)(
+                          const union ofp_action *a, struct ofpbuf *out))
 {
     const union ofp_action *a;
     size_t left;
 
     ACTION_FOR_EACH (a, left, in, n_in) {
-        enum ofperr error = ofpact_from_openflow10(a, out);
+        enum ofperr error = ofpact_from_openflow(a, out);
         if (error) {
             VLOG_WARN_RL(&rl, "bad action at offset %td (%s)",
                          (a - in) * sizeof *a, ofperr_get_name(error));
@@ -458,6 +460,13 @@ ofpacts_from_openflow10(const union ofp_action *in, size_t n_in,
     ofpact_put_END(out);
 
     return 0;
+}
+
+static enum ofperr
+ofpacts_from_openflow10(const union ofp_action *in, size_t n_in,
+                        struct ofpbuf *out)
+{
+    return ofpacts_from_openflow(in, n_in, out, ofpact_from_openflow10);
 }
 
 /* Attempts to convert 'actions_len' bytes of OpenFlow actions from the front
@@ -633,24 +642,7 @@ static enum ofperr
 ofpacts_from_openflow11(const union ofp_action *in, size_t n_in,
                         struct ofpbuf *out)
 {
-    const union ofp_action *a;
-    size_t left;
-
-    ACTION_FOR_EACH (a, left, in, n_in) {
-        enum ofperr error = ofpact_from_openflow11(a, out);
-        if (error) {
-            VLOG_WARN_RL(&rl, "bad action at offset %td (%s)",
-                         (a - in) * sizeof *a, ofperr_get_name(error));
-            return error;
-        }
-    }
-    if (left) {
-        VLOG_WARN_RL(&rl, "bad action format at offset %zu",
-                     (n_in - left) * sizeof *a);
-        return OFPERR_OFPBAC_BAD_LEN;
-    }
-
-    return 0;
+    return ofpacts_from_openflow(in, n_in, out, ofpact_from_openflow11);
 }
 
 /* OpenFlow 1.1 instructions. */
