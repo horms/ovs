@@ -1351,13 +1351,42 @@ ofp_print_queue_name(struct ds *string, uint32_t queue_id)
 static void
 ofp_print_ofpst_queue_request(struct ds *string, const struct ofp_header *oh)
 {
-    const struct ofp10_queue_stats_request *qsr = ofputil_stats_msg_body(oh);
+    uint16_t port_no;
+    uint32_t queue_id;
+
+    switch (oh->version) {
+    case OFP11_VERSION:
+    case OFP12_VERSION: {
+        const struct ofp11_queue_stats_request *qsr;
+
+        qsr = ofputil_stats_msg_body(oh);
+        if (ofputil_port_from_ofp11(qsr->port_no, &port_no)) {
+            ds_put_cstr(string, "*** parse error: invalid port ***\n");
+            return;
+        }
+        port_no = ntohs(qsr->port_no);
+        queue_id = ntohl(qsr->queue_id);
+        break;
+    }
+
+    case OFP10_VERSION: {
+        const struct ofp10_queue_stats_request *qsr;
+
+        qsr = ofputil_stats_msg_body(oh);
+        port_no = ntohs(qsr->port_no);
+        queue_id = ntohl(qsr->queue_id);
+        break;
+    }
+
+    default:
+       NOT_REACHED();
+    }
 
     ds_put_cstr(string, "port=");
-    ofputil_format_port(ntohs(qsr->port_no), string);
+    ofputil_format_port(port_no, string);
 
     ds_put_cstr(string, " queue=");
-    ofp_print_queue_name(string, ntohl(qsr->queue_id));
+    ofp_print_queue_name(string, queue_id);
 }
 
 static void
