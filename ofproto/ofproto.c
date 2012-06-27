@@ -2783,8 +2783,22 @@ struct queue_stats_cbdata {
 };
 
 static void
-put_queue_stats(struct queue_stats_cbdata *cbdata, uint32_t queue_id,
-                const struct netdev_queue_stats *stats)
+put_queue_stats11(struct queue_stats_cbdata *cbdata, uint32_t queue_id,
+                  const struct netdev_queue_stats *stats)
+{
+    struct ofp11_queue_stats *reply;
+
+    reply = ofputil_append_stats_reply(sizeof *reply, &cbdata->replies);
+    reply->port_no = ofputil_port_to_ofp11(cbdata->ofport->pp.port_no);
+    reply->queue_id = htonl(queue_id);
+    reply->tx_bytes = htonll(stats->tx_bytes);
+    reply->tx_packets = htonll(stats->tx_packets);
+    reply->tx_errors = htonll(stats->tx_errors);
+}
+
+static void
+put_queue_stats10(struct queue_stats_cbdata *cbdata, uint32_t queue_id,
+                  const struct netdev_queue_stats *stats)
 {
     struct ofp10_queue_stats *reply;
 
@@ -2795,6 +2809,28 @@ put_queue_stats(struct queue_stats_cbdata *cbdata, uint32_t queue_id,
     put_32aligned_be64(&reply->tx_bytes, htonll(stats->tx_bytes));
     put_32aligned_be64(&reply->tx_packets, htonll(stats->tx_packets));
     put_32aligned_be64(&reply->tx_errors, htonll(stats->tx_errors));
+}
+
+static void
+put_queue_stats(struct queue_stats_cbdata *cbdata, uint32_t queue_id,
+                const struct netdev_queue_stats *stats)
+{
+    struct ofpbuf *msg = ofpbuf_from_list(list_back(&cbdata->replies));
+    struct ofp_header *oh = msg->data;
+
+    switch (oh->version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION:
+        put_queue_stats11(cbdata, queue_id, stats);
+        break;
+
+    case OFP10_VERSION:
+        put_queue_stats10(cbdata, queue_id, stats);
+        break;
+
+    default:
+        NOT_REACHED();
+    }
 }
 
 static void
