@@ -803,27 +803,50 @@ do_dump_aggregate(int argc, char *argv[])
 static void
 do_queue_stats(int argc, char *argv[])
 {
-    struct ofp10_queue_stats_request *req;
     struct ofpbuf *request;
     struct vconn *vconn;
+    uint16_t port_no;
+    uint32_t queue_id;
 
     open_vconn(argv[1], &vconn);
 
-    req = ofputil_make_stats_request(sizeof *req, OFP10_VERSION,
-                                     OFPST_QUEUE, 0, &request);
-
     if (argc > 2 && argv[2][0] && strcasecmp(argv[2], "all")) {
-        req->port_no = htons(str_to_port_no(vconn, argv[2]));
+        port_no = str_to_port_no(vconn, argv[2]);
     } else {
-        req->port_no = htons(OFPP_ALL);
+        port_no = OFPP_ALL;
     }
     if (argc > 3 && argv[3][0] && strcasecmp(argv[3], "all")) {
-        req->queue_id = htonl(atoi(argv[3]));
+        queue_id = atoi(argv[3]);
     } else {
-        req->queue_id = htonl(OFPQ_ALL);
+        queue_id = OFPQ_ALL;
     }
 
-    memset(req->pad, 0, sizeof req->pad);
+    switch (vconn_get_version(vconn)) {
+    case OFP12_VERSION:
+    case OFP11_VERSION: {
+        struct ofp11_queue_stats_request *req;
+
+        req = ofputil_make_stats_request(sizeof *req, vconn_get_version(vconn),
+                                         OFPST_QUEUE, 0, &request);
+        req->port_no = ofputil_port_to_ofp11(port_no);
+        req->queue_id = htonl(queue_id);
+        break;
+    }
+
+    case OFP10_VERSION: {
+        struct ofp10_queue_stats_request *req;
+
+        req = ofputil_make_stats_request(sizeof *req, vconn_get_version(vconn),
+                                         OFPST_QUEUE, 0, &request);
+        req->port_no = htons(port_no);
+        memset(req->pad, 0, sizeof req->pad);
+        req->queue_id = htonl(queue_id);
+        break;
+    }
+
+    default:
+        NOT_REACHED();
+    }
 
     dump_stats_transaction(vconn, request);
     vconn_close(vconn);
