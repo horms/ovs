@@ -901,6 +901,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
     OFPST11_REQUEST(OFPST_TABLE, OFPST_TABLE, 0, 0),
     OFPST11_REQUEST(OFPST_PORT, OFPST_PORT,
                     sizeof(struct ofp11_port_stats_request), 0),
+    OFPST11_REQUEST(OFPST_QUEUE, OFPST_QUEUE,
+                    sizeof(struct ofp11_queue_stats_request), 0),
     OFPST11_REQUEST(OFPST_PORT_DESC, OFPST_PORT_DESC, 0, 0),
 #undef OFPST11_REQUEST
 
@@ -920,6 +922,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
     OFPST12_REQUEST(OFPST_TABLE, OFPST_TABLE, 0, 0),
     OFPST12_REQUEST(OFPST_PORT, OFPST_PORT,
                     sizeof(struct ofp11_port_stats_request), 0),
+    OFPST12_REQUEST(OFPST_QUEUE, OFPST_QUEUE,
+                    sizeof(struct ofp11_queue_stats_request), 0),
     OFPST12_REQUEST(OFPST_PORT_DESC, OFPST_PORT_DESC, 0, 0),
 #undef OFPST12_REQUEST
 

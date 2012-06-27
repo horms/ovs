@@ -2865,18 +2865,43 @@ handle_queue_stats_request(struct ofconn *ofconn,
                            const struct ofp_header *rq)
 {
     struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
-    const struct ofp10_queue_stats_request *qsr = ofputil_stats_msg_body(rq);
     struct queue_stats_cbdata cbdata;
     struct ofport *port;
-    unsigned int port_no;
+    uint16_t port_no;
     uint32_t queue_id;
 
     COVERAGE_INC(ofproto_queue_req);
 
     ofputil_start_stats_reply(rq, &cbdata.replies);
 
-    port_no = ntohs(qsr->port_no);
-    queue_id = ntohl(qsr->queue_id);
+    switch (rq->version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION: {
+        const struct ofp11_queue_stats_request *qsr;
+        enum ofperr error;
+
+        qsr = ofputil_stats_msg_body(rq);
+        error = ofputil_port_from_ofp11(qsr->port_no, &port_no);
+        if (error) {
+            return error;
+        }
+        queue_id = ntohl(qsr->queue_id);
+        break;
+    }
+
+    case OFP10_VERSION: {
+        const struct ofp10_queue_stats_request *qsr;
+
+        qsr = ofputil_stats_msg_body(rq);
+        port_no = ntohs(qsr->port_no);
+        queue_id = ntohl(qsr->queue_id);
+        break;
+    }
+
+    default:
+        NOT_REACHED();
+    }
+
     if (port_no == OFPP_ALL) {
         HMAP_FOR_EACH (port, hmap_node, &ofproto->ports) {
             handle_queue_stats_for_port(port, queue_id, &cbdata);
