@@ -394,6 +394,8 @@ enum ofperr ofpacts_check(const struct ofpact[],
 void ofpacts_to_openflow10(const struct ofpact[], struct ofpbuf *openflow);
 void ofpacts_to_openflow11(const struct ofpact[], struct ofpbuf *openflow,
                            enum ofp11_instruction_type type);
+void ofpacts_to_openflow12(const struct ofpact[], struct ofpbuf *openflow,
+                           enum ofp11_instruction_type type);
 
 /* Working with ofpacts. */
 bool ofpacts_output_to_port(const struct ofpact[], uint16_t port);

@@ -1330,6 +1330,51 @@ ofpact_output_to_openflow11(const struct ofpact_output *output,
 }
 
 static void
+ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
+{
+    switch (a->type) {
+    case OFPACT_OUTPUT:
+        return ofpact_output_to_openflow11(ofpact_get_OUTPUT(a), out);
+
+    case OFPACT_ENQUEUE:
+        /* XXX */
+        break;
+
+    /* TODO: more actions OFPAT_COPY_TTL_OUT ... OFPAT_DEC_NW_TTL */
+
+    case OFPACT_END:
+    case OFPACT_CONTROLLER:
+    case OFPACT_OUTPUT_REG:
+    case OFPACT_BUNDLE:
+    case OFPACT_SET_VLAN_VID:
+    case OFPACT_SET_VLAN_PCP:
+    case OFPACT_STRIP_VLAN:
+    case OFPACT_SET_ETH_SRC:
+    case OFPACT_SET_ETH_DST:
+    case OFPACT_SET_IPV4_SRC:
+    case OFPACT_SET_IPV4_DST:
+    case OFPACT_SET_IPV4_DSCP:
+    case OFPACT_SET_L4_SRC_PORT:
+    case OFPACT_SET_L4_DST_PORT:
+    case OFPACT_REG_MOVE:
+    case OFPACT_REG_LOAD:
+    case OFPACT_DEC_TTL:
+    case OFPACT_SET_TUNNEL:
+    case OFPACT_SET_QUEUE:
+    case OFPACT_POP_QUEUE:
+    case OFPACT_FIN_TIMEOUT:
+    case OFPACT_RESUBMIT:
+    case OFPACT_LEARN:
+    case OFPACT_MULTIPATH:
+    case OFPACT_AUTOPATH:
+    case OFPACT_NOTE:
+    case OFPACT_EXIT:
+    default:
+        NOT_REACHED();
+    }
+}
+
+static void
 ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
 {
     switch (a->type) {
@@ -1337,11 +1382,8 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
         NOT_REACHED();
 
     case OFPACT_OUTPUT:
-        return ofpact_output_to_openflow11(ofpact_get_OUTPUT(a), out);
-
     case OFPACT_ENQUEUE:
-        /* XXX */
-        break;
+        return ofpact_to_openflow11_common(a, out);
 
     case OFPACT_SET_VLAN_VID:
         ofputil_put_OFPAT11_SET_VLAN_VID(out)->vlan_vid
@@ -1413,12 +1455,56 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
     }
 }
 
+static void
+ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
+{
+    switch (a->type) {
+    case OFPACT_END:
+    case OFPACT_SET_VLAN_VID:
+    case OFPACT_SET_VLAN_PCP:
+    case OFPACT_STRIP_VLAN:
+    case OFPACT_SET_ETH_SRC:
+    case OFPACT_SET_ETH_DST:
+    case OFPACT_SET_IPV4_SRC:
+    case OFPACT_SET_IPV4_DST:
+    case OFPACT_SET_IPV4_DSCP:
+    case OFPACT_SET_L4_SRC_PORT:
+    case OFPACT_SET_L4_DST_PORT:
+        NOT_REACHED();
+
+    case OFPACT_OUTPUT:
+    case OFPACT_ENQUEUE:
+        return ofpact_to_openflow11_common(a, out);
+
+    case OFPACT_CONTROLLER:
+    case OFPACT_OUTPUT_REG:
+    case OFPACT_BUNDLE:
+    case OFPACT_REG_MOVE:
+    case OFPACT_REG_LOAD:
+    case OFPACT_DEC_TTL:
+    case OFPACT_SET_TUNNEL:
+    case OFPACT_SET_QUEUE:
+    case OFPACT_POP_QUEUE:
+    case OFPACT_FIN_TIMEOUT:
+    case OFPACT_RESUBMIT:
+    case OFPACT_LEARN:
+    case OFPACT_MULTIPATH:
+    case OFPACT_AUTOPATH:
+    case OFPACT_NOTE:
+    case OFPACT_EXIT:
+        ofpact_to_nxast(a, out);
+        break;
+    }
+}
+
 /* Converts the ofpacts in 'ofpacts' (terminated by OFPACT_END) into OpenFlow
  * 1.1 actions in 'openflow', appending the actions to any existing data in
  * 'openflow'. */
-void
-ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow,
-                      enum ofp11_instruction_type type)
+static void
+__ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow,
+                        enum ofp11_instruction_type type,
+                        void (*ofpact_to_openflow)(const struct ofpact *a,
+                                                   struct ofpbuf *out))
 {
     const struct ofpact *a;
 
@@ -1435,7 +1521,7 @@ ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow,
 
         ofpbuf_put_uninit(openflow, sizeof *oia);
         OFPACT_FOR_EACH (a, ofpacts) {
-            ofpact_to_openflow11(a, openflow);
+            ofpact_to_openflow(a, openflow);
         }
         oia = (struct ofp11_instruction_actions *)((char *)openflow->data +
                                                    start_len);
@@ -1454,6 +1540,20 @@ ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow,
     default:
         NOT_REACHED();
     }
+}
+
+void
+ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow,
+                      enum ofp11_instruction_type type)
+{
+    __ofpacts_to_openflow11(ofpacts, openflow, type, ofpact_to_openflow11);
+}
+
+void
+ofpacts_to_openflow12(const struct ofpact ofpacts[], struct ofpbuf *openflow,
+                      enum ofp11_instruction_type type)
+{
+    __ofpacts_to_openflow11(ofpacts, openflow, type, ofpact_to_openflow12);
 }
 
 /* Returns true if 'action' outputs to 'port', false otherwise. */
