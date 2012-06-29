@@ -2252,3 +2252,17 @@ mf_parse_subfield(struct mf_subfield *sf, const char *s)
     }
     return s;
 }
+
+const struct mf_field*
+mf_parse_oxm_name(const char *s)
+{
+    int i;
+    for (i = 0; i < MFF_N_IDS; i++) {
+        const struct mf_field *mf = mf_from_id(i);
+        int name_len = strlen(mf->oxm_name);
+        if (mf->oxm_name && !strncmp(mf->oxm_name, s, name_len)) {
+            return mf;
+        }
+    }
+    return NULL;
+}

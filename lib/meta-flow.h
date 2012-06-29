@@ -329,5 +329,6 @@ char *mf_parse_value(const struct mf_field *, const char *, union mf_value *);
 void mf_format(const struct mf_field *,
                const union mf_value *value, const union mf_value *mask,
                struct ds *);
+const struct mf_field *mf_parse_oxm_name(const char *s);
 
 #endif /* meta-flow.h */
