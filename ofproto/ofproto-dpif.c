@@ -1108,7 +1108,22 @@ get_features(struct ofproto *ofproto_ OVS_UNUSED,
                 OFPUTIL_A_SET_NW_TOS |
                 OFPUTIL_A_SET_TP_SRC |
                 OFPUTIL_A_SET_TP_DST |
-                OFPUTIL_A_ENQUEUE);
+                OFPUTIL_A_ENQUEUE |
+                OFPUTIL_A_COPY_TTL_OUT |
+                OFPUTIL_A_COPY_TTL_IN |
+                OFPUTIL_A_SET_MPLS_LABEL |
+                OFPUTIL_A_SET_MPLS_TC |
+                OFPUTIL_A_SET_MPLS_TTL |
+                OFPUTIL_A_DEC_MPLS_TTL |
+                OFPUTIL_A_PUSH_VLAN |
+                OFPUTIL_A_POP_VLAN |
+                OFPUTIL_A_PUSH_MPLS |
+                OFPUTIL_A_POP_MPLS |
+                OFPUTIL_A_SET_QUEUE |
+                OFPUTIL_A_GROUP |
+                OFPUTIL_A_SET_NW_TTL |
+                OFPUTIL_A_DEC_NW_TTL |
+                OFPUTIL_A_SET_FIELD);
 }
 
 static void
