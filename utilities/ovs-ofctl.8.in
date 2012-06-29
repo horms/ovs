@@ -867,6 +867,11 @@ Sets the IPv4 ToS/DSCP field to \fItos\fR.  Valid values are between 0 and
 255, inclusive.  Note that the two lower reserved bits are never
 modified.
 .
+.IP \fBset_field:\fIvalue\fB\->\fIdst
+Writes \fIvalue\fR to field \fIdst\fR.
+This is supported by OF1.2+.
+Example: \fBset_field:10.0.0.1\->OXM_OF_IPV4_SRC
+.
 .RE
 .IP
 The following actions are Nicira vendor extensions that, as of this writing, are
