@@ -3284,6 +3284,24 @@ static const struct ofputil_action_bit_translation of11_action_bits[] = {
     { 0, 0 },
 };
 
+static const struct ofputil_action_bit_translation of12_action_bits[] = {
+    { OFPUTIL_A_OUTPUT,         OFPAT12_OUTPUT },
+    { OFPUTIL_A_COPY_TTL_OUT,   OFPAT12_COPY_TTL_OUT },
+    { OFPUTIL_A_COPY_TTL_IN,    OFPAT12_COPY_TTL_IN },
+    { OFPUTIL_A_SET_MPLS_TTL,   OFPAT12_SET_MPLS_TTL },
+    { OFPUTIL_A_DEC_MPLS_TTL,   OFPAT12_DEC_MPLS_TTL },
+    { OFPUTIL_A_PUSH_VLAN,      OFPAT12_PUSH_VLAN },
+    { OFPUTIL_A_POP_VLAN,       OFPAT12_POP_VLAN },
+    { OFPUTIL_A_PUSH_MPLS,      OFPAT12_PUSH_MPLS },
+    { OFPUTIL_A_POP_MPLS,       OFPAT12_POP_MPLS },
+    { OFPUTIL_A_SET_QUEUE,      OFPAT12_SET_QUEUE },
+    { OFPUTIL_A_GROUP,          OFPAT12_GROUP },
+    { OFPUTIL_A_SET_NW_TTL,     OFPAT12_SET_NW_TTL },
+    { OFPUTIL_A_DEC_NW_TTL,     OFPAT12_DEC_NW_TTL },
+    { OFPUTIL_A_SET_FIELD,      OFPAT12_SET_FIELD },
+    { 0, 0 },
+};
+
 static enum ofputil_action_bitmap
 decode_action_bits(ovs_be32 of_actions,
                    const struct ofputil_action_bit_translation *x)
@@ -3349,7 +3367,13 @@ ofputil_decode_switch_features(const struct ofp_switch_features *osf,
         if (osf->capabilities & htonl(OFPC11_GROUP_STATS)) {
             features->capabilities |= OFPUTIL_C_GROUP_STATS;
         }
-        features->actions = decode_action_bits(osf->actions, of11_action_bits);
+        if (osf->header.version == OFP11_VERSION) {
+            features->actions = decode_action_bits(osf->actions,
+                                                   of11_action_bits);
+        } else if (osf->header.version == OFP12_VERSION) {
+            features->actions = decode_action_bits(osf->actions,
+                                                   of12_action_bits);
+        }
     } else {
         return OFPERR_OFPBRC_BAD_VERSION;
     }
@@ -3433,7 +3457,13 @@ ofputil_encode_switch_features(const struct ofputil_switch_features *features,
         if (features->capabilities & OFPUTIL_C_GROUP_STATS) {
             osf->capabilities |= htonl(OFPC11_GROUP_STATS);
         }
-        osf->actions = encode_action_bits(features->actions, of11_action_bits);
+        if (osf->header.version == OFP11_VERSION) {
+            osf->actions = encode_action_bits(features->actions,
+                                              of11_action_bits);
+        } else if (osf->header.version == OFP12_VERSION) {
+            osf->actions = encode_action_bits(features->actions,
+                                              of12_action_bits);
+        }
     }
 
     return b;
