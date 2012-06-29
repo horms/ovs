@@ -3531,6 +3531,29 @@ ofputil_encode_barrier_request(uint8_t ofp_version)
     return msg;
 }
 
+void *
+make_barrier_reply(uint8_t ofp_version, ovs_be32 xid, struct ofpbuf **bufferp)
+{
+    uint8_t ofp_type;
+
+    switch (ofp_version) {
+    case OFP12_VERSION:
+    case OFP11_VERSION:
+        ofp_type = OFPT11_BARRIER_REPLY;
+        break;
+
+    case OFP10_VERSION:
+        ofp_type = OFPT10_BARRIER_REPLY;
+        break;
+
+    default:
+        NOT_REACHED();
+    }
+
+    return make_openflow_xid(sizeof(struct ofp_header),
+                             ofp_version, ofp_type, xid, bufferp);
+}
+
 const char *
 ofputil_frag_handling_to_string(enum ofp_config_flags flags)
 {

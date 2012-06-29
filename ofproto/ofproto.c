@@ -3281,9 +3281,8 @@ handle_barrier_request(struct ofconn *ofconn, const struct ofp_header *oh)
     if (ofconn_has_pending_opgroups(ofconn)) {
         return OFPROTO_POSTPONE;
     }
-
-    make_openflow_xid(sizeof *oh, ofputil_protocol_to_ofp_version(protocol),
-                      OFPT10_BARRIER_REPLY, oh->xid, &buf);
+    make_barrier_reply(ofputil_protocol_to_ofp_version(protocol),
+                       oh->xid, &buf);
     ofconn_send_reply(ofconn, buf);
     return 0;
 }

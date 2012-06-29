@@ -574,6 +574,8 @@ struct ofpbuf *make_echo_request(void);
 struct ofpbuf *make_echo_reply(const struct ofp_header *rq);
 
 struct ofpbuf *ofputil_encode_barrier_request(uint8_t ofp_version);
+void * make_barrier_reply(uint8_t ofp_version, ovs_be32 xid,
+                          struct ofpbuf **bufferp);
 
 const char *ofputil_frag_handling_to_string(enum ofp_config_flags);
 bool ofputil_frag_handling_from_string(const char *, enum ofp_config_flags *);
