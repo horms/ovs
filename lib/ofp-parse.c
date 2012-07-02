@@ -36,6 +36,7 @@
 #include "ofpbuf.h"
 #include "openflow/openflow.h"
 #include "packets.h"
+#include "set-field.h"
 #include "socket-util.h"
 #include "vconn.h"
 #include "vlog.h"
@@ -366,7 +367,7 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         break;
 
     case OFPUTIL_OFPAT12_SET_FIELD:
-        NOT_REACHED();  /* This will be implemented by later patch */
+        set_field_parse(arg, ofpacts);
         break;
 
     case OFPUTIL_NXAST_RESUBMIT:
