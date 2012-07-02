@@ -1729,6 +1729,7 @@ ofpacts_equal(const struct ofpact *a, size_t a_len,
 }
 
 /* Formatting ofpacts. */
+static void ofpacts_format__(const struct ofpact *ofpacts, struct ds *string);
 
 static void
 print_note(const struct ofpact_note *note, struct ds *string)
@@ -1769,6 +1770,7 @@ ofpact_format(const struct ofpact *a, struct ds *s)
     const struct ofpact_autopath *autopath;
     const struct ofpact_controller *controller;
     const struct ofpact_tunnel *tunnel;
+    const struct ofpact_inst_actions *inst_actions;
     uint16_t port;
 
     switch (a->type) {
@@ -1909,7 +1911,10 @@ ofpact_format(const struct ofpact *a, struct ds *s)
 
     case OFPACT_RESUBMIT:
         resubmit = ofpact_get_RESUBMIT(a);
-        if (resubmit->in_port != OFPP_IN_PORT && resubmit->table_id == 255) {
+        if (resubmit->ofpact.compat == OFPUTIL_OFPIT11_GOTO_TABLE) {
+            ds_put_format(s, "goto_table:%"PRIu8, resubmit->table_id);
+        } else if (resubmit->in_port != OFPP_IN_PORT &&
+                   resubmit->table_id == 255) {
             ds_put_format(s, "resubmit:%"PRIu16, resubmit->in_port);
         } else {
             ds_put_format(s, "resubmit(");
@@ -1948,10 +1953,21 @@ ofpact_format(const struct ofpact *a, struct ds *s)
         break;
 
     case OFPACT_APPLY_ACTIONS:
+        ds_put_cstr(s, "apply_actions(");
+        inst_actions = ofpact_get_APPLY_ACTIONS(a);
+        ofpacts_format__(inst_actions->ofpacts, s);
+        ds_put_cstr(s, ")");
+        break;
+
     case OFPACT_CLEAR_ACTIONS:
+        ds_put_cstr(s, "clear_actions");
+        break;
+
     case OFPACT_WRITE_ACTIONS:
-        /* TODO:XXX */
-        NOT_REACHED();
+        ds_put_cstr(s, "write_actions(");
+        inst_actions = ofpact_get_WRITE_ACTIONS(a);
+        ofpacts_format__(inst_actions->ofpacts, s);
+        ds_put_cstr(s, ")");
         break;
     }
 }
@@ -1968,12 +1984,9 @@ ofpact_is_instruction(const struct ofpact *a)
     /* TODO:XXX meter, write_metadata */
 }
 
-/* Appends a string representing the actions in 'ofpacts' (terminated by
- * OFPACT_END) to 'string'. */
-void
-ofpacts_format(const struct ofpact *ofpacts, struct ds *string)
+static void
+ofpacts_format__(const struct ofpact *ofpacts, struct ds *string)
 {
-    ds_put_cstr(string, "actions=");
     if (ofpacts->type == OFPACT_END) {
         ds_put_cstr(string, "drop");
     } else {
@@ -1986,6 +1999,15 @@ ofpacts_format(const struct ofpact *ofpacts, struct ds *string)
             ofpact_format(a, string);
         }
     }
+}
+
+/* Appends a string representing the actions in 'ofpacts' (terminated by
+ * OFPACT_END) to 'string'. */
+void
+ofpacts_format(const struct ofpact *ofpacts, struct ds *string)
+{
+    ds_put_cstr(string, "actions=");
+    ofpacts_format__(ofpacts, string);
 }
 
 /* Internal use by helpers. */
