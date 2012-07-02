@@ -45,6 +45,8 @@ VLOG_DEFINE_THIS_MODULE(ofp_parse);
 
 static void ofp_fatal(const char *flow, bool verbose, const char *format, ...)
     NO_RETURN;
+static void str_to_ofpacts(const struct flow *flow,
+                           char *str, struct ofpbuf *ofpacts);
 
 static uint8_t
 str_to_table_id(const char *str)
@@ -284,6 +286,8 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
                    char *arg, struct ofpbuf *ofpacts)
 {
     struct ofpact_tunnel *tunnel;
+    struct ofpact_resubmit *resubmit;
+    struct ofpact_inst_actions *inst_actions;
     uint16_t vid;
     ovs_be32 ip;
     uint8_t pcp;
@@ -441,13 +445,41 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         parse_controller(ofpacts, arg);
         break;
 
+    /* TODO:XXX instruction meter */
+
     case OFPUTIL_OFPIT11_GOTO_TABLE:
+        resubmit = ofpact_put_RESUBMIT(ofpacts);
+        resubmit->ofpact.compat = OFPUTIL_OFPIT11_GOTO_TABLE;
+        resubmit->in_port = OFPP_IN_PORT;
+        resubmit->table_id = str_to_u32(arg);
+        if (resubmit->table_id == 255) {
+            ovs_fatal(0, "goto_table must have table_id < 255");
+        }
+        break;
+
     case OFPUTIL_OFPIT11_WRITE_METADATA:
-    case OFPUTIL_OFPIT11_WRITE_ACTIONS:
-    case OFPUTIL_OFPIT11_APPLY_ACTIONS:
-    case OFPUTIL_OFPIT11_CLEAR_ACTIONS:
         /* TODO:XXX */
         NOT_REACHED();
+        break;
+
+    case OFPUTIL_OFPIT11_WRITE_ACTIONS:
+        inst_actions = ofpact_put_WRITE_ACTIONS(ofpacts);
+        ofpact_nest(ofpacts, &inst_actions->ofpact);
+        str_to_ofpacts(flow, arg, ofpacts);
+        inst_actions = ofpact_get_WRITE_ACTIONS(ofpact_unnest(ofpacts));
+        ofpact_update_len(ofpacts, &inst_actions->ofpact);
+        break;
+
+    case OFPUTIL_OFPIT11_APPLY_ACTIONS:
+        inst_actions = ofpact_put_APPLY_ACTIONS(ofpacts);
+        ofpact_nest(ofpacts, &inst_actions->ofpact);
+        str_to_ofpacts(flow, arg, ofpacts);
+        inst_actions = ofpact_get_APPLY_ACTIONS(ofpact_unnest(ofpacts));
+        ofpact_update_len(ofpacts, &inst_actions->ofpact);
+        break;
+
+    case OFPUTIL_OFPIT11_CLEAR_ACTIONS:
+        ofpact_put_CLEAR_ACTIONS(ofpacts);
         break;
     }
 }

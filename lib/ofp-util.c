@@ -4279,6 +4279,7 @@ ofputil_action_code_from_name(const char *name)
         NULL,
 #define OFPAT10_ACTION(ENUM, STRUCT, NAME)           NAME,
 #define OFPAT11_ACTION(ENUM, STRUCT, NAME)           NAME,
+#define OFPIT11_ACTION(ENUM, STRUCT, NAME)           NAME,
 #define OFPAT12_ACTION(ENUM, STRUCT, NAME)           NAME,
 #define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME) NAME,
 #include "ofp-util.def"
