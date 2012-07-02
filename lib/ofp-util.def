@@ -36,6 +36,15 @@ OFPAT11_ACTION(OFPAT11_SET_TP_DST,   ofp_action_tp_port,  "mod_tp_dst")
 //OFPAT11_ACTION(OFPAT11_SET_NW_TTL,   ofp11_action_nw_ttl, "set_nw_ttl")
 //OFPAT11_ACTION(OFPAT11_DEC_NW_TTL,   ofp_action_header,   "dec_ttl")
 
+#ifndef OFPIT11_ACTION
+#define OFPIT11_ACTION(ENUM, STRUCT, NAME)
+#endif
+OFPIT11_ACTION(OFPIT11_GOTO_TABLE,   ofp11_instruction_goto_table, "goto_table")
+OFPIT11_ACTION(OFPIT11_WRITE_METADATA, ofp11_instruction_write_metadata, "write_metadata")
+OFPIT11_ACTION(OFPIT11_WRITE_ACTIONS, ofp11_instruction_actions, "write_actions")
+OFPIT11_ACTION(OFPIT11_APPLY_ACTIONS, ofp11_instruction_actions, "apply_actions")
+OFPIT11_ACTION(OFPIT11_CLEAR_ACTIONS, ofp11_instruction_actions, "clear_actions")
+
 #ifndef OFPAT12_ACTION
 #define OFPAT12_ACTION(ENUM, STRUCT, NAME)
 #endif
@@ -80,5 +89,6 @@ NXAST_ACTION(NXAST_CONTROLLER,     nx_action_controller,   0, "controller")
 
 #undef OFPAT10_ACTION
 #undef OFPAT11_ACTION
+#undef OFPIT11_ACTION
 #undef OFPAT12_ACTION
 #undef NXAST_ACTION

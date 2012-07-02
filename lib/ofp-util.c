@@ -4309,6 +4309,7 @@ ofputil_put_action(enum ofputil_action_code code, struct ofpbuf *buf)
 #define OFPAT10_ACTION(ENUM, STRUCT, NAME)                    \
     case OFPUTIL_##ENUM: return ofputil_put_##ENUM(buf);
 #define OFPAT11_ACTION OFPAT10_ACTION
+#define OFPIT11_ACTION OFPAT10_ACTION
 #define OFPAT12_ACTION OFPAT10_ACTION
 #define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME)        \
     case OFPUTIL_##ENUM: return ofputil_put_##ENUM(buf);
@@ -4334,6 +4335,7 @@ ofputil_put_action(enum ofputil_action_code code, struct ofpbuf *buf)
         return s;                                               \
     }
 #define OFPAT11_ACTION OFPAT10_ACTION
+#define OFPIT11_ACTION OFPAT10_ACTION
 #define OFPAT12_ACTION OFPAT10_ACTION
 #define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME)            \
     void                                                        \

@@ -440,6 +440,15 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
     case OFPUTIL_NXAST_CONTROLLER:
         parse_controller(ofpacts, arg);
         break;
+
+    case OFPUTIL_OFPIT11_GOTO_TABLE:
+    case OFPUTIL_OFPIT11_WRITE_METADATA:
+    case OFPUTIL_OFPIT11_WRITE_ACTIONS:
+    case OFPUTIL_OFPIT11_APPLY_ACTIONS:
+    case OFPUTIL_OFPIT11_CLEAR_ACTIONS:
+        /* TODO:XXX */
+        NOT_REACHED();
+        break;
     }
 }
 
