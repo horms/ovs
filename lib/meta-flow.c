@@ -211,7 +211,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFP_MPLS,
         true,
         NXM_NX_MPLS_LABEL, "NXM_NX_MPLS_LABEL",
-        0, NULL,
+        OXM_OF_MPLS_LABEL, "OXM_OF_MPLS_LABEL",
     }, {
         MFF_MPLS_TC, "mpls_tc", NULL,
         1, 3,
@@ -220,7 +220,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFP_MPLS,
         true,
         NXM_NX_MPLS_TC, "NXM_NX_MPLS_TC",
-        0, NULL,
+        OXM_OF_MPLS_TC, "OXM_OF_MPLS_STACK",
     }, {
         MFF_MPLS_STACK, "mpls_stack", NULL,
         1, 1,
@@ -229,7 +229,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFP_MPLS,
         true,
         NXM_NX_MPLS_STACK, "NXM_NX_MPLS_STACK",
-        0, NULL,
+        OXM_OF_MPLS_STACK, "OXM_OF_MPLS_STACK",
     },
 
     /* ## -- ## */
@@ -2491,8 +2491,10 @@ mf_parse_oxm_name(const char *s)
     int i;
     for (i = 0; i < MFF_N_IDS; i++) {
         const struct mf_field *mf = mf_from_id(i);
-        int name_len = strlen(mf->oxm_name);
-        if (mf->oxm_name && !strncmp(mf->oxm_name, s, name_len)) {
+        if (!mf->oxm_name) {
+            continue;
+        }
+        if (mf->oxm_name && !strncmp(mf->oxm_name, s, strlen(mf->oxm_name))) {
             return mf;
         }
     }
