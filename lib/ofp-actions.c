@@ -860,6 +860,46 @@ get_actions_from_instruction(const struct ofp11_instruction *inst,
     *n_actions = (ntohs(inst->len) - sizeof *inst) / OFP11_INSTRUCTION_ALIGN;
 }
 
+static enum ofperr
+ofpacts_pull_inst_actions(uint8_t ofp_version,
+                          const struct ofp11_instruction *inst,
+                          struct ofpbuf *ofpacts)
+{
+    const union ofp_action *actions;
+    size_t n_actions;
+    enum ofperr error;
+    struct ofpbuf *tmp = ofpbuf_new(1024 / 8); /* TODO:XXX 1024/8
+                                                * same to handle_flow_mod()
+                                                */
+    struct ofpact_inst_actions *inst_actions;
+
+    get_actions_from_instruction(inst, &actions, &n_actions);
+    if (ofp_version == OFP12_VERSION) {
+        error = ofpacts_from_openflow12(actions, n_actions, tmp);
+    } else if (ofp_version == OFP11_VERSION) {
+        error = ofpacts_from_openflow11(actions, n_actions, tmp);
+    } else {
+        NOT_REACHED();
+    }
+    if (error) {
+        goto exit;
+    }
+
+    ofpbuf_prealloc_tailroom(ofpacts, sizeof(*inst_actions) + tmp->size);
+    if (inst->type == CONSTANT_HTONS(OFPIT11_APPLY_ACTIONS)) {
+        inst_actions = ofpact_put_APPLY_ACTIONS(ofpacts);
+    } else if (inst->type == CONSTANT_HTONS(OFPIT11_WRITE_ACTIONS)){
+        inst_actions = ofpact_put_WRITE_ACTIONS(ofpacts);
+    } else {
+        NOT_REACHED();
+    }
+    ofpbuf_put(ofpacts, tmp->data, tmp->size);
+    ofpact_update_len(ofpacts, &inst_actions->ofpact);
+exit:
+    ofpbuf_delete(tmp);
+    return error;
+}
+
 enum ofperr
 ofpacts_pull_openflow11_instructions(uint8_t ofp_version,
                                      struct ofpbuf *openflow,
@@ -897,30 +937,39 @@ ofpacts_pull_openflow11_instructions(uint8_t ofp_version,
         goto exit;
     }
 
+    /* TODO:XXX insts[OVSINST_OFPIT13_METER] */
+    /* TODO:XXX insts[OVSINST_OFPIT11_APPLY_ACTIONS] */
     if (insts[OVSINST_OFPIT11_APPLY_ACTIONS]) {
-        const union ofp_action *actions;
-        size_t n_actions;
-
-        get_actions_from_instruction(insts[OVSINST_OFPIT11_APPLY_ACTIONS],
-                                     &actions, &n_actions);
-        if (ofp_version == OFP12_VERSION) {
-            error = ofpacts_from_openflow12(actions, n_actions, ofpacts);
-        } else if (ofp_version == OFP11_VERSION){
-            error = ofpacts_from_openflow11(actions, n_actions, ofpacts);
-        } else {
-            NOT_REACHED();
-        }
+        error = ofpacts_pull_inst_actions(
+            ofp_version, insts[OVSINST_OFPIT11_APPLY_ACTIONS], ofpacts);
         if (error) {
             goto exit;
         }
     }
+    if (insts[OVSINST_OFPIT11_CLEAR_ACTIONS]) {
+        ofpact_put_CLEAR_ACTIONS(ofpacts);
+    }
+    if (insts[OVSINST_OFPIT11_WRITE_ACTIONS]) {
+        error = ofpacts_pull_inst_actions(
+            ofp_version, insts[OVSINST_OFPIT11_WRITE_ACTIONS], ofpacts);
+        if (error) {
+            goto exit;
+        }
+    }
+    /* TODO:XXX insts[OVSINST_OFPIT11_WRITE_METADATA] */
+    if (insts[OVSINST_OFPIT11_GOTO_TABLE]) {
+        struct ofp11_instruction_goto_table *oigt =
+            (struct ofp11_instruction_goto_table *)
+            insts[OVSINST_OFPIT11_GOTO_TABLE];
+        struct ofpact_resubmit *resubmit = ofpact_put_RESUBMIT(ofpacts);
+        resubmit->ofpact.compat = OFPUTIL_OFPIT11_GOTO_TABLE;
+        resubmit->in_port = OFPP_IN_PORT;
+        resubmit->table_id = oigt->table_id;
+    }
 
     ofpact_put_END(ofpacts);
 
-    if (insts[OVSINST_OFPIT11_GOTO_TABLE] ||
-        insts[OVSINST_OFPIT11_WRITE_METADATA] ||
-        insts[OVSINST_OFPIT11_WRITE_ACTIONS] ||
-        insts[OVSINST_OFPIT11_CLEAR_ACTIONS]) {
+    if (insts[OVSINST_OFPIT11_WRITE_METADATA]) {
         error = OFPERR_OFPBIC_UNSUP_INST;
         goto exit;
     }
@@ -932,10 +981,16 @@ exit:
     return error;
 }
 
+static enum ofperr ofpacts_check__(const struct ofpact ofpacts[],
+                                   const struct flow *flow, int max_ports,
+                                   bool allow_inst);
+
 static enum ofperr
-ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports)
+ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports,
+               bool allow_inst)
 {
     const struct ofpact_enqueue *enqueue;
+    struct ofpact_inst_actions *inst_actions;
 
     switch (a->type) {
     case OFPACT_END:
@@ -985,7 +1040,12 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports)
     case OFPACT_SET_QUEUE:
     case OFPACT_POP_QUEUE:
     case OFPACT_FIN_TIMEOUT:
+        return 0;
+
     case OFPACT_RESUBMIT:
+        if (!allow_inst && a->compat == OFPUTIL_OFPIT11_GOTO_TABLE) {
+            NOT_REACHED();
+        }
         return 0;
 
     case OFPACT_LEARN:
@@ -1001,6 +1061,23 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports)
     case OFPACT_EXIT:
         return 0;
 
+    case OFPACT_APPLY_ACTIONS:
+        if (!allow_inst) {
+            NOT_REACHED();
+        }
+        inst_actions = ofpact_get_APPLY_ACTIONS(a);
+        return ofpacts_check__(inst_actions->ofpacts, flow, max_ports, false);
+
+    case OFPACT_WRITE_ACTIONS:
+        if (!allow_inst) {
+            NOT_REACHED();
+        }
+        inst_actions = ofpact_get_WRITE_ACTIONS(a);
+        return ofpacts_check__(inst_actions->ofpacts, flow, max_ports, false);
+
+    case OFPACT_CLEAR_ACTIONS:
+        return 0;
+
     default:
         NOT_REACHED();
     }
@@ -1009,20 +1086,26 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports)
 /* Checks that the actions in 'ofpacts' (terminated by OFPACT_END) are
  * appropriate for a packet with the prerequisites satisfied by 'flow' in a
  * switch with no more than 'max_ports' ports. */
-enum ofperr
-ofpacts_check(const struct ofpact ofpacts[],
-              const struct flow *flow, int max_ports)
+static enum ofperr
+ofpacts_check__(const struct ofpact ofpacts[],
+                const struct flow *flow, int max_ports, bool allow_inst)
 {
     const struct ofpact *a;
 
     OFPACT_FOR_EACH (a, ofpacts) {
-        enum ofperr error = ofpact_check__(a, flow, max_ports);
+        enum ofperr error = ofpact_check__(a, flow, max_ports, allow_inst);
         if (error) {
             return error;
         }
     }
 
     return 0;
+}
+enum ofperr
+ofpacts_check(const struct ofpact ofpacts[],
+              const struct flow *flow, int max_ports)
+{
+    return ofpacts_check__(ofpacts, flow, max_ports, true);
 }
 
 /* Converting ofpacts to Nicira OpenFlow extensions. */
@@ -1194,6 +1277,9 @@ ofpact_to_nxast(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_SET_IPV4_DSCP:
     case OFPACT_SET_L4_SRC_PORT:
     case OFPACT_SET_L4_DST_PORT:
+    case OFPACT_APPLY_ACTIONS:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_ACTIONS:
         NOT_REACHED();
     }
 }
@@ -1227,6 +1313,9 @@ ofpact_to_openflow10(const struct ofpact *a, struct ofpbuf *out)
 {
     switch (a->type) {
     case OFPACT_END:
+    case OFPACT_APPLY_ACTIONS:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_ACTIONS:
         NOT_REACHED();
 
     case OFPACT_OUTPUT:
@@ -1373,6 +1462,9 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_AUTOPATH:
     case OFPACT_NOTE:
     case OFPACT_EXIT:
+    case OFPACT_APPLY_ACTIONS:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_ACTIONS:
     default:
         NOT_REACHED();
     }
@@ -1383,6 +1475,9 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
 {
     switch (a->type) {
     case OFPACT_END:
+    case OFPACT_APPLY_ACTIONS:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_ACTIONS:
         NOT_REACHED();
 
     case OFPACT_OUTPUT:
@@ -1474,6 +1569,9 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_SET_IPV4_DSCP:
     case OFPACT_SET_L4_SRC_PORT:
     case OFPACT_SET_L4_DST_PORT:
+    case OFPACT_APPLY_ACTIONS:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_ACTIONS:
         NOT_REACHED();
 
     case OFPACT_OUTPUT:
@@ -1598,6 +1696,9 @@ ofpact_outputs_to_port(const struct ofpact *ofpact, uint16_t port)
     case OFPACT_AUTOPATH:
     case OFPACT_NOTE:
     case OFPACT_EXIT:
+    case OFPACT_APPLY_ACTIONS:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_ACTIONS:
     default:
         return false;
     }
@@ -1843,6 +1944,13 @@ ofpact_format(const struct ofpact *a, struct ds *s)
 
     case OFPACT_EXIT:
         ds_put_cstr(s, "exit");
+        break;
+
+    case OFPACT_APPLY_ACTIONS:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_ACTIONS:
+        /* TODO:XXX */
+        NOT_REACHED();
         break;
     }
 }

@@ -5511,6 +5511,13 @@ do_xlate_actions(const struct ofpact *ofpacts, struct action_xlate_ctx *ctx)
             ctx->has_fin_timeout = true;
             xlate_fin_timeout(ctx, ofpact_get_FIN_TIMEOUT(a));
             break;
+
+        case OFPACT_WRITE_ACTIONS:
+        case OFPACT_APPLY_ACTIONS:
+        case OFPACT_CLEAR_ACTIONS:
+            /* TODO:XXX */
+            NOT_REACHED();
+            break;
         }
     }
 
