@@ -1902,3 +1902,25 @@ ofpact_update_len(struct ofpbuf *ofpacts, struct ofpact *ofpact)
     assert(ofpact == ofpacts->l2);
     ofpact->len = (char *) ofpbuf_tail(ofpacts) - (char *) ofpact;
 }
+
+void
+ofpact_nest(struct ofpbuf *ofpacts, const struct ofpact *ofpact)
+{
+    assert(ofpact == ofpacts->l2);
+    assert(ofpacts->l3 == NULL);
+    ofpacts->l3 = ofpacts->l2;
+}
+
+struct ofpact *
+ofpact_unnest(struct ofpbuf *ofpacts)
+{
+    struct ofpact *ofpact;
+    assert(ofpacts->l2 != NULL);
+    assert(ofpacts->l3 != NULL);
+    assert(ofpacts->l3 < ofpacts->l2);
+
+    ofpact = ofpacts->l3;
+    ofpacts->l2 = ofpacts->l3;
+    ofpacts->l3 = NULL;
+    return ofpact;
+}
