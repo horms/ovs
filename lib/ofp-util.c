@@ -1204,6 +1204,9 @@ enum ofputil_protocol ofputil_flow_dump_protocols[] = {
 };
 size_t ofputil_n_flow_dump_protocols = ARRAY_SIZE(ofputil_flow_dump_protocols);
 
+static enum ofputil_protocol ofputil_usable_protocols_with_actions(
+    const struct ofpact *ofpacts);
+
 /* Returns the ofputil_protocol that is initially in effect on an OpenFlow
  * connection that has negotiated the given 'version'.  'version' should
  * normally be an 8-bit OpenFlow version identifier (e.g. 0x01 for OpenFlow
@@ -1605,6 +1608,119 @@ ofputil_usable_protocols(const struct cls_rule *rule)
 
     /* Other formats can express this rule. */
     return OFPUTIL_P_ANY;
+}
+
+static enum ofputil_protocol
+ofputil_usable_protocols_with_action(const struct ofpact *ofpact)
+{
+    /* FIXME: OF12 + nicira case */
+    enum ofputil_protocol protocols = OFPUTIL_P_ANY | OFPUTIL_P_TID;
+    struct ofpact_inst_actions *oia;
+
+    if (ofpact_is_instruction(ofpact)) {
+        protocols &= OFPUTIL_P_NXM_ANY | OFPUTIL_P_OF12; /* XXX: OF11 */
+    }
+    switch (ofpact->type) {
+    case OFPACT_END:
+        break;
+
+    /* instructions */
+    case OFPACT_APPLY_ACTIONS:
+        oia = ofpact_get_APPLY_ACTIONS(ofpact);
+        protocols &= ofputil_usable_protocols_with_actions(oia->ofpacts);
+        break;
+
+    case OFPACT_WRITE_ACTIONS:
+        oia = ofpact_get_APPLY_ACTIONS(ofpact);
+        protocols &= ofputil_usable_protocols_with_actions(oia->ofpacts);
+        break;
+
+    case OFPACT_CLEAR_ACTIONS:
+        break;
+
+    case OFPACT_RESUBMIT:
+        if (ofpact_is_instruction(ofpact)) {
+            protocols &= OFPUTIL_P_OF12; /* XXX OF11 */
+            break;
+        }
+        protocols &= OFPUTIL_P_NXM_ANY | OFPUTIL_P_OF12;
+        break;
+
+    case OFPACT_REG_LOAD:
+        if (ofpact->compat == OFPUTIL_OFPAT12_SET_FIELD) {
+            protocols &= OFPUTIL_P_OF12;
+            break;
+        }
+        protocols &= OFPUTIL_P_NXM_ANY | OFPUTIL_P_OF12;
+        break;
+
+    case OFPACT_OUTPUT:
+    case OFPACT_ENQUEUE:
+    case OFPACT_SET_VLAN_VID:
+    case OFPACT_SET_VLAN_PCP:
+    case OFPACT_STRIP_VLAN:
+    case OFPACT_SET_ETH_SRC:
+    case OFPACT_SET_ETH_DST:
+    case OFPACT_SET_IPV4_SRC:
+    case OFPACT_SET_IPV4_DST:
+    case OFPACT_SET_IPV4_DSCP:
+        break;
+
+    case OFPACT_COPY_TTL_OUT:
+    case OFPACT_COPY_TTL_IN:
+        protocols &= OFPUTIL_P_OF12; /* XXX: OF11 */
+        break;
+
+    case OFPACT_PUSH_MPLS:
+    case OFPACT_POP_MPLS:
+    case OFPACT_PUSH_VLAN:
+    case OFPACT_SET_MPLS_LABEL:
+    case OFPACT_SET_MPLS_TC:
+    case OFPACT_SET_MPLS_TTL:
+    case OFPACT_DEC_MPLS_TTL:
+        protocols &= (OFPUTIL_P_OF12 | OFPUTIL_P_NXM_ANY); /* XXX: OF11 */
+        break;
+
+    case OFPACT_SET_L4_SRC_PORT:
+    case OFPACT_SET_L4_DST_PORT:
+        /* OF12 doesn't support this */
+        protocols &= (OFPUTIL_P_OF10 | OFPUTIL_P_NXM_ANY); /* XXX: OF11 */
+        break;
+
+    case OFPACT_CONTROLLER:
+    case OFPACT_OUTPUT_REG:
+    case OFPACT_BUNDLE:
+    case OFPACT_REG_MOVE:
+    case OFPACT_DEC_TTL:
+    case OFPACT_SET_TUNNEL:
+    case OFPACT_SET_QUEUE:
+    case OFPACT_POP_QUEUE:
+    case OFPACT_FIN_TIMEOUT:
+    case OFPACT_LEARN:
+    case OFPACT_MULTIPATH:
+    case OFPACT_AUTOPATH:
+    case OFPACT_NOTE:
+    case OFPACT_EXIT:
+        protocols &= OFPUTIL_P_NXM_ANY | OFPUTIL_P_OF12;
+        break;
+    }
+
+    assert(protocols);
+    return protocols;
+}
+
+static enum ofputil_protocol
+ofputil_usable_protocols_with_actions(const struct ofpact *ofpacts)
+{
+    const struct ofpact *a;
+    enum ofputil_protocol protocols = OFPUTIL_P_ANY;
+    if (ofpacts) {
+        OFPACT_FOR_EACH(a, ofpacts) {
+            protocols &= ofputil_usable_protocols_with_action(a);
+        }
+    }
+    assert(protocols);
+    return protocols;
 }
 
 /* Returns an OpenFlow message that, sent on an OpenFlow connection whose
@@ -2055,6 +2171,10 @@ ofputil_flow_mod_usable_protocols(const struct ofputil_flow_mod *fms,
         if (fm->cookie_mask != htonll(0)) {
             usable_protocols &= OFPUTIL_P_NXM_ANY;
         }
+
+        usable_protocols |= OFPUTIL_P_OF12;
+        usable_protocols &=
+            ofputil_usable_protocols_with_actions(fm->ofpacts);
     }
     assert(usable_protocols);
 
