@@ -5505,6 +5505,7 @@ static bool
 do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
 {
     struct ofpact_controller *controller;
+    struct ofpact_reg_load *load;
     ovs_be32 mpls_label;
     uint32_t mpls_tc;
     uint32_t mpls_ttl;
@@ -5618,7 +5619,14 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         break;
 
     case OFPACT_REG_LOAD:
-        nxm_execute_reg_load(ofpact_get_REG_LOAD(a), &ctx->flow);
+        load = ofpact_get_REG_LOAD(a);
+        nxm_execute_reg_load(load, &ctx->flow);
+        if (load->dst.field->id == MFF_MPLS_LABEL ||
+            load->dst.field->id == MFF_MPLS_TC ||
+            load->dst.field->id == MFF_MPLS_STACK) {
+            commit_mpls_lse_action(&ctx->flow, &ctx->base_flow,
+                                   ctx->odp_actions);
+        }
         break;
 
     case OFPACT_DEC_TTL:
