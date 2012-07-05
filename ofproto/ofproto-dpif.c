@@ -5474,9 +5474,14 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         ctx->flow.tp_dst = htons(ofpact_get_SET_L4_DST_PORT(a)->port);
         break;
 
-    case OFPACT_RESUBMIT:
-        xlate_ofpact_resubmit(ctx, ofpact_get_RESUBMIT(a));
+    case OFPACT_RESUBMIT: {
+        struct ofpact_resubmit *resubmit = ofpact_get_RESUBMIT(a);
+        xlate_ofpact_resubmit(ctx, resubmit);
+        if (resubmit->ofpact.compat == OFPUTIL_OFPIT11_GOTO_TABLE) {
+            return false;
+        }
         break;
+    }
 
     case OFPACT_SET_TUNNEL:
         ctx->flow.tun_id = htonll(ofpact_get_SET_TUNNEL(a)->tun_id);
