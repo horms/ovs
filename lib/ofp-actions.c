@@ -33,6 +33,7 @@
 VLOG_DEFINE_THIS_MODULE(ofp_actions);
 
 static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+
 
 /* Converting OpenFlow 1.0 to ofpacts. */
 
@@ -1953,6 +1954,18 @@ ofpact_format(const struct ofpact *a, struct ds *s)
         NOT_REACHED();
         break;
     }
+}
+
+bool
+ofpact_is_instruction(const struct ofpact *a)
+{
+    return
+        a->type == OFPACT_APPLY_ACTIONS ||
+        a->type == OFPACT_CLEAR_ACTIONS ||
+        a->type == OFPACT_WRITE_ACTIONS ||
+        (a->type == OFPACT_RESUBMIT &&
+         a->compat == OFPUTIL_OFPIT11_GOTO_TABLE);
+    /* TODO:XXX meter, write_metadata */
 }
 
 /* Appends a string representing the actions in 'ofpacts' (terminated by

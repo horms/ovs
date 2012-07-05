@@ -424,6 +424,7 @@ void ofpacts_to_openflow12(const struct ofpact[], struct ofpbuf *openflow,
 bool ofpacts_output_to_port(const struct ofpact[], uint16_t port);
 bool ofpacts_equal(const struct ofpact a[], size_t a_len,
                    const struct ofpact b[], size_t b_len);
+bool ofpact_is_instruction(const struct ofpact *a);
 
 /* Formatting ofpacts.
  *
