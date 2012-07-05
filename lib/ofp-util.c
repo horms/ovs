@@ -1939,7 +1939,7 @@ ofputil_encode_flow_mod(const struct ofputil_flow_mod *fm,
         memset(ofm->pad, 0, sizeof ofm->pad);
         ofputil_put_match(msg, &fm->cr, fm->cookie, fm->cookie_mask, protocol);
         if (fm->ofpacts) {
-            ofpacts_to_openflow12(fm->ofpacts, msg, OFPIT11_APPLY_ACTIONS);
+            ofpacts_insts_to_openflow11(ofp_version, fm->ofpacts, msg);
         }
         break;
     }
@@ -2426,7 +2426,7 @@ ofputil_append_flow_stats_reply(uint8_t ofp_version,
         ofs->packet_count = htonll(unknown_to_zero(fs->packet_count));
         ofs->byte_count = htonll(unknown_to_zero(fs->byte_count));
         ofputil_put_match(reply, &fs->rule, 0, 0, OFPUTIL_P_OF12);
-        ofpacts_to_openflow12(fs->ofpacts, reply, OFPIT11_APPLY_ACTIONS);
+        ofpacts_insts_to_openflow11(ofp_version, fs->ofpacts, reply);
         ofs = ofpbuf_at_assert(reply, start_ofs, sizeof *ofs);
         ofs->length = htons(reply->size - start_ofs);
     } else if (osm->type == htons(OFPST_FLOW) && ofp_version == OFP10_VERSION) {

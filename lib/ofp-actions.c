@@ -1600,63 +1600,147 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     }
 }
 
+static void
+ofpacts_to_inst_actions(const struct ofpact ofpacts[],
+                        struct ofpbuf *openflow,
+                        enum ofp11_instruction_type type,
+                        void (*ofpact_to_openflow)(
+                            const struct ofpact *a, struct ofpbuf *out))
+{
+    size_t start_len;
+    struct ofp11_instruction_actions *oia;
+    const struct ofpact *a;
+
+    start_len = openflow->size;
+    oia = ofpbuf_put_uninit(openflow, sizeof *oia);
+    oia->type = htons(type);
+    memset(oia->pad, 0, sizeof oia->pad);
+
+    OFPACT_FOR_EACH (a, ofpacts) {
+        assert(!ofpact_is_instruction(a));
+        ofpact_to_openflow(a, openflow);
+    }
+
+    oia = ofpbuf_at_assert(openflow, start_len, sizeof *oia);
+    oia->len = htons(openflow->size - start_len);
+}
+
 /* Converts the ofpacts in 'ofpacts' (terminated by OFPACT_END) into OpenFlow
  * 1.1 actions in 'openflow', appending the actions to any existing data in
  * 'openflow'. */
 static void
-__ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow,
-                        enum ofp11_instruction_type type,
-                        void (*ofpact_to_openflow)(const struct ofpact *a,
-                                                   struct ofpbuf *out))
+ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
+                              struct ofpbuf *openflow,
+                              void (*ofpact_to_openflow)(
+                                  const struct ofpact *a, struct ofpbuf *out))
 {
-    const struct ofpact *a;
+    size_t start_len = openflow->size;
+    struct ofp11_instruction_actions *oia;
 
-    switch (type) {
-    case OFPIT11_GOTO_TABLE:
-    case OFPIT11_WRITE_METADATA:
-    case OFPIT11_WRITE_ACTIONS:
-        /* FIXME: Implementation needed */
-        NOT_REACHED();
+    switch (ofpacts[0].type) {
+    case OFPACT_END:
+        break;
 
-    case OFPIT11_APPLY_ACTIONS: {
-        struct ofp11_instruction_actions *oia;
-        size_t start_len = openflow->size;
+    case OFPACT_RESUBMIT: {
+        struct ofpact_resubmit *resubmit;
+        struct ofp11_instruction_goto_table *oigt;
 
-        ofpbuf_put_uninit(openflow, sizeof *oia);
-        OFPACT_FOR_EACH (a, ofpacts) {
-            ofpact_to_openflow(a, openflow);
-        }
-        oia = (struct ofp11_instruction_actions *)((char *)openflow->data +
-                                                   start_len);
-        oia->type = htons(type);
-        oia->len = htons(openflow->size - start_len);
-        memset(oia->pad, 0, sizeof oia->pad);
+        resubmit = ofpact_get_RESUBMIT(ofpacts);
+        assert(resubmit->in_port == OFPP_IN_PORT);
+        assert(resubmit->ofpact.compat == OFPUTIL_OFPIT11_GOTO_TABLE);
 
+        oigt = ofpbuf_put_uninit(openflow, sizeof *oigt);
+        oigt->type = htons(OFPIT11_GOTO_TABLE);
+        oigt->len = htons(openflow->size - start_len);
+        oigt->table_id = resubmit->table_id;
+        memset(oigt->pad, 0, sizeof oigt->pad);
         break;
     }
 
-    case OFPIT11_CLEAR_ACTIONS:
-    case OFPIT11_EXPERIMENTER:
-        /* FIXME: Implementation needed */
-        NOT_REACHED();
+    case OFPACT_WRITE_ACTIONS:
+    case OFPACT_APPLY_ACTIONS: {
+        const struct ofpact_inst_actions *inst_actions;
+        enum ofp11_instruction_type type;
 
+        if (ofpacts[0].type == OFPACT_WRITE_ACTIONS) {
+            inst_actions = ofpact_get_WRITE_ACTIONS(ofpacts);
+            type = OFPIT11_WRITE_ACTIONS;
+        } else {
+            inst_actions = ofpact_get_APPLY_ACTIONS(ofpacts);
+            type = OFPIT11_APPLY_ACTIONS;
+        }
+        ofpacts_to_inst_actions(inst_actions->ofpacts, openflow, type,
+                                ofpact_to_openflow);
+        break;
+    }
+
+    case OFPACT_CLEAR_ACTIONS:
+        oia = ofpbuf_put_uninit(openflow, sizeof *oia);
+        oia->type = htons(OFPIT11_CLEAR_ACTIONS);
+        oia->len = htons(openflow->size - start_len);
+        memset(oia->pad, 0, sizeof oia->pad);
+        break;
+
+    /* FIXME: write-metadata, experimenter, meter */
+
+    case OFPACT_OUTPUT:
+    case OFPACT_CONTROLLER:
+    case OFPACT_ENQUEUE:
+    case OFPACT_OUTPUT_REG:
+    case OFPACT_BUNDLE:
+    case OFPACT_SET_VLAN_VID:
+    case OFPACT_SET_VLAN_PCP:
+    case OFPACT_STRIP_VLAN:
+    case OFPACT_SET_ETH_SRC:
+    case OFPACT_SET_ETH_DST:
+    case OFPACT_SET_IPV4_SRC:
+    case OFPACT_SET_IPV4_DST:
+    case OFPACT_SET_IPV4_DSCP:
+    case OFPACT_SET_L4_SRC_PORT:
+    case OFPACT_SET_L4_DST_PORT:
+    case OFPACT_REG_MOVE:
+    case OFPACT_REG_LOAD:
+    case OFPACT_DEC_TTL:
+    case OFPACT_SET_TUNNEL:
+    case OFPACT_SET_QUEUE:
+    case OFPACT_POP_QUEUE:
+    case OFPACT_FIN_TIMEOUT:
+    case OFPACT_LEARN:
+    case OFPACT_MULTIPATH:
+    case OFPACT_AUTOPATH:
+    case OFPACT_NOTE:
+    case OFPACT_EXIT:
     default:
         NOT_REACHED();
     }
 }
 
 void
-ofpacts_to_openflow11(const struct ofpact ofpacts[], struct ofpbuf *openflow,
-                      enum ofp11_instruction_type type)
+ofpacts_insts_to_openflow11(uint8_t ofp_version,
+                            const struct ofpact ofpacts[],
+                            struct ofpbuf *openflow)
 {
-    __ofpacts_to_openflow11(ofpacts, openflow, type, ofpact_to_openflow11);
-}
+    const struct ofpact *a;
+    void (*ofpact_to_openflow)(const struct ofpact *a, struct ofpbuf *out);
 
-void
-ofpacts_to_openflow12(const struct ofpact ofpacts[], struct ofpbuf *openflow,
-                      enum ofp11_instruction_type type)
-{
-    __ofpacts_to_openflow11(ofpacts, openflow, type, ofpact_to_openflow12);
+    if (ofp_version == OFP11_VERSION) {
+        ofpact_to_openflow = ofpact_to_openflow11;
+    } else if (ofp_version == OFP12_VERSION) {
+        ofpact_to_openflow = ofpact_to_openflow12;
+    } else {
+        NOT_REACHED();
+    }
+
+    if (!ofpact_is_instruction(ofpacts)) {
+        ofpacts_to_inst_actions(ofpacts, openflow, OFPIT11_APPLY_ACTIONS,
+                                ofpact_to_openflow);
+        return;
+    }
+
+    OFPACT_FOR_EACH(a, ofpacts) {
+        assert(ofpact_is_instruction(a) || a->type == OFPACT_END);
+        ofpacts_insts_to_openflow11__(ofpacts, openflow, ofpact_to_openflow);
+    }
 }
 
 /* Returns true if 'action' outputs to 'port', false otherwise. */
