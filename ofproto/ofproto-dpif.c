@@ -4728,6 +4728,10 @@ send_packet(const struct ofport_dpif *ofport, struct ofpbuf *packet)
 /* OpenFlow to datapath action translation. */
 
 static void do_xlate_actions(const struct ofpact *, struct action_xlate_ctx *);
+static void do_xlate_actions__(const struct ofpact *ofpacts,
+                               struct action_xlate_ctx *ctx);
+static bool do_xlate_action(const struct ofpact *ofpact,
+                            struct action_xlate_ctx *ctx);
 static void xlate_normal(struct action_xlate_ctx *);
 
 /* Composes an ODP action for a "slow path" action for 'flow' within 'ofproto'.
@@ -5354,7 +5358,6 @@ do_xlate_actions(const struct ofpact *ofpacts, struct action_xlate_ctx *ctx)
 {
     const struct ofport_dpif *port;
     bool was_evictable = true;
-    const struct ofpact *a;
 
     port = get_ofp_port(ctx->ofproto, ctx->flow.in_port);
     if (port && !may_receive(port, ctx)) {
@@ -5367,161 +5370,8 @@ do_xlate_actions(const struct ofpact *ofpacts, struct action_xlate_ctx *ctx)
         was_evictable = ctx->rule->up.evictable;
         ctx->rule->up.evictable = false;
     }
-    OFPACT_FOR_EACH (a, ofpacts) {
-        struct ofpact_controller *controller;
+    do_xlate_actions__(ofpacts, ctx);
 
-        if (ctx->exit) {
-            break;
-        }
-
-        switch (a->type) {
-        case OFPACT_END:
-            goto out;
-
-        case OFPACT_OUTPUT:
-            xlate_output_action(ctx, ofpact_get_OUTPUT(a)->port,
-                                ofpact_get_OUTPUT(a)->max_len);
-            break;
-
-        case OFPACT_CONTROLLER:
-            controller = ofpact_get_CONTROLLER(a);
-            execute_controller_action(ctx, controller->max_len,
-                                      controller->reason,
-                                      controller->controller_id);
-            break;
-
-        case OFPACT_ENQUEUE:
-            xlate_enqueue_action(ctx, ofpact_get_ENQUEUE(a));
-            break;
-
-        case OFPACT_SET_VLAN_VID:
-            ctx->flow.vlan_tci &= ~htons(VLAN_VID_MASK);
-            ctx->flow.vlan_tci |= (htons(ofpact_get_SET_VLAN_VID(a)->vlan_vid)
-                                   | htons(VLAN_CFI));
-            break;
-
-        case OFPACT_SET_VLAN_PCP:
-            ctx->flow.vlan_tci &= ~htons(VLAN_PCP_MASK);
-            ctx->flow.vlan_tci |= htons((ofpact_get_SET_VLAN_PCP(a)->vlan_pcp
-                                         << VLAN_PCP_SHIFT)
-                                        | VLAN_CFI);
-            break;
-
-        case OFPACT_STRIP_VLAN:
-            ctx->flow.vlan_tci = htons(0);
-            break;
-
-        case OFPACT_SET_ETH_SRC:
-            memcpy(ctx->flow.dl_src, ofpact_get_SET_ETH_SRC(a)->mac,
-                   ETH_ADDR_LEN);
-            break;
-
-        case OFPACT_SET_ETH_DST:
-            memcpy(ctx->flow.dl_dst, ofpact_get_SET_ETH_DST(a)->mac,
-                   ETH_ADDR_LEN);
-            break;
-
-        case OFPACT_SET_IPV4_SRC:
-            ctx->flow.nw_src = ofpact_get_SET_IPV4_SRC(a)->ipv4;
-            break;
-
-        case OFPACT_SET_IPV4_DST:
-            ctx->flow.nw_dst = ofpact_get_SET_IPV4_DST(a)->ipv4;
-            break;
-
-        case OFPACT_SET_IPV4_DSCP:
-            /* OpenFlow 1.0 only supports IPv4. */
-            if (ctx->flow.dl_type == htons(ETH_TYPE_IP)) {
-                ctx->flow.nw_tos &= ~IP_DSCP_MASK;
-                ctx->flow.nw_tos |= ofpact_get_SET_IPV4_DSCP(a)->dscp;
-            }
-            break;
-
-        case OFPACT_SET_L4_SRC_PORT:
-            ctx->flow.tp_src = htons(ofpact_get_SET_L4_SRC_PORT(a)->port);
-            break;
-
-        case OFPACT_SET_L4_DST_PORT:
-            ctx->flow.tp_dst = htons(ofpact_get_SET_L4_DST_PORT(a)->port);
-            break;
-
-        case OFPACT_RESUBMIT:
-            xlate_ofpact_resubmit(ctx, ofpact_get_RESUBMIT(a));
-            break;
-
-        case OFPACT_SET_TUNNEL:
-            ctx->flow.tun_id = htonll(ofpact_get_SET_TUNNEL(a)->tun_id);
-            break;
-
-        case OFPACT_SET_QUEUE:
-            xlate_set_queue_action(ctx, ofpact_get_SET_QUEUE(a)->queue_id);
-            break;
-
-        case OFPACT_POP_QUEUE:
-            ctx->flow.skb_priority = ctx->orig_skb_priority;
-            break;
-
-        case OFPACT_REG_MOVE:
-            nxm_execute_reg_move(ofpact_get_REG_MOVE(a), &ctx->flow);
-            break;
-
-        case OFPACT_REG_LOAD:
-            nxm_execute_reg_load(ofpact_get_REG_LOAD(a), &ctx->flow);
-            break;
-
-        case OFPACT_DEC_TTL:
-            if (compose_dec_ttl(ctx)) {
-                goto out;
-            }
-            break;
-
-        case OFPACT_NOTE:
-            /* Nothing to do. */
-            break;
-
-        case OFPACT_MULTIPATH:
-            multipath_execute(ofpact_get_MULTIPATH(a), &ctx->flow);
-            break;
-
-        case OFPACT_AUTOPATH:
-            xlate_autopath(ctx, ofpact_get_AUTOPATH(a));
-            break;
-
-        case OFPACT_BUNDLE:
-            ctx->ofproto->has_bundle_action = true;
-            xlate_bundle_action(ctx, ofpact_get_BUNDLE(a));
-            break;
-
-        case OFPACT_OUTPUT_REG:
-            xlate_output_reg_action(ctx, ofpact_get_OUTPUT_REG(a));
-            break;
-
-        case OFPACT_LEARN:
-            ctx->has_learn = true;
-            if (ctx->may_learn) {
-                xlate_learn_action(ctx, ofpact_get_LEARN(a));
-            }
-            break;
-
-        case OFPACT_EXIT:
-            ctx->exit = true;
-            break;
-
-        case OFPACT_FIN_TIMEOUT:
-            ctx->has_fin_timeout = true;
-            xlate_fin_timeout(ctx, ofpact_get_FIN_TIMEOUT(a));
-            break;
-
-        case OFPACT_WRITE_ACTIONS:
-        case OFPACT_APPLY_ACTIONS:
-        case OFPACT_CLEAR_ACTIONS:
-            /* TODO:XXX */
-            NOT_REACHED();
-            break;
-        }
-    }
-
-out:
     /* We've let OFPP_NORMAL and the learning action look at the packet,
      * so drop it now if forwarding is disabled. */
     if (port && !stp_forward_in_state(port->stp_state)) {
@@ -5531,6 +5381,175 @@ out:
     if (ctx->rule) {
         ctx->rule->up.evictable = was_evictable;
     }
+}
+
+static void
+do_xlate_actions__(const struct ofpact *ofpacts, struct action_xlate_ctx *ctx)
+{
+    const struct ofpact *a;
+
+    OFPACT_FOR_EACH (a, ofpacts) {
+        if (ctx->exit) {
+            break;
+        }
+        if (!do_xlate_action(a, ctx)) {
+            break;
+        }
+    }
+}
+
+static bool
+do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
+{
+    struct ofpact_controller *controller;
+
+    switch (a->type) {
+    case OFPACT_END:
+        return false;
+
+    case OFPACT_OUTPUT:
+        xlate_output_action(ctx, ofpact_get_OUTPUT(a)->port,
+                            ofpact_get_OUTPUT(a)->max_len);
+        break;
+
+    case OFPACT_CONTROLLER:
+        controller = ofpact_get_CONTROLLER(a);
+        execute_controller_action(ctx, controller->max_len,
+                                  controller->reason,
+                                  controller->controller_id);
+        break;
+
+    case OFPACT_ENQUEUE:
+        xlate_enqueue_action(ctx, ofpact_get_ENQUEUE(a));
+        break;
+
+    case OFPACT_SET_VLAN_VID:
+        ctx->flow.vlan_tci &= ~htons(VLAN_VID_MASK);
+        ctx->flow.vlan_tci |= (htons(ofpact_get_SET_VLAN_VID(a)->vlan_vid)
+                               | htons(VLAN_CFI));
+        break;
+
+    case OFPACT_SET_VLAN_PCP:
+        ctx->flow.vlan_tci &= ~htons(VLAN_PCP_MASK);
+        ctx->flow.vlan_tci |= htons((ofpact_get_SET_VLAN_PCP(a)->vlan_pcp
+                                     << VLAN_PCP_SHIFT)
+                                    | VLAN_CFI);
+        break;
+
+    case OFPACT_STRIP_VLAN:
+        ctx->flow.vlan_tci = htons(0);
+        break;
+
+    case OFPACT_SET_ETH_SRC:
+        memcpy(ctx->flow.dl_src, ofpact_get_SET_ETH_SRC(a)->mac,
+               ETH_ADDR_LEN);
+        break;
+
+    case OFPACT_SET_ETH_DST:
+        memcpy(ctx->flow.dl_dst, ofpact_get_SET_ETH_DST(a)->mac,
+               ETH_ADDR_LEN);
+        break;
+
+    case OFPACT_SET_IPV4_SRC:
+        ctx->flow.nw_src = ofpact_get_SET_IPV4_SRC(a)->ipv4;
+        break;
+
+    case OFPACT_SET_IPV4_DST:
+        ctx->flow.nw_dst = ofpact_get_SET_IPV4_DST(a)->ipv4;
+        break;
+
+    case OFPACT_SET_IPV4_DSCP:
+        /* OpenFlow 1.0 only supports IPv4. */
+        if (ctx->flow.dl_type == htons(ETH_TYPE_IP)) {
+            ctx->flow.nw_tos &= ~IP_DSCP_MASK;
+            ctx->flow.nw_tos |= ofpact_get_SET_IPV4_DSCP(a)->dscp;
+        }
+        break;
+
+    case OFPACT_SET_L4_SRC_PORT:
+        ctx->flow.tp_src = htons(ofpact_get_SET_L4_SRC_PORT(a)->port);
+        break;
+
+    case OFPACT_SET_L4_DST_PORT:
+        ctx->flow.tp_dst = htons(ofpact_get_SET_L4_DST_PORT(a)->port);
+        break;
+
+    case OFPACT_RESUBMIT:
+        xlate_ofpact_resubmit(ctx, ofpact_get_RESUBMIT(a));
+        break;
+
+    case OFPACT_SET_TUNNEL:
+        ctx->flow.tun_id = htonll(ofpact_get_SET_TUNNEL(a)->tun_id);
+        break;
+
+    case OFPACT_SET_QUEUE:
+        xlate_set_queue_action(ctx, ofpact_get_SET_QUEUE(a)->queue_id);
+        break;
+
+    case OFPACT_POP_QUEUE:
+        ctx->flow.skb_priority = ctx->orig_skb_priority;
+        break;
+
+    case OFPACT_REG_MOVE:
+        nxm_execute_reg_move(ofpact_get_REG_MOVE(a), &ctx->flow);
+        break;
+
+    case OFPACT_REG_LOAD:
+        nxm_execute_reg_load(ofpact_get_REG_LOAD(a), &ctx->flow);
+        break;
+
+    case OFPACT_DEC_TTL:
+        if (compose_dec_ttl(ctx)) {
+            return false;
+        }
+        break;
+
+    case OFPACT_NOTE:
+        /* Nothing to do. */
+        break;
+
+    case OFPACT_MULTIPATH:
+        multipath_execute(ofpact_get_MULTIPATH(a), &ctx->flow);
+        break;
+
+    case OFPACT_AUTOPATH:
+        xlate_autopath(ctx, ofpact_get_AUTOPATH(a));
+        break;
+
+    case OFPACT_BUNDLE:
+        ctx->ofproto->has_bundle_action = true;
+        xlate_bundle_action(ctx, ofpact_get_BUNDLE(a));
+        break;
+
+    case OFPACT_OUTPUT_REG:
+        xlate_output_reg_action(ctx, ofpact_get_OUTPUT_REG(a));
+        break;
+
+    case OFPACT_LEARN:
+        ctx->has_learn = true;
+        if (ctx->may_learn) {
+            xlate_learn_action(ctx, ofpact_get_LEARN(a));
+        }
+        break;
+
+    case OFPACT_EXIT:
+        ctx->exit = true;
+        break;
+
+    case OFPACT_FIN_TIMEOUT:
+        ctx->has_fin_timeout = true;
+        xlate_fin_timeout(ctx, ofpact_get_FIN_TIMEOUT(a));
+        break;
+
+    case OFPACT_APPLY_ACTIONS:
+    case OFPACT_CLEAR_ACTIONS:
+    case OFPACT_WRITE_ACTIONS:
+        /* TODO:XXX */
+        NOT_REACHED();
+        break;
+    }
+
+    return true;
 }
 
 static void
