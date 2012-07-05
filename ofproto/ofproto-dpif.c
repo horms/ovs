@@ -5542,6 +5542,9 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         break;
 
     case OFPACT_APPLY_ACTIONS:
+        do_xlate_actions__(ofpact_get_APPLY_ACTIONS(a)->ofpacts, ctx);
+        break;
+
     case OFPACT_CLEAR_ACTIONS:
     case OFPACT_WRITE_ACTIONS:
         /* TODO:XXX */
