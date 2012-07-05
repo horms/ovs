@@ -230,14 +230,24 @@ cls_rule_set_any_vid(struct cls_rule *rule)
  *     VID equals the low 12 bits of 'dl_vlan'.
  */
 void
-cls_rule_set_dl_vlan(struct cls_rule *rule, ovs_be16 dl_vlan)
+cls_rule_set_dl_vlan_masked(struct cls_rule *rule, ovs_be16 dl_vlan,
+                            ovs_be16 mask)
 {
+    if (!(mask & htons(VLAN_CFI))) {
+        dl_vlan = htons(OFP10_VLAN_NONE);
+    }
     flow_set_vlan_vid(&rule->flow, dl_vlan);
     if (dl_vlan == htons(OFP10_VLAN_NONE)) {
         rule->wc.vlan_tci_mask = htons(UINT16_MAX);
     } else {
-        rule->wc.vlan_tci_mask |= htons(VLAN_VID_MASK | VLAN_CFI);
+        rule->wc.vlan_tci_mask |= mask & htons(VLAN_VID_MASK | VLAN_CFI);
     }
+}
+void
+cls_rule_set_dl_vlan(struct cls_rule *rule, ovs_be16 dl_vlan)
+{
+    cls_rule_set_dl_vlan_masked(rule, dl_vlan,
+                              htons(VLAN_VID_MASK | VLAN_CFI));
 }
 
 /* Modifies 'rule' so that the VLAN PCP is wildcarded.  If the VID is already

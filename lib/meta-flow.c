@@ -151,7 +151,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
     }, {
         MFF_VLAN_VID, "dl_vlan", NULL,
         sizeof(ovs_be16), 12,
-        MFM_NONE, 0,
+        MFM_FULLY, 0,
         MFS_DECIMAL,
         MFP_NONE,
         true,
@@ -1706,7 +1706,6 @@ mf_set(const struct mf_field *mf,
     switch (mf->id) {
     case MFF_IN_PORT:
     case MFF_ETH_TYPE:
-    case MFF_VLAN_VID:
     case MFF_VLAN_PCP:
     case MFF_IPV6_LABEL:
     case MFF_IP_PROTO:
@@ -1765,6 +1764,10 @@ mf_set(const struct mf_field *mf,
 
     case MFF_ETH_SRC:
         cls_rule_set_dl_src_masked(rule, value->mac, mask->mac);
+        break;
+
+    case MFF_VLAN_VID:
+        cls_rule_set_dl_vlan_masked(rule, value->be16, mask->be16);
         break;
 
     case MFF_VLAN_TCI:
