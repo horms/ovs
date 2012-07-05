@@ -135,18 +135,27 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
             memcpy(&value, p + 4, width);
             if (!mf_is_value_valid(mf, &value)) {
                 error = OFPERR_OFPBMC_BAD_VALUE;
-            } else if (!NXM_HASMASK(header)) {
-                error = 0;
-                mf_set_value(mf, &value, rule);
             } else {
-                union mf_value mask;
+                if ((header == OXM_OF_VLAN_VID || header == OXM_OF_VLAN_VID_W)
+                    && !(value.be16 & htons(VLAN_CFI))) {
+                    /* Special case for CFI not set, map to OFP10_VLAN_NONE
+                     * which provides the desired behaviour. */
+                    value.be16 = htons(OFP10_VLAN_NONE);
+                }
 
-                memcpy(&mask, p + 4 + width, width);
-                if (!mf_is_mask_valid(mf, &mask)) {
-                    error = OFPERR_OFPBMC_BAD_MASK;
-                } else {
+                if (!NXM_HASMASK(header)) {
                     error = 0;
-                    mf_set(mf, &value, &mask, rule);
+                    mf_set_value(mf, &value, rule);
+                } else {
+                    union mf_value mask;
+
+                    memcpy(&mask, p + 4 + width, width);
+                    if (!mf_is_mask_valid(mf, &mask)) {
+                        error = OFPERR_OFPBMC_BAD_MASK;
+                    } else {
+                        error = 0;
+                        mf_set(mf, &value, &mask, rule);
+                    }
                 }
             }
         } else {
