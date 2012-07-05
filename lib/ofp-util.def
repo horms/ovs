@@ -39,7 +39,7 @@ OFPAT11_ACTION(OFPAT11_SET_TP_DST,   ofp_action_tp_port,  "mod_tp_dst")
 #ifndef OFPAT12_ACTION
 #define OFPAT12_ACTION(ENUM, STRUCT, NAME)
 #endif
-//OFPAT12_ACTION(OFPAT12_OUTPUT, , "output")
+OFPAT12_ACTION(OFPAT12_OUTPUT, ofp11_action_output, "output")
 //OFPAT12_ACTION(OFPAT12_COPY_TTL_OUT, ofp_action_header, "copy_ttl_out")
 //OFPAT12_ACTION(OFPAT12_COPY_TTL_IN, ofp_action_header, "copy_ttl_in")
 //OFPAT12_ACTION(OFPAT12_SET_MPLS_TTL, , "set_mpls_ttl")

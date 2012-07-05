@@ -27,6 +27,7 @@
 #include "nx-match.h"
 #include "ofp-util.h"
 #include "ofpbuf.h"
+#include "set-field.h"
 #include "vlog.h"
 
 VLOG_DEFINE_THIS_MODULE(ofp_actions);
@@ -648,6 +649,84 @@ ofpacts_from_openflow11(const union ofp_action *in, size_t n_in,
     return ofpacts_from_openflow(in, n_in, out, ofpact_from_openflow11);
 }
 
+static enum ofperr
+decode_openflow12_action(const union ofp_action *a,
+                         enum ofputil_action_code *code)
+{
+    /* set_field has variable length.
+     * This just checks if struct is available. The more check will be done
+     * by set_field_from_openflow()
+     */
+    if (a->type == CONSTANT_HTONS(OFPAT12_SET_FIELD)) {
+        if (ntohs(a->header.len) >= sizeof(struct ofp12_action_set_field)) {
+            *code = OFPUTIL_OFPAT12_SET_FIELD;
+            return 0;
+        }
+        return OFPERR_OFPBAC_BAD_LEN;
+    }
+
+    switch (a->type) {
+    case CONSTANT_HTONS(OFPAT12_EXPERIMENTER):
+        return decode_nxast_action(a, code);
+
+#define OFPAT12_ACTION(ENUM, STRUCT, NAME)                          \
+        case CONSTANT_HTONS(ENUM):                                  \
+            if (a->header.len == htons(sizeof(struct STRUCT))) {    \
+                *code = OFPUTIL_##ENUM;                             \
+                return 0;                                           \
+            } else {                                                \
+                return OFPERR_OFPBAC_BAD_LEN;                       \
+            }                                                       \
+            break;
+#include "ofp-util.def"
+
+    default:
+        return OFPERR_OFPBAC_BAD_TYPE;
+    }
+}
+
+static enum ofperr
+ofpact_from_openflow12(const union ofp_action *a, struct ofpbuf *out)
+{
+    /* XXX */
+    enum ofputil_action_code code;
+    enum ofperr error;
+
+    error = decode_openflow12_action(a, &code);
+    if (error) {
+        return error;
+    }
+
+    switch (code) {
+    case OFPUTIL_ACTION_INVALID:
+#define OFPAT10_ACTION(ENUM, STRUCT, NAME) case OFPUTIL_##ENUM:
+#define OFPAT11_ACTION(ENUM, STRUCT, NAME) case OFPUTIL_##ENUM:
+#include "ofp-util.def"
+        NOT_REACHED();
+
+    case OFPUTIL_OFPAT12_OUTPUT:
+        return output_from_openflow11((const struct ofp11_action_output *) a,
+                                      out);
+
+    case OFPUTIL_OFPAT12_SET_FIELD:
+        return set_field_from_openflow(
+            (const struct ofp12_action_set_field *)a, out);
+
+#define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME) case OFPUTIL_##ENUM:
+#include "ofp-util.def"
+        return ofpact_from_nxast(a, code, out);
+    }
+
+    return error;
+}
+
+static enum ofperr
+ofpacts_from_openflow12(const union ofp_action *in, size_t n_in,
+                        struct ofpbuf *out)
+{
+    return ofpacts_from_openflow(in, n_in, out, ofpact_from_openflow12);
+}
+
 /* OpenFlow 1.1 instructions. */
 
 #define OVS_INSTRUCTIONS                                    \
@@ -778,7 +857,8 @@ get_actions_from_instruction(const struct ofp11_instruction *inst,
 }
 
 enum ofperr
-ofpacts_pull_openflow11_instructions(struct ofpbuf *openflow,
+ofpacts_pull_openflow11_instructions(uint8_t ofp_version,
+                                     struct ofpbuf *openflow,
                                      unsigned int instructions_len,
                                      struct ofpbuf *ofpacts)
 {
@@ -819,7 +899,13 @@ ofpacts_pull_openflow11_instructions(struct ofpbuf *openflow,
 
         get_actions_from_instruction(insts[OVSINST_OFPIT11_APPLY_ACTIONS],
                                      &actions, &n_actions);
-        error = ofpacts_from_openflow11(actions, n_actions, ofpacts);
+        if (ofp_version == OFP12_VERSION) {
+            error = ofpacts_from_openflow12(actions, n_actions, ofpacts);
+        } else if (ofp_version == OFP11_VERSION){
+            error = ofpacts_from_openflow11(actions, n_actions, ofpacts);
+        } else {
+            NOT_REACHED();
+        }
         if (error) {
             goto exit;
         }

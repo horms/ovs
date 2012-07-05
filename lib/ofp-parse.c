@@ -294,6 +294,7 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
 
     case OFPUTIL_OFPAT10_OUTPUT:
     case OFPUTIL_OFPAT11_OUTPUT:
+    case OFPUTIL_OFPAT12_OUTPUT:
         parse_output(arg, ofpacts);
         break;
 

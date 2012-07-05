@@ -383,7 +383,8 @@ struct ofpact_note {
 enum ofperr ofpacts_pull_openflow10(struct ofpbuf *openflow,
                                     unsigned int actions_len,
                                     struct ofpbuf *ofpacts);
-enum ofperr ofpacts_pull_openflow11_instructions(struct ofpbuf *openflow,
+enum ofperr ofpacts_pull_openflow11_instructions(uint8_t ofp_version,
+                                                 struct ofpbuf *openflow,
                                                  unsigned int instructions_len,
                                                  struct ofpbuf *ofpacts);
 enum ofperr ofpacts_check(const struct ofpact[],
