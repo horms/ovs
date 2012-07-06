@@ -5679,9 +5679,9 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         break;
 
     case OFPACT_POP_MPLS:
-        ctx->flow.dl_type = ofpact_get_POP_MPLS(a)->ethertype;
         commit_mpls_pop_action(&ctx->flow, &ctx->base_flow,
-                               ctx->odp_actions);
+                               ctx->odp_actions,
+                               ofpact_get_POP_MPLS(a)->ethertype);
         if (ctx->flow.mpls_lse != htonl(0)) {
             ctx->flow.mpls_lse = htonl(0);
         }

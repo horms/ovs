@@ -134,8 +134,8 @@ void commit_odp_actions(const struct flow *, struct flow *base,
                         struct ofpbuf *odp_actions);
 void commit_mpls_push_action(struct flow *flow, struct flow *base,
                              struct ofpbuf *odp_actions, ovs_be16 eth_type);
-void commit_mpls_pop_action(const struct flow *flow, struct flow *base,
-                             struct ofpbuf *odp_actions);
+void commit_mpls_pop_action(struct flow *flow, struct flow *base,
+                            struct ofpbuf *odp_actions, ovs_be16 eth_type);
 void commit_mpls_lse_action(const struct flow *flow, struct flow *base,
                               struct ofpbuf *odp_actions);
 
