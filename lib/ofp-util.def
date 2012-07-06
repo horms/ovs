@@ -41,6 +41,8 @@ OFPAT11_ACTION(OFPAT11_SET_MPLS_TTL, ofp11_action_mpls_ttl, "set_mpls_ttl")
 OFPAT11_ACTION(OFPAT11_DEC_MPLS_TTL, ofp_action_header,   "dec_mpls_ttl")
 OFPAT11_ACTION(OFPAT11_PUSH_MPLS,    ofp11_action_push,   "push_mpls")
 OFPAT11_ACTION(OFPAT11_POP_MPLS,     ofp11_action_pop_mpls, "pop_mpls")
+OFPAT11_ACTION(OFPAT11_COPY_TTL_OUT, ofp_action_header,   "copy_ttl_out")
+OFPAT11_ACTION(OFPAT11_COPY_TTL_IN,  ofp_action_header,   "copy_ttl_in")
 
 #ifndef OFPIT11_ACTION
 #define OFPIT11_ACTION(ENUM, STRUCT, NAME)
@@ -55,8 +57,8 @@ OFPIT11_ACTION(OFPIT11_CLEAR_ACTIONS, ofp11_instruction_actions, "clear_actions"
 #define OFPAT12_ACTION(ENUM, STRUCT, NAME)
 #endif
 OFPAT12_ACTION(OFPAT12_OUTPUT, ofp11_action_output, "output")
-//OFPAT12_ACTION(OFPAT12_COPY_TTL_OUT, ofp_action_header, "copy_ttl_out")
-//OFPAT12_ACTION(OFPAT12_COPY_TTL_IN, ofp_action_header, "copy_ttl_in")
+OFPAT12_ACTION(OFPAT12_COPY_TTL_OUT, ofp_action_header, "copy_ttl_out")
+OFPAT12_ACTION(OFPAT12_COPY_TTL_IN, ofp_action_header, "copy_ttl_in")
 OFPAT12_ACTION(OFPAT12_SET_MPLS_TTL, ofp11_action_mpls_ttl, "set_mpls_ttl")
 OFPAT12_ACTION(OFPAT12_DEC_MPLS_TTL, ofp_action_header, "dec_mpls_ttl")
 //OFPAT12_ACTION(OFPAT12_PUSH_VLAN, , "push_vlan")

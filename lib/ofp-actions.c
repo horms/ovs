@@ -688,6 +688,14 @@ ofpact_from_openflow11(const union ofp_action *a, struct ofpbuf *out)
         break;
     }
 
+    case OFPUTIL_OFPAT11_COPY_TTL_OUT:
+        ofpact_put_COPY_TTL_OUT(out);
+        break;
+
+    case OFPUTIL_OFPAT11_COPY_TTL_IN:
+        ofpact_put_COPY_TTL_IN(out);
+        break;
+
 #define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME) case OFPUTIL_##ENUM:
 #include "ofp-util.def"
         return ofpact_from_nxast(a, code, out);
@@ -758,6 +766,14 @@ ofpact_from_openflow12(const union ofp_action *a, struct ofpbuf *out)
 #define OFPIT11_ACTION(ENUM, STRUCT, NAME) case OFPUTIL_##ENUM:
 #include "ofp-util.def"
         NOT_REACHED();
+
+    case OFPUTIL_OFPAT12_COPY_TTL_OUT:
+        ofpact_put_COPY_TTL_OUT(out);
+        break;
+
+    case OFPUTIL_OFPAT12_COPY_TTL_IN:
+        ofpact_put_COPY_TTL_IN(out);
+        break;
 
     case OFPUTIL_OFPAT12_SET_MPLS_TTL: {
         struct ofp11_action_mpls_ttl *oasmt =
