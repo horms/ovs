@@ -454,7 +454,7 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
     case OFPUTIL_NXAST_COPY_TTL_IN:
     case OFPUTIL_OFPAT11_COPY_TTL_IN:
     case OFPUTIL_OFPAT12_COPY_TTL_IN:
-        ofputil_put_NXAST_COPY_TTL_IN(ofpacts);
+        ofpact_put_COPY_TTL_IN(ofpacts);
         break;
 
     case OFPUTIL_OFPAT11_SET_MPLS_LABEL:
