@@ -327,14 +327,6 @@ ofpact_from_nxast(const union ofp_action *a, enum ofputil_action_code code,
         controller_from_openflow((const struct nx_action_controller *) a, out);
         break;
 
-    case OFPUTIL_NXAST_COPY_TTL_OUT:
-        ofpact_put_COPY_TTL_OUT(out);
-        break;
-
-    case OFPUTIL_NXAST_COPY_TTL_IN:
-        ofpact_put_COPY_TTL_IN(out);
-        break;
-
     case OFPUTIL_NXAST_PUSH_VLAN:
         napv = (const struct nx_action_push_vlan *) a;
         ofpact_put_PUSH_VLAN(out)->tpid = napv->tpid;
@@ -1408,14 +1400,6 @@ ofpact_to_nxast(const struct ofpact *a, struct ofpbuf *out)
         ofputil_put_NXAST_EXIT(out);
         break;
 
-    case OFPACT_COPY_TTL_OUT:
-        ofputil_put_NXAST_COPY_TTL_OUT(out);
-        break;
-
-    case OFPACT_COPY_TTL_IN:
-        ofputil_put_NXAST_COPY_TTL_IN(out);
-        break;
-
     case OFPACT_PUSH_VLAN:
         ofputil_put_NXAST_PUSH_VLAN(out)->tpid = ofpact_get_PUSH_VLAN(a)->tpid;
         break;
@@ -1442,6 +1426,8 @@ ofpact_to_nxast(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_DEC_MPLS_TTL:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
+    case OFPACT_COPY_TTL_OUT:
+    case OFPACT_COPY_TTL_IN:
         NOT_REACHED();
     }
 }

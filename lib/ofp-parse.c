@@ -445,13 +445,11 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         parse_controller(ofpacts, arg);
         break;
 
-    case OFPUTIL_NXAST_COPY_TTL_OUT:
     case OFPUTIL_OFPAT11_COPY_TTL_OUT:
     case OFPUTIL_OFPAT12_COPY_TTL_OUT:
         ofpact_put_COPY_TTL_OUT(ofpacts);
         break;
 
-    case OFPUTIL_NXAST_COPY_TTL_IN:
     case OFPUTIL_OFPAT11_COPY_TTL_IN:
     case OFPUTIL_OFPAT12_COPY_TTL_IN:
         ofpact_put_COPY_TTL_IN(ofpacts);

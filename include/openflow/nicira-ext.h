@@ -347,8 +347,6 @@ enum nx_action_subtype {
     NXAST_DEC_TTL,              /* struct nx_action_header */
     NXAST_FIN_TIMEOUT,          /* struct nx_action_fin_timeout */
     NXAST_CONTROLLER,           /* struct nx_action_controller */
-    NXAST_COPY_TTL_OUT,         /* struct nx_action_header */
-    NXAST_COPY_TTL_IN,          /* struct nx_action_header */
     NXAST_PUSH_VLAN,            /* struct nx_action_push_vlan */
 };
 
