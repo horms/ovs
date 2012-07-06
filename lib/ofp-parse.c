@@ -453,37 +453,31 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         ofputil_put_NXAST_COPY_TTL_IN(ofpacts);
         break;
 
-    case OFPUTIL_NXAST_SET_MPLS_LABEL:
     case OFPUTIL_OFPAT11_SET_MPLS_LABEL:
         ofpact_put_SET_MPLS_LABEL(ofpacts)->mpls_label =
             htonl(str_to_u32(arg));
         break;
 
-    case OFPUTIL_NXAST_SET_MPLS_TC:
     case OFPUTIL_OFPAT11_SET_MPLS_TC:
         ofpact_put_SET_MPLS_TC(ofpacts)->mpls_tc = str_to_u32(arg);
         break;
 
-    case OFPUTIL_NXAST_SET_MPLS_TTL:
     case OFPUTIL_OFPAT11_SET_MPLS_TTL:
     case OFPUTIL_OFPAT12_SET_MPLS_TTL:
         ofpact_put_SET_MPLS_TTL(ofpacts)->mpls_ttl = str_to_u32(arg);
         break;
 
-    case OFPUTIL_NXAST_DEC_MPLS_TTL:
     case OFPUTIL_OFPAT11_DEC_MPLS_TTL:
     case OFPUTIL_OFPAT12_DEC_MPLS_TTL:
         ofpact_put_DEC_MPLS_TTL(ofpacts);
         break;
 
-    case OFPUTIL_NXAST_PUSH_MPLS:
     case OFPUTIL_OFPAT11_PUSH_MPLS:
     case OFPUTIL_OFPAT12_PUSH_MPLS:
         ofpact_put_PUSH_MPLS(ofpacts)->ethertype =
             htons(str_to_u16(arg, "push_mpls"));
         break;
 
-    case OFPUTIL_NXAST_POP_MPLS:
     case OFPUTIL_OFPAT11_POP_MPLS:
     case OFPUTIL_OFPAT12_POP_MPLS:
         ofpact_put_POP_MPLS(ofpacts)->ethertype =

@@ -94,12 +94,6 @@ NXAST_ACTION(NXAST_FIN_TIMEOUT,    nx_action_fin_timeout,  0, "fin_timeout")
 NXAST_ACTION(NXAST_CONTROLLER,     nx_action_controller,   0, "controller")
 NXAST_ACTION(NXAST_COPY_TTL_OUT,   nx_action_header,       0, "copy_ttl_out")
 NXAST_ACTION(NXAST_COPY_TTL_IN,    nx_action_header,       0, "copy_ttl_in")
-NXAST_ACTION(NXAST_SET_MPLS_LABEL, nx_action_mpls_label,   0, "set_mpls_label")
-NXAST_ACTION(NXAST_SET_MPLS_TC,    nx_action_mpls_tc,      0, "set_mpls_tc")
-NXAST_ACTION(NXAST_SET_MPLS_TTL,   nx_action_mpls_ttl,     0, "set_mpls_ttl")
-NXAST_ACTION(NXAST_DEC_MPLS_TTL,   nx_action_header,       0, "dec_mpls_ttl")
-NXAST_ACTION(NXAST_PUSH_MPLS,      nx_action_push_mpls,    0, "push_mpls")
-NXAST_ACTION(NXAST_POP_MPLS,       nx_action_pop_mpls,     0, "pop_mpls")
 NXAST_ACTION(NXAST_PUSH_VLAN,      nx_action_push_vlan,    0, "push_vlan")
 
 #undef OFPAT10_ACTION

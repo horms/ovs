@@ -349,12 +349,6 @@ enum nx_action_subtype {
     NXAST_CONTROLLER,           /* struct nx_action_controller */
     NXAST_COPY_TTL_OUT,         /* struct nx_action_header */
     NXAST_COPY_TTL_IN,          /* struct nx_action_header */
-    NXAST_SET_MPLS_LABEL,       /* struct nx_action_mpls_label */
-    NXAST_SET_MPLS_TC,          /* struct nx_action_mpls_tc */
-    NXAST_SET_MPLS_TTL,         /* struct nx_action_mpls_ttl */
-    NXAST_DEC_MPLS_TTL,         /* struct nx_action_header */
-    NXAST_PUSH_MPLS,            /* struct nx_action_push_mpls */
-    NXAST_POP_MPLS,             /* struct nx_action_pop_mpls */
     NXAST_PUSH_VLAN,            /* struct nx_action_push_vlan */
 };
 
@@ -2043,61 +2037,6 @@ struct nx_action_controller {
     uint8_t zero;                   /* Must be zero. */
 };
 OFP_ASSERT(sizeof(struct nx_action_controller) == 16);
-
-/* Action structure for NXAST_SET_MPLS_LABEL. */
-struct nx_action_mpls_label {
-    ovs_be16 type;                  /* OFPAT_SET_MPLS_LABEL. */
-    ovs_be16 len;                   /* Length is 8. */
-    ovs_be32 vendor;                /* NX_VENDOR_ID. */
-    ovs_be16 subtype;               /* NXAST_SET_MPLS_LABEL. */
-    uint8_t pad[2];
-    ovs_be32 mpls_label;            /* MPLS label in low 20 bits. */
-};
-OFP_ASSERT(sizeof(struct nx_action_mpls_label) == 16);
-
-/* Action structure for NXAST_SET_MPLS_TC. */
-struct nx_action_mpls_tc {
-    ovs_be16 type;                  /* OFPAT_SET_MPLS_TC. */
-    ovs_be16 len;                   /* Length is 8. */
-    ovs_be32 vendor;                /* NX_VENDOR_ID. */
-    ovs_be16 subtype;               /* NXAST_SET_MPLS_TC. */
-    uint8_t  mpls_tc;               /* MPLS TC */
-    uint8_t  pad[5];
-};
-OFP_ASSERT(sizeof(struct nx_action_mpls_tc) == 16);
-
-/* Action structure for NXAST_SET_MPLS_TTL. */
-struct nx_action_mpls_ttl {
-    ovs_be16 type;                  /* OFPAT_SET_MPLS_TTL. */
-    ovs_be16 len;                   /* Length is 8. */
-    ovs_be32 vendor;                /* NX_VENDOR_ID. */
-    ovs_be16 subtype;               /* NXAST_SET_MPLS_TTL. */
-    uint8_t  mpls_ttl;              /* MPLS TTL */
-    uint8_t  pad[5];
-};
-OFP_ASSERT(sizeof(struct nx_action_mpls_ttl) == 16);
-
-/* Action structure for NXAST_PUSH_MPLS. */
-struct nx_action_push_mpls {
-    ovs_be16 type;                  /* OFPAT_PUSH_MPLS. */
-    ovs_be16 len;                   /* Length is 8. */
-    ovs_be32 vendor;                /* NX_VENDOR_ID. */
-    ovs_be16 subtype;               /* NXAST_PUSH_MPLS. */
-    ovs_be16 ethertype;             /* Ethertype */
-    uint8_t  pad[4];
-};
-OFP_ASSERT(sizeof(struct nx_action_push_mpls) == 16);
-
-/* Action structure for NXAST_POP_MPLS. */
-struct nx_action_pop_mpls {
-    ovs_be16 type;                  /* OFPAT_POP_MPLS. */
-    ovs_be16 len;                   /* Length is 8. */
-    ovs_be32 vendor;                /* NX_VENDOR_ID. */
-    ovs_be16 subtype;               /* NXAST_POP_MPLS. */
-    ovs_be16 ethertype;             /* Ethertype */
-    uint8_t  pad[4];
-};
-OFP_ASSERT(sizeof(struct nx_action_pop_mpls) == 16);
 
 /* Action structure for NXAST_PUSH_VLAN. */
 struct nx_action_push_vlan {
