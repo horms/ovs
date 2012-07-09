@@ -686,6 +686,19 @@ ofpact_from_openflow11(const union ofp_action *a, struct ofpbuf *out)
         ofpact_put_SET_L4_DST_PORT(out)->port = ntohs(a->tp_port.tp_port);
         break;
 
+    case OFPUTIL_OFPAT11_SET_MPLS_LABEL: {
+        struct ofp11_action_mpls_label *oaml =
+            (struct ofp11_action_mpls_label *)a;
+        ofpact_put_SET_MPLS_LABEL(out)->mpls_label = oaml->mpls_label;
+        break;
+    }
+
+    case OFPUTIL_OFPAT11_SET_MPLS_TC: {
+        struct ofp11_action_mpls_tc *oamt = (struct ofp11_action_mpls_tc *)a;
+        ofpact_put_SET_MPLS_TC(out)->mpls_tc = oamt->mpls_tc;
+        break;
+    }
+
     case OFPUTIL_OFPAT11_SET_MPLS_TTL: {
         struct ofp11_action_mpls_ttl *oasmt =
             (struct ofp11_action_mpls_ttl *)a;
