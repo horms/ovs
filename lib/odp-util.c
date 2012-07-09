@@ -2327,14 +2327,18 @@ commit_mpls_push_action(struct flow *flow, struct flow *base,
 
 /* Handle MPLS Pop action. Update packet flow. */
 void
-commit_mpls_pop_action(const struct flow *flow, struct flow *base,
-                       struct ofpbuf *odp_actions)
+commit_mpls_pop_action(struct flow *flow, struct flow *base,
+                       struct ofpbuf *odp_actions, ovs_be16 eth_type)
 {
-    assert(!(flow->dl_type == htons(ETH_TYPE_MPLS) ||
-             flow->dl_type == htons(ETH_TYPE_MPLS_MCAST)));
-    nl_msg_put_be16(odp_actions, OVS_ACTION_ATTR_POP_MPLS, flow->dl_type);
+    assert(flow->dl_type == htons(ETH_TYPE_MPLS) ||
+           flow->dl_type == htons(ETH_TYPE_MPLS_MCAST));
+    assert(eth_type != htons(ETH_TYPE_MPLS) &&
+           eth_type != htons(ETH_TYPE_MPLS_MCAST));
+    nl_msg_put_be16(odp_actions, OVS_ACTION_ATTR_POP_MPLS, eth_type);
     /* Update dl_type and mpls_lse fields. */
-    base->dl_type = flow->dl_type;
+    if (flow->dl_type & htonl(MPLS_STACK_MASK)) {
+        base->dl_type = flow->dl_type = eth_type;
+    }
     base->mpls_lse = flow->mpls_lse;
 }
 
