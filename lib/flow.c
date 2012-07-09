@@ -89,6 +89,33 @@ pull_icmpv6(struct ofpbuf *packet)
 }
 
 static void
+parse_remaining_mpls(struct ofpbuf *b, struct flow *flow)
+{
+    /* Proceed with parsing remaining MPLS headers. */
+    struct mpls_hdr *mh = ofpbuf_pull(b, sizeof *mh);
+    while (!(mh->mpls_lse & htonl(MPLS_STACK_MASK))) {
+        if (flow->inner_mpls_lse == htonl(0)) {
+            flow->inner_mpls_lse = mh->mpls_lse;
+        }
+        mh = ofpbuf_pull(b, sizeof *mh);
+    }
+    if (flow->inner_mpls_lse == htonl(0)) {
+        flow->inner_mpls_lse = mh->mpls_lse;
+    }
+}
+
+static void
+parse_mpls(struct ofpbuf *b, struct flow *flow)
+{
+    /* Make sure there is some data following MPLS header
+       before proceeding with parsing MPLS headers. */
+    if (b->size >= sizeof(struct mpls_hdr) + sizeof(ovs_be16)) {
+        struct mpls_hdr *mh = ofpbuf_pull(b, sizeof *mh);
+        flow->mpls_lse = mh->mpls_lse;
+    }
+}
+
+static void
 parse_vlan(struct ofpbuf *b, struct flow *flow)
 {
     struct qtag_prefix {
@@ -319,6 +346,8 @@ invalid:
  *
  *    - packet->l2 to the start of the Ethernet header.
  *
+ *    - packet->l2_5 to the start of the MPLS shim header.
+ *
  *    - packet->l3 to just past the Ethernet header, or just past the
  *      vlan_header if one is present, to the first byte of the payload of the
  *      Ethernet frame.
@@ -343,10 +372,11 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
     flow->in_port = ofp_in_port;
     flow->skb_priority = skb_priority;
 
-    packet->l2 = b.data;
-    packet->l3 = NULL;
-    packet->l4 = NULL;
-    packet->l7 = NULL;
+    packet->l2   = b.data;
+    packet->l2_5 = NULL;
+    packet->l3   = NULL;
+    packet->l4   = NULL;
+    packet->l7   = NULL;
 
     if (b.size < sizeof *eth) {
         return;
@@ -362,7 +392,27 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
     if (eth->eth_type == htons(ETH_TYPE_VLAN)) {
         parse_vlan(&b, flow);
     }
+
     flow->dl_type = parse_ethertype(&b);
+
+    /* Parse mpls, copy l3 ttl. */
+    if (flow->dl_type == htons(ETH_TYPE_MPLS) ||
+        flow->dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
+        struct ip_header *ih = b.data;
+        struct ip6_hdr   *ih6 = b.data;
+        packet->l2_5 = b.data;
+        parse_mpls(&b, flow);
+        if (!(flow->mpls_lse & htonl(MPLS_STACK_MASK))) {
+            parse_remaining_mpls(&b, flow);
+        }
+        if (ih) {
+            if (IP_VER(ih->ip_ihl_ver) == IP_VERSION) {
+                flow->nw_ttl = ih->ip_ttl;
+            } else if (IP6_VER(ih6->ip6_vfc) == IP6_VERSION) {
+                flow->nw_ttl = ih6->ip6_hlim;
+            }
+        }
+    }
 
     /* Network layer. */
     packet->l3 = b.data;
@@ -444,7 +494,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
     const flow_wildcards_t wc = wildcards->wildcards;
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         flow->regs[i] &= wildcards->reg_masks[i];
@@ -478,6 +528,19 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
     if (wc & FWW_NW_TTL) {
         flow->nw_ttl = 0;
     }
+
+    /* Inner mpls label stack entry has no mask/match. */
+    flow->inner_mpls_lse = 0;
+    flow->mpls_lse &= ~htonl(MPLS_TTL_MASK);
+    if (wc & FWW_MPLS_LABEL) {
+        flow->mpls_lse &= ~htonl(MPLS_LABEL_MASK);
+    }
+    if (wc & FWW_MPLS_TC) {
+        flow->mpls_lse &= ~htonl(MPLS_TC_MASK);
+    }
+    if (wc & FWW_MPLS_STACK) {
+        flow->mpls_lse &= ~htonl(MPLS_STACK_MASK);
+    }
     flow->nw_frag &= wildcards->nw_frag_mask;
     if (wc & FWW_ARP_SHA) {
         memset(flow->arp_sha, 0, sizeof flow->arp_sha);
@@ -498,7 +561,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     fmd->tun_id = flow->tun_id;
     fmd->tun_id_mask = htonll(UINT64_MAX);
@@ -540,6 +603,18 @@ flow_format(struct ds *ds, const struct flow *flow)
                   ETH_ADDR_ARGS(flow->dl_src),
                   ETH_ADDR_ARGS(flow->dl_dst),
                   ntohs(flow->dl_type));
+
+    ds_put_format(ds, ",mpls(");
+    if (flow->mpls_lse) {
+        ds_put_format(ds, "label:%"PRIu32",tc:%d,ttl:%d,bos:%d",
+                      mpls_lse_to_label(flow->mpls_lse),
+                      mpls_lse_to_tc(flow->mpls_lse),
+                      mpls_lse_to_ttl(flow->mpls_lse),
+                      mpls_lse_to_stack(flow->mpls_lse));
+    } else {
+        ds_put_char(ds, '0');
+    }
+    ds_put_char(ds, ')');
 
     if (flow->dl_type == htons(ETH_TYPE_IPV6)) {
         ds_put_format(ds, " label:%#"PRIx32" proto:%"PRIu8" tos:%#"PRIx8
@@ -587,7 +662,7 @@ flow_print(FILE *stream, const struct flow *flow)
 void
 flow_wildcards_init_catchall(struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     wc->wildcards = FWW_ALL;
     wc->tun_id_mask = htonll(0);
@@ -611,7 +686,7 @@ flow_wildcards_init_catchall(struct flow_wildcards *wc)
 void
 flow_wildcards_init_exact(struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     wc->wildcards = 0;
     wc->tun_id_mask = htonll(UINT64_MAX);
@@ -637,7 +712,7 @@ flow_wildcards_is_exact(const struct flow_wildcards *wc)
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     if (wc->wildcards
         || wc->tun_id_mask != htonll(UINT64_MAX)
@@ -671,7 +746,7 @@ flow_wildcards_is_catchall(const struct flow_wildcards *wc)
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     if (wc->wildcards != FWW_ALL
         || wc->tun_id_mask != htonll(0)
@@ -708,7 +783,7 @@ flow_wildcards_combine(struct flow_wildcards *dst,
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     dst->wildcards = src1->wildcards | src2->wildcards;
     dst->tun_id_mask = src1->tun_id_mask & src2->tun_id_mask;
@@ -749,7 +824,7 @@ flow_wildcards_equal(const struct flow_wildcards *a,
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     if (a->wildcards != b->wildcards
         || a->tun_id_mask != b->tun_id_mask
@@ -785,7 +860,7 @@ flow_wildcards_has_extra(const struct flow_wildcards *a,
     uint8_t eth_masked[ETH_ADDR_LEN];
     struct in6_addr ipv6_masked;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         if ((a->reg_masks[i] & b->reg_masks[i]) != b->reg_masks[i]) {
@@ -958,6 +1033,39 @@ flow_set_vlan_pcp(struct flow *flow, uint8_t pcp)
     flow->vlan_tci |= htons((pcp << VLAN_PCP_SHIFT) | VLAN_CFI);
 }
 
+/* Sets the MPLS Label that 'flow' matches to 'label', which is interpreted
+ * as an OpenFlow 1.1 "mpls_label" value. */
+void
+flow_set_mpls_label(struct flow *flow, ovs_be32 label)
+{
+    if (label == htonl(0)) {
+        flow->mpls_lse = htonl(0);
+    } else {
+        flow->mpls_lse &= ~htonl(MPLS_LABEL_MASK);
+        flow->mpls_lse |=
+            htonl((ntohl(label) << MPLS_LABEL_SHIFT) & MPLS_LABEL_MASK);
+    }
+}
+
+/* Sets the MPLS TC that 'flow' matches to 'tc', which should be in the
+ * range 0...7. */
+void
+flow_set_mpls_tc(struct flow *flow, uint8_t tc)
+{
+    tc &= 0x07;
+    flow->mpls_lse &= ~htonl(MPLS_TC_MASK);
+    flow->mpls_lse |= htonl(tc << MPLS_TC_SHIFT);
+}
+
+/* Sets the MPLS STACK bit that 'flow' matches to which should be 0 or 1. */
+void
+flow_set_mpls_stack(struct flow *flow, uint8_t stack)
+{
+    stack &= 0x01;
+    flow->mpls_lse &= ~htonl(MPLS_STACK_MASK);
+    flow->mpls_lse |= htonl(stack << MPLS_STACK_SHIFT);
+}
+
 /* Puts into 'b' a packet that flow_extract() would parse as having the given
  * 'flow'.
  *
@@ -978,7 +1086,11 @@ flow_compose(struct ofpbuf *b, const struct flow *flow)
         eth_push_vlan(b, flow->vlan_tci);
     }
 
-    if (flow->dl_type == htons(ETH_TYPE_IP)) {
+    if (flow->dl_type == htons(ETH_TYPE_MPLS) ||
+        flow->dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
+        push_mpls(b, flow->dl_type);
+        set_mpls_lse(b, flow->mpls_lse);
+    } else if (flow->dl_type == htons(ETH_TYPE_IP)) {
         struct ip_header *ip;
 
         b->l3 = ip = ofpbuf_put_zeros(b, sizeof *ip);

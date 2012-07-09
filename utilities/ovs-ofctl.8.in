@@ -409,6 +409,21 @@ integer between 0 and 65535, inclusive, either in decimal or as a
 hexadecimal number prefixed by \fB0x\fR (e.g. \fB0x0806\fR to match ARP 
 packets).
 .
+.IP \fBmpls_label=\fIlabel\fR
+Matches MPLS Label when \fIethertype\fR is \fI0x8847\fR or \fI0x8848\fR.
+Specify a number between 0 and 2^20-1, inclusive, as the 20-bit MPLS label
+to match. If none specified, all packets which has \fIethertype\fR equal to
+\fI0x8847\fR or \fI0x8848\fR are matched.
+.
+.IP \fBmpls_tc=\fIpriority\fR
+Matches MPLS traffic class when \fIethertype\fR is \fI0x8847\fR or
+\fI0x8848\fR.  Specify a value between 0 and 7, inclusive.  A higher value
+indicates a higher packet priority level.
+.
+.IP \fBmpls_stack=\fIstack\fR
+Matches MPLS stack bit when \fIethertype\fR is \fI0x8847\fR or \fI0x8848\fR.
+Specify either 0 or 1 to match a packet with a single label or multiple labels.
+.
 .IP \fBnw_src=\fIip\fR[\fB/\fInetmask\fR]
 .IQ \fBnw_dst=\fIip\fR[\fB/\fInetmask\fR]
 When \fBdl_type\fR is 0x0800 (possibly via shorthand, e.g. \fBip\fR
@@ -843,6 +858,36 @@ as necessary to match the value specified.  Valid values are between 0
 .
 .IP \fBstrip_vlan\fR
 Strips the VLAN tag from a packet if it is present.
+.
+.IP \fBpush_mpls\fR:\fIethertype\fR
+Modifies the ethertype of a packet with the value specified. The new MPLS
+label stack entry is set with value copied from outermost MPLS label stack
+entry if present and stack bit set to 0 or MPLS label stack entry is set with
+\fBlabel\fR:\fI0 for IPv4, 2 for IPv6 or default 0\fR, \fBtc\fR:\fIleast
+significant 3 bits from IPv4 DSCP or IPv6 traffic-class or 0\fR,
+\fBstack\fR:\fI1\fR, \fBttl\fR:\fIIPv4 ttl or IPv6 hlim or default 64\fR.
+.
+.IP \fBpop_mpls\fR:\fIethertype\fR
+Strips the outermost MPLS label stack entry and modifies the ethertype of a
+packet with the value specified if MPLS stack bit is set(i.e. bottom of stack).
+.
+.IP \fBset_mpls_label\fR:\fIlabel\fR
+Modifies the outermost MPLS label stack entry's label field.
+.
+.IP \fBset_mpls_ttl\fR:\fIttl\fR
+Modifies the outermost MPLS label stack entry's time-to-live field.
+.
+.IP \fBset_mpls_tc\fR:\fItc\fR
+Modifies the outermost MPLS label stack entry's traffic-class field.
+.
+.IP \fBcopy_mpls_ttl_in\fR
+Copies ttl from outermost MPLS header to next-to-outermost MPLS or IP header.
+.
+.IP \fBcopy_mpls_ttl_out\fR
+Copies ttl from next-to-outermost IP or MPLS header to outermost MPLS header.
+.
+.IP \fBdec_mpls_ttl\fR
+Decrements ttl from outermost MPLS header.
 .
 .IP \fBmod_dl_src\fB:\fImac\fR
 Sets the source Ethernet address to \fImac\fR.

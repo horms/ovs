@@ -109,6 +109,9 @@ void cls_rule_set_dl_vlan_masked(struct cls_rule *, ovs_be16, ovs_be16);
 void cls_rule_set_dl_vlan(struct cls_rule *, ovs_be16);
 void cls_rule_set_any_pcp(struct cls_rule *);
 void cls_rule_set_dl_vlan_pcp(struct cls_rule *, uint8_t);
+void cls_rule_set_mpls_label(struct cls_rule *, ovs_be32);
+void cls_rule_set_mpls_tc(struct cls_rule *, uint8_t);
+void cls_rule_set_mpls_stack(struct cls_rule *, uint8_t);
 void cls_rule_set_tp_src(struct cls_rule *, ovs_be16);
 void cls_rule_set_tp_src_masked(struct cls_rule *,
                                 ovs_be16 port, ovs_be16 mask);

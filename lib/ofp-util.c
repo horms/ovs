@@ -104,7 +104,7 @@ static const flow_wildcards_t WC_INVARIANTS = 0
 void
 ofputil_wildcard_from_ofpfw10(uint32_t ofpfw, struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     /* Initialize most of rule->wc. */
     flow_wildcards_init_catchall(wc);
@@ -112,7 +112,8 @@ ofputil_wildcard_from_ofpfw10(uint32_t ofpfw, struct flow_wildcards *wc)
 
     /* Wildcard fields that aren't defined by ofp10_match or tun_id. */
     wc->wildcards |= (FWW_ARP_SHA | FWW_ARP_THA | FWW_NW_ECN | FWW_NW_TTL
-                      | FWW_IPV6_LABEL);
+                      | FWW_IPV6_LABEL | FWW_MPLS_LABEL | FWW_MPLS_TC
+                      | FWW_MPLS_STACK);
 
     if (ofpfw & OFPFW10_NW_TOS) {
         /* OpenFlow 1.0 defines a TOS wildcard, but it's much later in
@@ -1507,7 +1508,7 @@ ofputil_usable_protocols(const struct cls_rule *rule)
 {
     const struct flow_wildcards *wc = &rule->wc;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     /* NXM and OF1.1+ supports bitwise matching on ethernet addresses. */
     if (!eth_mask_is_exact(wc->dl_src_mask)
@@ -1568,6 +1569,21 @@ ofputil_usable_protocols(const struct cls_rule *rule)
     /* Only NXM supports bitwise matching on transport port. */
     if ((wc->tp_src_mask && wc->tp_src_mask != htons(UINT16_MAX)) ||
         (wc->tp_dst_mask && wc->tp_dst_mask != htons(UINT16_MAX))) {
+        return OFPUTIL_P_NXM_ANY;
+    }
+
+    /* Only NXM supports matching mpls label */
+    if (!(wc->wildcards & FWW_MPLS_LABEL)) {
+        return OFPUTIL_P_NXM_ANY;
+    }
+
+    /* Only NXM supports matching mpls tc */
+    if (!(wc->wildcards & FWW_MPLS_TC)) {
+        return OFPUTIL_P_NXM_ANY;
+    }
+
+    /* Only NXM supports matching mpls stack */
+    if (!(wc->wildcards & FWW_MPLS_STACK)) {
         return OFPUTIL_P_NXM_ANY;
     }
 
@@ -4384,7 +4400,8 @@ ofputil_normalize_rule(struct cls_rule *rule)
         MAY_ARP_SHA     = 1 << 4, /* arp_sha */
         MAY_ARP_THA     = 1 << 5, /* arp_tha */
         MAY_IPV6        = 1 << 6, /* ipv6_src, ipv6_dst, ipv6_label */
-        MAY_ND_TARGET   = 1 << 7  /* nd_target */
+        MAY_ND_TARGET   = 1 << 7, /* nd_target */
+        MAY_MPLS        = 1 << 8, /* mpls label and tc */
     } may_match;
 
     struct flow_wildcards wc;
@@ -4412,6 +4429,9 @@ ofputil_normalize_rule(struct cls_rule *rule)
         }
     } else if (rule->flow.dl_type == htons(ETH_TYPE_ARP)) {
         may_match = MAY_NW_PROTO | MAY_NW_ADDR | MAY_ARP_SHA | MAY_ARP_THA;
+    } else if (rule->flow.dl_type == htons(ETH_TYPE_MPLS) ||
+               rule->flow.dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
+        may_match = MAY_MPLS;
     } else {
         may_match = 0;
     }
@@ -4444,6 +4464,11 @@ ofputil_normalize_rule(struct cls_rule *rule)
     }
     if (!(may_match & MAY_ND_TARGET)) {
         wc.nd_target_mask = in6addr_any;
+    }
+    if (!(may_match & MAY_MPLS)) {
+        wc.wildcards |= FWW_MPLS_LABEL;
+        wc.wildcards |= FWW_MPLS_TC;
+        wc.wildcards |= FWW_MPLS_STACK;
     }
 
     /* Log any changes. */

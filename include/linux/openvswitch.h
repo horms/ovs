@@ -278,6 +278,8 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_ICMPV6,    /* struct ovs_key_icmpv6 */
 	OVS_KEY_ATTR_ARP,       /* struct ovs_key_arp */
 	OVS_KEY_ATTR_ND,        /* struct ovs_key_nd */
+	OVS_KEY_ATTR_MPLS,      /* be32 MPLS Label Stack Entry */
+	OVS_KEY_ATTR_INNER_MPLS,/* be32 Inner MPLS Label Stack Entry */
 	OVS_KEY_ATTR_TUN_ID = 63, /* be64 tunnel ID */
 	__OVS_KEY_ATTR_MAX
 };
@@ -466,6 +468,16 @@ struct ovs_action_push_vlan {
  * @OVS_ACTION_ATTR_POP_VLAN: Pop the outermost 802.1Q header off the packet.
  * @OVS_ACTION_ATTR_SAMPLE: Probabilitically executes actions, as specified in
  * the nested %OVS_SAMPLE_ATTR_* attributes.
+ * @OVS_ACTION_ATTR_PUSH_MPLS: Set the new ethertype and push a new MPLS label.
+ * @OVS_ACTION_ATTR_POP_MPLS: Set the new ethertype and pop the top of stack
+ * MPLS label.
+ * @OVS_ACTION_ATTR_SET_MPLS_LSE: Set the new MPLS label or ttl or traffic class.
+ * @OVS_ACTION_ATTR_DEC_MPLS_TTL: Decrement Time-To-Live associated with MPLS
+ * packet.
+ * @OVS_ACTION_ATTR_COPY_MPLS_TTL_OUT: Copy Time-To-Live from IP/MPLS header to
+ * MPLS header.
+ * @OVS_ACTION_ATTR_COPY_MPLS_TTL_IN: Copy Time-To-Live from MPLS header to
+ * IP header.
  *
  * Only a single header can be set with a single %OVS_ACTION_ATTR_SET.  Not all
  * fields within a header are modifiable, e.g. the IPv4 protocol and fragment
@@ -480,6 +492,12 @@ enum ovs_action_attr {
 	OVS_ACTION_ATTR_PUSH_VLAN,    /* struct ovs_action_push_vlan. */
 	OVS_ACTION_ATTR_POP_VLAN,     /* No argument. */
 	OVS_ACTION_ATTR_SAMPLE,       /* Nested OVS_SAMPLE_ATTR_*. */
+	OVS_ACTION_ATTR_PUSH_MPLS,    /* be16, ethertype */
+	OVS_ACTION_ATTR_POP_MPLS,     /* be16, ethertype */
+	OVS_ACTION_ATTR_SET_MPLS_LSE, /* be32, mpls label stack entry. */
+	OVS_ACTION_ATTR_DEC_MPLS_TTL, /* u8, decremented ttl. */
+	OVS_ACTION_ATTR_COPY_TTL_OUT, /* u8, ttl to be copied out. */
+	OVS_ACTION_ATTR_COPY_TTL_IN,  /* u8, ttl to be copied in. */
 	__OVS_ACTION_ATTR_MAX
 };
 

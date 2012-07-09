@@ -100,6 +100,7 @@ lcov_wrappers = \
 	tests/lcov/test-csum \
 	tests/lcov/test-file_name \
 	tests/lcov/test-flows \
+	tests/lcov/test-mpls \
 	tests/lcov/test-hash \
 	tests/lcov/test-heap \
 	tests/lcov/test-hmap \
@@ -158,6 +159,7 @@ valgrind_wrappers = \
 	tests/valgrind/test-csum \
 	tests/valgrind/test-file_name \
 	tests/valgrind/test-flows \
+	tests/valgrind/test-mpls \
 	tests/valgrind/test-hash \
 	tests/valgrind/test-heap \
 	tests/valgrind/test-hmap \
@@ -244,6 +246,10 @@ noinst_PROGRAMS += tests/test-flows
 tests_test_flows_SOURCES = tests/test-flows.c
 tests_test_flows_LDADD = lib/libopenvswitch.a $(SSL_LIBS)
 dist_check_SCRIPTS = tests/flowgen.pl
+
+noinst_PROGRAMS += tests/test-mpls
+tests_test_mpls_SOURCES = tests/test-mpls.c
+tests_test_mpls_LDADD = lib/libopenvswitch.a $(SSL_LIBS)
 
 noinst_PROGRAMS += tests/test-hash
 tests_test_hash_SOURCES = tests/test-hash.c

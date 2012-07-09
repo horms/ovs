@@ -147,6 +147,15 @@ void eth_addr_bitand(const uint8_t src[ETH_ADDR_LEN],
                      const uint8_t mask[ETH_ADDR_LEN],
                      uint8_t dst[ETH_ADDR_LEN]);
 
+void set_mpls_ttl(struct ofpbuf *, uint8_t ttl);
+void dec_mpls_ttl(struct ofpbuf *, uint8_t new_ttl);
+void copy_mpls_ttl_in(struct ofpbuf *, uint8_t new_ttl);
+void copy_mpls_ttl_out(struct ofpbuf *, uint8_t new_ttl);
+void set_mpls_tc(struct ofpbuf *, uint8_t tc);
+void set_mpls_lse(struct ofpbuf *, ovs_be32 label);
+void push_mpls (struct ofpbuf *packet, ovs_be16 ethtype);
+void pop_mpls(struct ofpbuf *, ovs_be16 ethtype);
+
 /* Example:
  *
  * uint8_t mac[ETH_ADDR_LEN];
@@ -289,6 +298,76 @@ struct vlan_eth_header {
 } __attribute__((packed));
 BUILD_ASSERT_DECL(VLAN_ETH_HEADER_LEN == sizeof(struct vlan_eth_header));
 
+/* MPLS related definitions */
+#define MPLS_TTL_MASK       0x000000ff
+#define MPLS_TTL_SHIFT      0
+
+#define MPLS_STACK_MASK     0x00000100
+#define MPLS_STACK_SHIFT    8
+
+#define MPLS_TC_MASK        0x00000e00
+#define MPLS_TC_SHIFT       9
+
+#define MPLS_LABEL_MASK     0xfffff000
+#define MPLS_LABEL_SHIFT    12
+
+#define MPLS_HLEN           4
+
+struct mpls_hdr {
+    ovs_be32 mpls_lse;
+};
+BUILD_ASSERT_DECL(MPLS_HLEN == sizeof(struct mpls_hdr));
+
+#define MPLS_ETH_HEADER_LEN (ETH_HEADER_LEN + MPLS_HLEN)
+struct mpls_eth_header {
+    uint8_t  eth_dst[ETH_ADDR_LEN];
+    uint8_t  eth_src[ETH_ADDR_LEN];
+    ovs_be16 eth_type;         /* htons(ETH_TYPE_MPLS) or
+                                  htons(ETH_TYPE_MPLS_MCAST). */
+    ovs_be32 mpls_lse;
+} __attribute__((packed));
+BUILD_ASSERT_DECL(MPLS_ETH_HEADER_LEN == sizeof(struct mpls_eth_header));
+
+/* Given a mpls label stack entry in network byte order
+ * return mpls label */
+static inline uint32_t
+mpls_lse_to_label(ovs_be32 mpls_lse)
+{
+    return (ntohl(mpls_lse) & MPLS_LABEL_MASK) >> MPLS_LABEL_SHIFT;
+}
+
+/* Given a mpls label stack entry in network byte order
+ * return mpls tc */
+static inline int
+mpls_lse_to_tc(ovs_be32 mpls_lse)
+{
+    return (ntohl(mpls_lse) & MPLS_TC_MASK) >> MPLS_TC_SHIFT;
+}
+
+/* Given a mpls label stack entry in network byte order
+ * return mpls ttl */
+static inline int
+mpls_lse_to_ttl(ovs_be32 mpls_lse)
+{
+    return (ntohl(mpls_lse) & MPLS_TTL_MASK) >> MPLS_TTL_SHIFT;
+}
+
+/* Set TTL in mpls lse. */
+static inline void
+flow_set_mpls_lse_ttl(ovs_be32 *mpls_lse, uint8_t ttl)
+{
+    *mpls_lse &= ~htonl(MPLS_TTL_MASK);
+    *mpls_lse |= htonl(ttl << MPLS_TTL_SHIFT);
+}
+
+/* Given a mpls label stack entry in network byte order
+ * return mpls stack */
+static inline int
+mpls_lse_to_stack(ovs_be32 mpls_lse)
+{
+    return (mpls_lse & htonl(MPLS_STACK_MASK)) != 0;
+}
+
 /* The "(void) (ip)[0]" below has no effect on the value, since it's the first
  * argument of a comma expression, but it makes sure that 'ip' is a pointer.
  * This is useful since a common mistake is to pass an integer instead of a
@@ -348,6 +427,8 @@ void ip_format_masked(ovs_be32 ip, ovs_be32 mask, struct ds *);
 #define IP_DSCP_MASK 0xfc
 
 #define IP_VERSION 4
+
+#define IP_DSCP(ip_tos) ((ip_tos & IP_DSCP_MASK) >> 2)
 
 #define IP_DONT_FRAGMENT  0x4000 /* Don't fragment. */
 #define IP_MORE_FRAGMENTS 0x2000 /* More fragments. */
@@ -447,6 +528,11 @@ BUILD_ASSERT_DECL(ARP_ETH_HEADER_LEN == sizeof(struct arp_eth_header));
 
 /* The IPv6 flow label is in the lower 20 bits of the first 32-bit word. */
 #define IPV6_LABEL_MASK 0x000fffff
+
+#define IP6_VERSION    6
+
+#define IP6_VER(ip6_vfc) ((ip6_vfc) >> 4)
+#define IP6_TC(ip6_flow) ((ip6_flow >> 20) & 0xff)
 
 /* Example:
  *

@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/ip6.h>
 #include <stdlib.h>
 #include "byte-order.h"
 #include "csum.h"
@@ -195,6 +196,354 @@ eth_pop_vlan(struct ofpbuf *packet)
         ofpbuf_pull(packet, VLAN_HEADER_LEN);
         packet->l2 = (char*)packet->l2 + VLAN_HEADER_LEN;
         memcpy(packet->data, &tmp, sizeof tmp);
+    }
+}
+
+/* Set ethertype of the packet. */
+static void
+set_ethertype(struct ofpbuf *packet, ovs_be16 eth_type)
+{
+    struct eth_header *eh = packet->data;
+
+    if (eh->eth_type == htons(ETH_TYPE_VLAN)) {
+        /* ethtype for VLAN packets is at L3_offset - 2 bytes. */
+        ovs_be16 *next_ethtype;
+        next_ethtype = (ovs_be16 *)((char *)packet->l3 - 2);
+        *next_ethtype = eth_type;
+    } else {
+        eh->eth_type = eth_type;
+    }
+}
+
+/* Get ethertype of the packet. */
+static ovs_be16
+get_ethertype(struct ofpbuf *packet)
+{
+    struct eth_header *eh = packet->data;
+    char *mh = packet->l2_5;
+    ovs_be16 *ethtype = NULL;
+
+    if (eh->eth_type == htons(ETH_TYPE_VLAN)) {
+        if (mh != NULL) {
+            ethtype = (ovs_be16 *)(mh - 2);
+        } else {
+            ethtype = (ovs_be16 *)((char *)packet->l3 - 2);
+        }
+        return *ethtype;
+    } else {
+        return eh->eth_type;
+    }
+}
+
+/* Extract ttl and tos from ipv4 or ipv6 header
+   for non-IP pick default value. */
+static int
+get_label_ttl_and_tos(struct ofpbuf* packet, uint8_t *ttl,
+                      uint8_t *tos, uint8_t *label)
+{
+    struct eth_header *eh = packet->data;
+    struct ip_header *ih = packet->l3;
+    struct ip6_hdr   *ih6 = packet->l3;
+    struct mpls_hdr *mh = packet->l2_5;
+    ovs_be16 ethtype = htons(0);
+
+    if (packet->size < sizeof *eh + sizeof *ih) {
+        return 0;
+    }
+
+    ethtype = get_ethertype(packet);
+
+    switch (ntohs(ethtype)) {
+
+    case ETH_TYPE_IP:
+        *ttl = ih->ip_ttl;
+        *tos = IP_DSCP(ih->ip_tos) & 0x07;
+        *label = 0; /* IPV4 Explicit Null label. */
+	break;
+
+    case ETH_TYPE_IPV6:
+        *ttl = ih6->ip6_hlim;
+        *tos = IP6_TC(ntohl(ih6->ip6_flow)) & 0x07;
+        *label = 2; /* IPV6 Explicit Null label. */
+	break;
+
+    case ETH_TYPE_MPLS:
+    case ETH_TYPE_MPLS_MCAST:
+        *ttl = mpls_lse_to_ttl(mh->mpls_lse);
+        *tos = mpls_lse_to_tc(mh->mpls_lse);
+        *label = mpls_lse_to_label(mh->mpls_lse);
+	break;
+
+    default:
+        *ttl = 64;
+        *tos = 0;
+        *label = 0; /* default label. */
+	break;
+    }
+    return 1;
+}
+
+/* Set MPLS tag time-to-live. */
+static void
+set_mpls_lse_ttl(ovs_be32 *tag, ovs_be32 ttl)
+{
+    *tag &= ~htonl(MPLS_TTL_MASK);
+    *tag |= ttl & htonl(MPLS_TTL_MASK);
+}
+
+/* Set MPLS tag traffic-class. */
+static void
+set_mpls_lse_tc(ovs_be32 *tag, ovs_be32 tc)
+{
+    *tag &= ~htonl(MPLS_TC_MASK);
+    *tag |= tc & htonl(MPLS_TC_MASK);
+}
+
+/* Set MPLS tag label. */
+static void
+set_mpls_lse_label(ovs_be32 *tag, ovs_be32 label)
+{
+    *tag &= ~htonl(MPLS_LABEL_MASK);
+    *tag |= label & htonl(MPLS_LABEL_MASK);
+}
+
+/* Set MPLS tag stack. */
+static void
+set_mpls_lse_stack(ovs_be32 *tag, ovs_be32 stack)
+{
+    *tag &= ~htonl(MPLS_STACK_MASK);
+    *tag |= stack & htonl(MPLS_STACK_MASK);
+}
+
+/* Set MPLS lse from actions. */
+static void
+set_new_mpls_lse(struct mpls_hdr *mh, ovs_be32 mpls_lse)
+{
+    set_mpls_lse_label(&mh->mpls_lse, mpls_lse);
+    set_mpls_lse_ttl(&mh->mpls_lse, mpls_lse);
+    set_mpls_lse_tc(&mh->mpls_lse, mpls_lse);
+}
+
+/* Set MPLS label, MPLS TC, MPLS ttl and MPLS stack. */
+static void
+set_mpls_lse_values(ovs_be32 *tag, uint8_t ttl, uint8_t stack,
+                    uint8_t tc, uint32_t label)
+{
+    set_mpls_lse_ttl(tag, htonl(ttl << MPLS_TTL_SHIFT));
+    set_mpls_lse_tc(tag, htonl(tc << MPLS_TC_SHIFT));
+    set_mpls_lse_label(tag, htonl(label << MPLS_LABEL_SHIFT));
+    set_mpls_lse_stack(tag, htonl(stack << MPLS_STACK_SHIFT));
+}
+
+/* Adjust L2 and L2.5 data after pushing new mpls shim header. */
+static void
+push_mpls_lse(struct ofpbuf *packet, struct mpls_hdr *mh)
+{
+    char * header;
+    size_t len;
+    header = ofpbuf_push_uninit(packet, MPLS_HLEN);
+    len = (char*)packet->l2_5 - (char*)packet->l2;
+    memmove(header, packet->l2, len);
+    memcpy((char*)header + len, mh, sizeof *mh);
+    packet->l2 = (char*)packet->l2 - MPLS_HLEN;
+    packet->l2_5 = (char*)packet->l2_5 - MPLS_HLEN;
+}
+
+/* Decrement MPLS TTL from the packet.
+ * 'packet->l2_5' must initially point to 'packet''s MPLS Label stack. */
+void
+dec_mpls_ttl(struct ofpbuf *packet, uint8_t new_ttl)
+{
+    ovs_be16 eth_type = htons(0);
+    struct eth_header *eh = packet->data;
+    struct mpls_hdr *mh = packet->l2_5;
+
+    if (packet->size < sizeof *eh) {
+        return;
+    }
+
+    /* Packet type should be mpls to decrement ttl. */
+    eth_type = get_ethertype(packet);
+
+    if (eth_type == htons(ETH_TYPE_MPLS) ||
+        eth_type == htons(ETH_TYPE_MPLS_MCAST)) {
+
+        /* Update decremented ttl into mpls header. */
+        set_mpls_lse_ttl(&mh->mpls_lse, htonl(new_ttl << MPLS_TTL_SHIFT));
+    }
+}
+
+/* Copy MPLS TTL from the packet either ipv4/ipv6.
+ * 'packet->l2_5' must initially point to 'packet''s MPLS Label stack. */
+void
+copy_mpls_ttl_in(struct ofpbuf *packet, uint8_t new_ttl)
+{
+    struct eth_header *eh = packet->data;
+    struct mpls_hdr *mh = packet->l2_5;
+    struct ip_header *ih = packet->l3;
+    struct ip6_hdr *ih6 = packet->l3;
+    ovs_be16 eth_type = htons(0);
+    size_t hdr_size = sizeof *eh + sizeof *mh + sizeof *ih;
+
+    if (packet->size < hdr_size) {
+        return;
+    }
+
+    /* Packet type should be mpls to copy ttl to l3. */
+    eth_type = get_ethertype(packet);
+    if (eth_type == htons(ETH_TYPE_MPLS) ||
+        eth_type == htons(ETH_TYPE_MPLS_MCAST)) {
+
+        /* If bottom of the stack handle IP checksum. */
+        if (mh->mpls_lse & htonl(MPLS_STACK_MASK)) {
+            if (IP_VER(ih->ip_ihl_ver) == IP_VERSION) {
+                /* Change the ip checksum. */
+                uint8_t *field = &ih->ip_ttl;
+                ih->ip_csum = recalc_csum16(ih->ip_csum,
+                                 htons(*field << 8), htons(new_ttl << 8));
+                ih->ip_ttl = new_ttl;
+            } else if (IP6_VER(ih6->ip6_vfc) == IP6_VERSION) {
+                ih6->ip6_hlim = new_ttl;
+            }
+        } else {
+            struct mpls_hdr *mh2;
+            mh2 = (struct mpls_hdr *)((char *) packet->l2_5 + sizeof *mh);
+            set_mpls_lse_ttl(&mh2->mpls_lse, htonl(new_ttl << MPLS_TTL_SHIFT));
+        }
+    }
+}
+
+/* Copy MPLS TTL to the packet layer3 only ipv4/ipv6.
+ * 'packet->l2_5' must initially point to 'packet''s MPLS Label stack. */
+void
+copy_mpls_ttl_out(struct ofpbuf *packet, uint8_t new_ttl)
+{
+    struct eth_header *eh = packet->data;
+    struct mpls_hdr *mh = packet->l2_5;
+    struct ip_header *ih = packet->l3;
+    struct ip6_hdr   *ih6 = packet->l3;
+    ovs_be16 eth_type = htons(0);
+    size_t hdr_size = sizeof *eh + sizeof *mh + sizeof *ih;
+
+    /* TTL sent from ofproto-dpif.c is not the correct one,
+     * hence ignore it. */
+    if (packet->size < hdr_size) {
+        return;
+    }
+
+    /* Packet type should me mpls to copy ttl from l3. */
+    eth_type = get_ethertype(packet);
+    if (eth_type == htons(ETH_TYPE_MPLS) ||
+        eth_type == htons(ETH_TYPE_MPLS_MCAST)) {
+
+        /* If bottom of the stack copy from l3. */
+        if (mh->mpls_lse & htonl(MPLS_STACK_MASK)) {
+            uint8_t nh_ttl;
+            /* Get ipv4 or ipv6 or default ttl. */
+            if (IP_VER(ih->ip_ihl_ver) == IP_VERSION) {
+                nh_ttl = ih->ip_ttl;
+            } else if (IP6_VER(ih6->ip6_vfc) == IP6_VERSION) {
+                nh_ttl = ih6->ip6_hlim;
+            } else {
+                nh_ttl = 64; /* Default ttl for non-IP. */
+            }
+            set_mpls_lse_ttl(&mh->mpls_lse, htonl(nh_ttl << MPLS_TTL_SHIFT));
+        } else {
+            struct mpls_hdr *mh2;
+            mh2 = (struct mpls_hdr *)((char *) packet->l2_5 + sizeof *mh);
+            new_ttl = mpls_lse_to_ttl(mh2->mpls_lse);
+            set_mpls_lse_ttl(&mh->mpls_lse, htonl(new_ttl << MPLS_TTL_SHIFT));
+        }
+    }
+}
+
+/* Set MPLS label stack entry to outermost MPLS header.*/
+void
+set_mpls_lse(struct ofpbuf *packet, ovs_be32 mpls_lse)
+{
+    struct eth_header *eh = packet->data;
+    struct mpls_hdr *mh = packet->l2_5;
+    ovs_be16 eth_type = htons(0);
+
+    if (packet->size < sizeof *eh) {
+        return;
+    }
+
+    /* Packet type should me mpls to set label stack entry. */
+    eth_type = get_ethertype(packet);
+    if (eth_type == htons(ETH_TYPE_MPLS) ||
+        eth_type == htons(ETH_TYPE_MPLS_MCAST)) {
+        /* Update mpls label stack entry. */
+        set_new_mpls_lse(mh, mpls_lse);
+    }
+}
+
+/* Push MPLS label stack entry onto packet. */
+void
+push_mpls(struct ofpbuf *packet, ovs_be16 ethtype)
+{
+    struct eth_header *eh = packet->data;
+    uint8_t nh_ttl, nh_tos, label;
+    ovs_be16 eth_type = htons(0);
+
+    if (packet->size < sizeof *eh ||
+        (ethtype != htons(ETH_TYPE_MPLS) &&
+         ethtype != htons(ETH_TYPE_MPLS_MCAST))) {
+        return;
+    }
+
+    /* Get the packet ether_type. */
+    eth_type = get_ethertype(packet);
+
+    /* Get Label, time-to-live and tos from L3 or L2.5. */
+    if (get_label_ttl_and_tos(packet, &nh_ttl, &nh_tos, &label)) {
+        struct mpls_hdr mh;
+
+        if (eth_type == htons(ETH_TYPE_MPLS) ||
+            eth_type == htons(ETH_TYPE_MPLS_MCAST)) {
+            set_mpls_lse_values(&mh.mpls_lse, nh_ttl, 0, nh_tos, label);
+        } else {
+            /* Set ethtype and mpls label stack entry. */
+            set_ethertype(packet, ethtype);
+            set_mpls_lse_values(&mh.mpls_lse, nh_ttl, 1, nh_tos, label);
+            packet->l2_5 = packet->l3;
+        }
+        /* Push new MPLS shim header onto packet. */
+        push_mpls_lse(packet, &mh);
+    }
+}
+
+/* Pop outermost MPLS label stack entry from packet. */
+void
+pop_mpls(struct ofpbuf *packet, ovs_be16 ethtype)
+{
+    struct eth_header *eh = packet->data;
+    struct mpls_hdr *mh = NULL;
+    ovs_be16 eth_type = htons(0);
+
+    if (packet->size < sizeof *eh + sizeof *mh)
+        return;
+
+    eth_type = get_ethertype(packet);
+
+    if (eth_type == htons(ETH_TYPE_MPLS) ||
+        eth_type == htons(ETH_TYPE_MPLS_MCAST)) {
+        size_t len;
+        mh = packet->l2_5;
+        len = (char*)packet->l2_5 - (char*)packet->l2;
+        /* If bottom of the stack set ethertype. */
+        if (mh->mpls_lse & htonl(MPLS_STACK_MASK)) {
+            packet->l3 = packet->l2_5;
+            packet->l2_5 = NULL;
+            set_ethertype(packet, ethtype);
+        } else {
+            packet->l2_5 = (char*)packet->l2_5 + MPLS_HLEN;
+        }
+        /* Shift the l2 header forward. */
+        memmove((char*)packet->data + MPLS_HLEN, packet->data, len);
+        packet->size -= MPLS_HLEN;
+        packet->data = (char*)packet->data + MPLS_HLEN;
+        packet->l2 = (char*)packet->l2 + MPLS_HLEN;
     }
 }
 

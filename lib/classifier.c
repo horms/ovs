@@ -273,6 +273,35 @@ cls_rule_set_dl_vlan_pcp(struct cls_rule *rule, uint8_t dl_vlan_pcp)
     rule->wc.vlan_tci_mask |= htons(VLAN_CFI | VLAN_PCP_MASK);
 }
 
+/* Modifies 'rule' depending on 'mpls_label':
+ * Makes 'rule' match only packets with an MPLS header whose label equals the
+ * low 20 bits of 'mpls_label'. */
+void
+cls_rule_set_mpls_label(struct cls_rule *rule, ovs_be32 mpls_label)
+{
+    rule->wc.wildcards &= ~FWW_MPLS_LABEL;
+    flow_set_mpls_label(&rule->flow, mpls_label);
+}
+
+/* Modifies 'rule' so that it matches only packets with an MPLS header whose
+ * Traffic Class equals the low 3 bits of 'mpls_tc'. */
+void
+cls_rule_set_mpls_tc(struct cls_rule *rule, uint8_t mpls_tc)
+{
+    rule->wc.wildcards &= ~FWW_MPLS_TC;
+    flow_set_mpls_tc(&rule->flow, mpls_tc);
+}
+
+/* Modifies 'rule' so that it matches only specific packets with
+ * MPLS stack bit set for single label or MPLS stack bit not set for
+ * multiple labels. */
+void
+cls_rule_set_mpls_stack(struct cls_rule *rule, uint8_t mpls_stack)
+{
+    rule->wc.wildcards &= ~FWW_MPLS_STACK;
+    flow_set_mpls_stack(&rule->flow, mpls_stack);
+}
+
 void
 cls_rule_set_tp_src(struct cls_rule *rule, ovs_be16 tp_src)
 {
@@ -535,7 +564,7 @@ cls_rule_format(const struct cls_rule *rule, struct ds *s)
 
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     if (rule->priority != OFP_DEFAULT_PRIORITY) {
         ds_put_format(s, "priority=%d,", rule->priority);
@@ -577,6 +606,10 @@ cls_rule_format(const struct cls_rule *rule, struct ds *s)
             }
         } else if (f->dl_type == htons(ETH_TYPE_ARP)) {
             ds_put_cstr(s, "arp,");
+        } else if (f->dl_type == htons(ETH_TYPE_MPLS)) {
+            ds_put_cstr(s, "mpls,");
+        } else if (f->dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
+            ds_put_cstr(s, "mplsm,");
         } else {
             skip_type = false;
         }
@@ -672,6 +705,18 @@ cls_rule_format(const struct cls_rule *rule, struct ds *s)
     }
     if (!(w & FWW_NW_TTL)) {
         ds_put_format(s, "nw_ttl=%"PRIu8",", f->nw_ttl);
+    }
+    if (!(w & FWW_MPLS_LABEL)) {
+        ds_put_format(s, "mpls_label=%"PRIu32",",
+                 mpls_lse_to_label(f->mpls_lse));
+    }
+    if (!(w & FWW_MPLS_TC)) {
+        ds_put_format(s, "mpls_tc=%"PRIu8",",
+                 mpls_lse_to_tc(f->mpls_lse));
+    }
+    if (!(w & FWW_MPLS_STACK)) {
+        ds_put_format(s, "mpls_stack=%"PRIu8",",
+                 mpls_lse_to_stack(f->mpls_lse));
     }
     switch (wc->nw_frag_mask) {
     case FLOW_NW_FRAG_ANY | FLOW_NW_FRAG_LATER:
@@ -1198,7 +1243,7 @@ flow_equal_except(const struct flow *a, const struct flow *b,
     const flow_wildcards_t wc = wildcards->wildcards;
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         if ((a->regs[i] ^ b->regs[i]) & wildcards->reg_masks[i]) {
@@ -1226,6 +1271,12 @@ flow_equal_except(const struct flow *a, const struct flow *b,
             && (wc & FWW_ARP_SHA || eth_addr_equals(a->arp_sha, b->arp_sha))
             && (wc & FWW_ARP_THA || eth_addr_equals(a->arp_tha, b->arp_tha))
             && (wc & FWW_IPV6_LABEL || a->ipv6_label == b->ipv6_label)
+            && (wc & FWW_MPLS_LABEL ||
+                !((a->mpls_lse ^ b->mpls_lse) & htonl(MPLS_LABEL_MASK)))
+            && (wc & FWW_MPLS_TC ||
+                !((a->mpls_lse ^ b->mpls_lse) & htonl(MPLS_TC_MASK)))
+            && (wc & FWW_MPLS_STACK ||
+                !((a->mpls_lse ^ b->mpls_lse) & htonl(MPLS_STACK_MASK)))
             && ipv6_equal_except(&a->ipv6_src, &b->ipv6_src,
                     &wildcards->ipv6_src_mask)
             && ipv6_equal_except(&a->ipv6_dst, &b->ipv6_dst,

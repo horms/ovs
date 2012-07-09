@@ -24,6 +24,11 @@ in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x86dd),ipv
 in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x86dd),ipv6(src=::1,dst=::2,label=0,proto=58,tclass=0,hlimit=128,frag=no),icmpv6(type=136,code=0),nd(target=::3,tll=00:0a:0b:0c:0d:0e)
 in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x86dd),ipv6(src=::1,dst=::2,label=0,proto=58,tclass=0,hlimit=128,frag=no),icmpv6(type=136,code=0),nd(target=::3,sll=00:05:06:07:08:09,tll=00:0a:0b:0c:0d:0e)
 in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x0806),arp(sip=1.2.3.4,tip=5.6.7.8,op=1,sha=00:0f:10:11:12:13,tha=00:14:15:16:17:18)
+in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8847),mpls(label=100,tc=3,ttl=64,bos=1)
+in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8847),mpls(label=100,tc=7,ttl=100,bos=1)
+in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8847),mpls(label=100,tc=7,ttl=100,bos=0)
+in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8848),mpls(label=1000,tc=4,ttl=200,bos=1)
+in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8848),mpls(label=1000,tc=4,ttl=200,bos=0)
 ])
 
 (echo '# Valid forms without tun_id or VLAN header.'
@@ -37,6 +42,14 @@ in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x0806),arp
  echo '# Valid forms with VLAN header.'
  sed 's/\(eth([[^)]]*)\),*/\1,eth_type(0x8100),vlan(vid=99,pcp=7),encap(/
 s/$/)/' odp-base.txt
+
+ echo
+ echo '# Valid forms with MPLS header.'
+ sed 's/\(eth([[^)]]*)\),*/\1,eth_type(0x8847),mpls(label=100,tc=7,ttl=64,bos=1)' odp-base.txt
+
+ echo
+ echo '# Valid forms with MPLS multicast header.'
+ sed 's/\(eth([[^)]]*)\),*/\1,eth_type(0x8848),mpls(label=100,tc=7,ttl=64,bos=1)' odp-base.txt
 
  echo
  echo '# Valid forms with QoS priority.'
@@ -89,6 +102,13 @@ push_vlan(vid=12,pcp=0)
 push_vlan(vid=13,pcp=5,cfi=0)
 push_vlan(tpid=0x9100,vid=13,pcp=5)
 push_vlan(tpid=0x9100,vid=13,pcp=5,cfi=0)
+push_mpls(eth_type=0x8847)
+push_mpls(eth_type=0x8848)
+mpls_lse(label=100,tc=3,ttl=64,bos=0)
+mpls_lse(label=101,tc=4,ttl=100,bos=1)
+dec_mpls_ttl(ttl=64)
+copy_ttl_in(ttl=64)
+copy_ttl_out(ttl=64)
 pop_vlan
 sample(sample=9.7%,actions(1,2,3,push_vlan(vid=1,pcp=2)))
 ])

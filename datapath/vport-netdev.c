@@ -273,12 +273,20 @@ static void netdev_port_receive(struct vport *vport, struct sk_buff *skb)
 	ovs_vport_receive(vport, skb);
 }
 
-static unsigned int packet_length(const struct sk_buff *skb)
+static unsigned int packet_length(struct sk_buff *skb)
 {
 	unsigned int length = skb->len - ETH_HLEN;
+	unsigned int vlan_hlen = 0, mpls_hlen = 0;
 
-	if (skb->protocol == htons(ETH_P_8021Q))
+	if (skb->protocol == htons(ETH_P_8021Q)) {
+
 		length -= VLAN_HLEN;
+		vlan_hlen = VLAN_HLEN;
+	}
+
+	/* Handle VLAN/MPLS or MPLS encapsulated packets. */
+	check_vlan_mpls_hlen(skb, &vlan_hlen, &mpls_hlen);
+	length = length - vlan_hlen - mpls_hlen;
 
 	return length;
 }
@@ -294,6 +302,163 @@ static bool dev_supports_vlan_tx(struct net_device *dev)
 	/* Assume that the driver is buggy. */
 	return false;
 #endif
+}
+
+/* Check for MPLS header presence. */
+bool mpls_tag_present(struct sk_buff *skb)
+{
+	__be16 protocol = htons(0);
+	if (skb->protocol == htons(ETH_P_MPLS_UC) ||
+		skb->protocol == htons(ETH_P_MPLS_MC)) {
+		return true;
+	} else {
+
+		if (unlikely(!pskb_may_pull(skb, VLAN_ETH_HLEN + MPLS_HLEN)))
+			return false;
+
+		if (vlan_tx_tag_present(skb))
+			protocol = eth_hdr(skb)->h_proto;
+		else
+			protocol = vlan_eth_hdr(skb)->h_vlan_encapsulated_proto;
+
+		return (protocol == htons(ETH_P_MPLS_UC) ||
+				protocol == htons(ETH_P_MPLS_MC));
+	}
+}
+
+/* Handle offload for kernel version < 3.6.0 only. */
+static bool dev_supports_mpls_tx(void)
+{
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0)
+	return false;
+#else
+	return true;
+#endif
+}
+
+/* Get protocol after MPLS or VLAN/MPLS header. */
+void check_skb_vlan_mpls_protocol(struct sk_buff *skb)
+{
+	int vlan_depth = ETH_HLEN;
+	int vlan_hlen = 0;
+	__be32 mpls_lse = htonl(0);
+	int mpls_lse_len = MPLS_HLEN;
+
+	/* Handle MPLS, VLAN/MPLS and VLAN-QinQ/MPLS encapsulated packets. */
+	while (skb->protocol == htons(ETH_P_8021Q)) {
+		struct vlan_hdr *vh;
+
+		if (unlikely(!pskb_may_pull(skb, vlan_depth + VLAN_HLEN)))
+			return;
+
+		vh = (struct vlan_hdr *)(skb->data + vlan_depth);
+		skb->protocol = vh->h_vlan_encapsulated_proto;
+		vlan_depth += VLAN_HLEN;
+		vlan_hlen += VLAN_HLEN;
+	}
+
+	if (skb->protocol == htons(ETH_P_MPLS_UC) ||
+		skb->protocol == htons(ETH_P_MPLS_MC)) {
+
+		if (unlikely(!pskb_may_pull(skb, vlan_depth + mpls_lse_len + 4)))
+			return;
+
+		mpls_lse = *(__be32 *)(skb->data + vlan_depth);
+		while (!(mpls_lse & htonl(MPLS_STACK_MASK))) {
+			if (unlikely(!pskb_may_pull(skb, vlan_depth + mpls_lse_len + 4)))
+				return;
+			mpls_lse = *(__be32 *)(skb->data + vlan_depth + mpls_lse_len);
+			mpls_lse_len += MPLS_HLEN;
+		}
+
+		if (unlikely(!pskb_may_pull(skb,
+							vlan_depth + mpls_lse_len + sizeof(struct iphdr))))
+			return;
+
+		if (ip_hdr(skb)->version == 4)
+			skb->protocol = htons(ETH_P_IP);
+		else if (ipv6_hdr(skb)->version == 6)
+			skb->protocol = htons(ETH_P_IPV6);
+	}
+}
+
+/* Handle GSO and non-GSO packets for VLAN-QinQ and
+ * MPLS packets. */
+static int skb_handle_vlan_mpls(struct vport *vport, struct sk_buff *skb)
+{
+	int features, len;
+
+	features = netif_skb_features(skb);
+
+	features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
+				  NETIF_F_UFO | NETIF_F_FSO |
+				  NETIF_F_ALL_CSUM | NETIF_F_HW_VLAN_TX);
+
+	if (vlan_tx_tag_present(skb)) {
+		skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
+		if (unlikely(!skb))
+			goto error;
+
+		vlan_set_tci(skb, 0);
+	}
+
+	/* Handle GSO packets. */
+	if (!dev_supports_mpls_tx()) {
+		if (netif_needs_gso(skb, features)) {
+			/* skb_gso_segment depends on skb->protocol, save and
+			 * restore after the call. */
+			__be16 tmp_protocol = skb->protocol;
+			check_skb_vlan_mpls_protocol(skb);
+			skb->next = skb_gso_segment(skb, features);
+			skb->protocol = tmp_protocol;
+
+			if (IS_ERR(skb->next))
+				goto error;
+			if (skb->next)
+				goto gso;
+		} else if (get_ip_summed(skb) == OVS_CSUM_PARTIAL) {
+			/* Handle non-GSO packets which requires checksum calculation here. */
+			int err;
+			/* Linearize skb before calculating checksum. */
+			if (unlikely(skb_linearize(skb)))
+				goto error;
+			err = skb_checksum_help(skb);
+			if (unlikely(err))
+				goto error;
+		}
+		/* Nothing needs to be done, just trasnmit. */
+		len = skb->len;
+		dev_queue_xmit(skb);
+		return len;
+	} else {
+		/* Kernel > 3.6.0, let kernel handle offloads,
+		   save and restore features. */
+		u32 tmp_features = skb->dev->features;
+		skb->dev->features = features;
+		len = skb->len;
+		dev_queue_xmit(skb);
+		skb->dev->features = tmp_features;
+		return len;
+	}
+
+gso:
+	len = 0;
+	do {
+		struct sk_buff *nskb = skb->next;
+		skb->next = nskb->next;
+		nskb->next = NULL;
+
+		len += nskb->len;
+		dev_queue_xmit(nskb);
+	} while (skb->next);
+
+	kfree_skb(skb);
+	return len;
+
+error:
+	kfree_skb(skb);
+	ovs_vport_record_error(vport, VPORT_E_TX_DROPPED);
+	return 0;
 }
 
 static int netdev_send(struct vport *vport, struct sk_buff *skb)
@@ -315,7 +480,8 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 	skb->dev = netdev_vport->dev;
 	forward_ip_summed(skb, true);
 
-	if (vlan_tx_tag_present(skb) && !dev_supports_vlan_tx(skb->dev)) {
+	if (vlan_tx_tag_present(skb) && !dev_supports_vlan_tx(skb->dev) &&
+		!mpls_tag_present(skb)) {
 		int features;
 
 		features = netif_skb_features(skb);
@@ -369,7 +535,8 @@ tag:
 		if (unlikely(!skb))
 			return 0;
 		vlan_set_tci(skb, 0);
-	}
+	} else if (mpls_tag_present(skb))
+		return skb_handle_vlan_mpls(vport, skb);
 
 	len = skb->len;
 	dev_queue_xmit(skb);

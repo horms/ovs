@@ -101,6 +101,17 @@ static struct sk_buff *gre_update_header(const struct vport *vport,
 	__be32 *options = (__be32 *)(skb_network_header(skb) + mutable->tunnel_hlen
 					       - GRE_HEADER_SECTION);
 
+	/* GRE IP hdr doesn't carry options, hence ok to rely on iphdr size. */
+	struct gre_base_hdr *greh =
+		(struct gre_base_hdr *)(skb_network_header(skb) + sizeof(struct iphdr));
+
+	if (skb->protocol == htons(ETH_P_MPLS_UC) ||
+		skb->protocol == htons(ETH_P_MPLS_MC)) {
+		/* For MPLS packets tunneled via GRE to MPLS adjacent router, set
+		 * protocol type to MPLS. */
+		greh->protocol = skb->protocol;
+	}
+
 	/* Work backwards over the options so the checksum is last. */
 	if (mutable->flags & TNL_F_OUT_KEY_ACTION)
 		*options = be64_get_low32(OVS_CB(skb)->tun_id);
@@ -147,7 +158,9 @@ static int parse_header(struct iphdr *iph, __be16 *flags, __be64 *key)
 	if (unlikely(greh->flags & (GRE_VERSION | GRE_ROUTING)))
 		return -EINVAL;
 
-	if (unlikely(greh->protocol != htons(ETH_P_TEB)))
+	if (unlikely(greh->protocol != htons(ETH_P_TEB) &&
+				 greh->protocol != htons(ETH_P_MPLS_UC) &&
+				 greh->protocol != htons(ETH_P_MPLS_MC)))
 		return -EINVAL;
 
 	hdr_len = GRE_HEADER_SECTION;

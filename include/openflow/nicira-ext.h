@@ -347,6 +347,14 @@ enum nx_action_subtype {
     NXAST_DEC_TTL,              /* struct nx_action_header */
     NXAST_FIN_TIMEOUT,          /* struct nx_action_fin_timeout */
     NXAST_CONTROLLER,           /* struct nx_action_controller */
+    NXAST_COPY_TTL_OUT,         /* struct nx_action_header */
+    NXAST_COPY_TTL_IN,          /* struct nx_action_header */
+    NXAST_SET_MPLS_LABEL,       /* struct nx_action_mpls_label */
+    NXAST_SET_MPLS_TC,          /* struct nx_action_mpls_tc */
+    NXAST_SET_MPLS_TTL,         /* struct nx_action_mpls_ttl */
+    NXAST_DEC_MPLS_TTL,         /* struct nx_action_header */
+    NXAST_PUSH_MPLS,            /* struct nx_action_push_mpls */
+    NXAST_POP_MPLS,             /* struct nx_action_pop_mpls */
 };
 
 /* Header for Nicira-defined actions. */
@@ -1771,6 +1779,33 @@ OFP_ASSERT(sizeof(struct nx_action_output_reg) == 24);
 #define NXM_NX_COOKIE     NXM_HEADER  (0x0001, 30, 8)
 #define NXM_NX_COOKIE_W   NXM_HEADER_W(0x0001, 30, 8)
 
+/* The mpls_label in MPLS shim header.
+ *
+ * Prereqs: NXM_OF_ETH_TYPE must be either 0x8847 or 0x8848.
+ *
+ * Format: 32-bit integer, lower 20 bits
+ *
+ * Masking: Not maskable. */
+#define NXM_NX_MPLS_LABEL      NXM_HEADER  (0x0001, 31, 4)
+
+/* The mpls_tc in MPLS shim header.
+ *
+ * Prereqs: NXM_OF_ETH_TYPE must be either 0x8847 or 0x8848.
+ *
+ * Format: 8-bit integer, lower 3 bits
+ *
+ * Masking: Not maskable. */
+#define NXM_NX_MPLS_TC      NXM_HEADER  (0x0001, 32, 1)
+
+/* The mpls_stack in MPLS shim header.
+ *
+ * Prereqs: NXM_OF_ETH_TYPE must be either 0x8847 or 0x8848.
+ *
+ * Format: 8-bit integer, lower 1 bit
+ *
+ * Masking: Not maskable. */
+#define NXM_NX_MPLS_STACK   NXM_HEADER  (0x0001, 33, 1)
+
 /* ## --------------------- ## */
 /* ## Requests and replies. ## */
 /* ## --------------------- ## */
@@ -1971,5 +2006,60 @@ struct nx_action_controller {
     uint8_t zero;                   /* Must be zero. */
 };
 OFP_ASSERT(sizeof(struct nx_action_controller) == 16);
+
+/* Action structure for NXAST_SET_MPLS_LABEL. */
+struct nx_action_mpls_label {
+    ovs_be16 type;                  /* OFPAT_SET_MPLS_LABEL. */
+    ovs_be16 len;                   /* Length is 8. */
+    ovs_be32 vendor;                /* NX_VENDOR_ID. */
+    ovs_be16 subtype;               /* NXAST_SET_MPLS_LABEL. */
+    uint8_t pad[2];
+    ovs_be32 mpls_label;            /* MPLS label in low 20 bits. */
+};
+OFP_ASSERT(sizeof(struct nx_action_mpls_label) == 16);
+
+/* Action structure for NXAST_SET_MPLS_TC. */
+struct nx_action_mpls_tc {
+    ovs_be16 type;                  /* OFPAT_SET_MPLS_TC. */
+    ovs_be16 len;                   /* Length is 8. */
+    ovs_be32 vendor;                /* NX_VENDOR_ID. */
+    ovs_be16 subtype;               /* NXAST_SET_MPLS_TC. */
+    uint8_t  mpls_tc;               /* MPLS TC */
+    uint8_t  pad[5];
+};
+OFP_ASSERT(sizeof(struct nx_action_mpls_tc) == 16);
+
+/* Action structure for NXAST_SET_MPLS_TTL. */
+struct nx_action_mpls_ttl {
+    ovs_be16 type;                  /* OFPAT_SET_MPLS_TTL. */
+    ovs_be16 len;                   /* Length is 8. */
+    ovs_be32 vendor;                /* NX_VENDOR_ID. */
+    ovs_be16 subtype;               /* NXAST_SET_MPLS_TTL. */
+    uint8_t  mpls_ttl;              /* MPLS TTL */
+    uint8_t  pad[5];
+};
+OFP_ASSERT(sizeof(struct nx_action_mpls_ttl) == 16);
+
+/* Action structure for NXAST_PUSH_MPLS. */
+struct nx_action_push_mpls {
+    ovs_be16 type;                  /* OFPAT_PUSH_MPLS. */
+    ovs_be16 len;                   /* Length is 8. */
+    ovs_be32 vendor;                /* NX_VENDOR_ID. */
+    ovs_be16 subtype;               /* NXAST_PUSH_MPLS. */
+    ovs_be16 ethertype;             /* Ethertype */
+    uint8_t  pad[4];
+};
+OFP_ASSERT(sizeof(struct nx_action_push_mpls) == 16);
+
+/* Action structure for NXAST_POP_MPLS. */
+struct nx_action_pop_mpls {
+    ovs_be16 type;                  /* OFPAT_POP_MPLS. */
+    ovs_be16 len;                   /* Length is 8. */
+    ovs_be32 vendor;                /* NX_VENDOR_ID. */
+    ovs_be16 subtype;               /* NXAST_POP_MPLS. */
+    ovs_be16 ethertype;             /* Ethertype */
+    uint8_t  pad[4];
+};
+OFP_ASSERT(sizeof(struct nx_action_pop_mpls) == 16);
 
 #endif /* openflow/nicira-ext.h */

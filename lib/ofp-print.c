@@ -608,6 +608,10 @@ ofp10_match_to_string(const struct ofp10_match *om, int verbosity)
             }
         } else if (om->dl_type == htons(ETH_TYPE_ARP)) {
             ds_put_cstr(&f, "arp,");
+        } else if (om->dl_type == htons(ETH_TYPE_MPLS)) {
+            ds_put_cstr(&f, "mpls,");
+        } else if (om->dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
+            ds_put_cstr(&f, "mplsm,");
         } else {
             skip_type = false;
         }

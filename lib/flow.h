@@ -34,7 +34,7 @@ struct ofpbuf;
 /* This sequence number should be incremented whenever anything involving flows
  * or the wildcarding of flows changes.  This will cause build assertion
  * failures in places which likely need to be updated. */
-#define FLOW_WC_SEQ 11
+#define FLOW_WC_SEQ 12
 
 #define FLOW_N_REGS 8
 BUILD_ASSERT_DECL(FLOW_N_REGS <= NXM_NX_MAX_REGS);
@@ -61,6 +61,8 @@ struct flow {
     ovs_be32 nw_src;            /* IPv4 source address. */
     ovs_be32 nw_dst;            /* IPv4 destination address. */
     ovs_be32 ipv6_label;        /* IPv6 flow label. */
+    ovs_be32 mpls_lse;          /* MPLS label stack entry. */
+    ovs_be32 inner_mpls_lse;    /* Inner MPLS label stack entry. */
     uint16_t in_port;           /* OpenFlow port number of input port. */
     ovs_be16 vlan_tci;          /* If 802.1Q, TCI | VLAN_CFI; otherwise 0. */
     ovs_be16 dl_type;           /* Ethernet frame type. */
@@ -92,14 +94,14 @@ struct flow_metadata {
 
 /* Assert that there are FLOW_SIG_SIZE bytes of significant data in "struct
  * flow", followed by FLOW_PAD_SIZE bytes of padding. */
-#define FLOW_SIG_SIZE (110 + FLOW_N_REGS * 4)
+#define FLOW_SIG_SIZE (118 + FLOW_N_REGS * 4)
 #define FLOW_PAD_SIZE 2
 BUILD_ASSERT_DECL(offsetof(struct flow, nw_frag) == FLOW_SIG_SIZE - 1);
 BUILD_ASSERT_DECL(sizeof(((struct flow *)0)->nw_frag) == 1);
 BUILD_ASSERT_DECL(sizeof(struct flow) == FLOW_SIG_SIZE + FLOW_PAD_SIZE);
 
 /* Remember to update FLOW_WC_SEQ when changing 'struct flow'. */
-BUILD_ASSERT_DECL(FLOW_SIG_SIZE == 142 && FLOW_WC_SEQ == 11);
+BUILD_ASSERT_DECL(FLOW_SIG_SIZE == 150 && FLOW_WC_SEQ == 12);
 
 void flow_extract(struct ofpbuf *, uint32_t priority, ovs_be64 tun_id,
                   uint16_t in_port, struct flow *);
@@ -115,6 +117,10 @@ static inline size_t flow_hash(const struct flow *, uint32_t basis);
 
 void flow_set_vlan_vid(struct flow *, ovs_be16 vid);
 void flow_set_vlan_pcp(struct flow *, uint8_t pcp);
+
+void flow_set_mpls_label(struct flow *flow, ovs_be32 label);
+void flow_set_mpls_tc(struct flow *flow, uint8_t tc);
+void flow_set_mpls_stack(struct flow *flow, uint8_t stack);
 
 void flow_compose(struct ofpbuf *, const struct flow *);
 
@@ -155,10 +161,13 @@ typedef unsigned int OVS_BITWISE flow_wildcards_t;
 #define FWW_ARP_THA     ((OVS_FORCE flow_wildcards_t) (1 << 6))
 #define FWW_IPV6_LABEL  ((OVS_FORCE flow_wildcards_t) (1 << 7))
 #define FWW_NW_TTL      ((OVS_FORCE flow_wildcards_t) (1 << 8))
-#define FWW_ALL         ((OVS_FORCE flow_wildcards_t) (((1 << 9)) - 1))
+#define FWW_MPLS_LABEL  ((OVS_FORCE flow_wildcards_t) (1 << 9))
+#define FWW_MPLS_TC     ((OVS_FORCE flow_wildcards_t) (1 << 10))
+#define FWW_MPLS_STACK  ((OVS_FORCE flow_wildcards_t) (1 << 11))
+#define FWW_ALL         ((OVS_FORCE flow_wildcards_t) (((1 << 12)) - 1))
 
 /* Remember to update FLOW_WC_SEQ when adding or removing FWW_*. */
-BUILD_ASSERT_DECL(FWW_ALL == ((1 << 9) - 1) && FLOW_WC_SEQ == 11);
+BUILD_ASSERT_DECL(FWW_ALL == ((1 << 12) - 1) && FLOW_WC_SEQ == 12);
 
 /* Information on wildcards for a flow, as a supplement to "struct flow".
  *
@@ -184,7 +193,7 @@ struct flow_wildcards {
 };
 
 /* Remember to update FLOW_WC_SEQ when updating struct flow_wildcards. */
-BUILD_ASSERT_DECL(sizeof(struct flow_wildcards) == 120 && FLOW_WC_SEQ == 11);
+BUILD_ASSERT_DECL(sizeof(struct flow_wildcards) == 120 && FLOW_WC_SEQ == 12);
 
 void flow_wildcards_init_catchall(struct flow_wildcards *);
 void flow_wildcards_init_exact(struct flow_wildcards *);

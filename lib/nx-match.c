@@ -499,7 +499,7 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
     int match_len;
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 11);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
 
     /* Metadata. */
     if (!(wc & FWW_IN_PORT)) {
@@ -538,6 +538,27 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
 
     } else {
         nxm_put_16m(b, NXM_OF_VLAN_TCI, flow->vlan_tci, cr->wc.vlan_tci_mask);
+    }
+
+
+    /* MPLS. */
+    if (!(wc & FWW_DL_TYPE) &&
+       (flow->dl_type == htons(ETH_TYPE_MPLS) ||
+        flow->dl_type == htons(ETH_TYPE_MPLS_MCAST))) {
+        if (!(wc & FWW_MPLS_TC)) {
+            nxm_put_8(b, oxm ? OXM_OF_MPLS_TC : NXM_NX_MPLS_TC,
+                      mpls_lse_to_tc(flow->mpls_lse));
+        }
+
+        if (!(wc & FWW_MPLS_STACK)) {
+            nxm_put_8(b, oxm ? OXM_OF_MPLS_STACK : NXM_NX_MPLS_STACK,
+                      mpls_lse_to_stack(flow->mpls_lse));
+        }
+
+        if (!(wc & FWW_MPLS_LABEL)) {
+            nxm_put_32(b, oxm ? OXM_OF_MPLS_LABEL : NXM_NX_MPLS_LABEL,
+                 htonl(mpls_lse_to_label(flow->mpls_lse)));
+        }
     }
 
     /* L3. */

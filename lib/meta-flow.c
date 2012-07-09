@@ -168,6 +168,38 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         OXM_OF_VLAN_PCP, "OXM_OF_VLAN_PCP",
     },
 
+    /* ## ---- ## */
+    /* ## L2.5 ## */
+    /* ## ---- ## */
+    {
+        MFF_MPLS_LABEL, "mpls_label", NULL,
+        4, 20,
+        MFM_NONE, FWW_MPLS_LABEL,
+        MFS_DECIMAL,
+        MFP_MPLS,
+        true,
+        NXM_NX_MPLS_LABEL, "NXM_NX_MPLS_LABEL",
+        0, NULL,
+    }, {
+        MFF_MPLS_TC, "mpls_tc", NULL,
+        1, 3,
+        MFM_NONE, FWW_MPLS_TC,
+        MFS_DECIMAL,
+        MFP_MPLS,
+        true,
+        NXM_NX_MPLS_TC, "NXM_NX_MPLS_TC",
+        0, NULL,
+    }, {
+        MFF_MPLS_STACK, "mpls_stack", NULL,
+        1, 1,
+        MFM_NONE, FWW_MPLS_STACK,
+        MFS_DECIMAL,
+        MFP_MPLS,
+        true,
+        NXM_NX_MPLS_STACK, "NXM_NX_MPLS_STACK",
+        0, NULL,
+    },
+
     /* ## -- ## */
     /* ## L3 ## */
     /* ## -- ## */
@@ -585,6 +617,9 @@ mf_is_all_wild(const struct mf_field *mf, const struct flow_wildcards *wc)
     case MFF_ARP_THA:
     case MFF_ND_SLL:
     case MFF_ND_TLL:
+    case MFF_MPLS_LABEL:
+    case MFF_MPLS_TC:
+    case MFF_MPLS_STACK:
         assert(mf->fww_bit != 0);
         return (wc->wildcards & mf->fww_bit) != 0;
 
@@ -667,6 +702,9 @@ mf_get_mask(const struct mf_field *mf, const struct flow_wildcards *wc,
     case MFF_ARP_THA:
     case MFF_ND_SLL:
     case MFF_ND_TLL:
+    case MFF_MPLS_LABEL:
+    case MFF_MPLS_TC:
+    case MFF_MPLS_STACK:
         assert(mf->fww_bit != 0);
         memset(mask, wc->wildcards & mf->fww_bit ? 0x00 : 0xff, mf->n_bytes);
         break;
@@ -804,6 +842,9 @@ mf_are_prereqs_ok(const struct mf_field *mf, const struct flow *flow)
         return flow->dl_type == htons(ETH_TYPE_IPV6);
     case MFP_VLAN_VID:
         return flow->vlan_tci & htons(VLAN_CFI);
+    case MFP_MPLS:
+        return (flow->dl_type == htons(ETH_TYPE_MPLS) ||
+                flow->dl_type == htons(ETH_TYPE_MPLS_MCAST));
     case MFP_IP_ANY:
         return is_ip_any(flow);
 
@@ -897,6 +938,15 @@ mf_is_value_valid(const struct mf_field *mf, const union mf_value *value)
     case MFF_IPV6_LABEL:
         return !(value->be32 & ~htonl(IPV6_LABEL_MASK));
 
+    case MFF_MPLS_LABEL:
+        return !(value->be32 & ~htonl(MPLS_LABEL_MASK >> MPLS_LABEL_SHIFT));
+
+    case MFF_MPLS_TC:
+        return !(value->u8 & ~7);
+
+    case MFF_MPLS_STACK:
+        return !(value->u8 & ~1);
+
     case MFF_N_IDS:
     default:
         NOT_REACHED();
@@ -944,6 +994,18 @@ mf_get_value(const struct mf_field *mf, const struct flow *flow,
 
     case MFF_VLAN_PCP:
         value->u8 = vlan_tci_to_pcp(flow->vlan_tci);
+        break;
+
+    case MFF_MPLS_LABEL:
+        value->be32 = htonl(mpls_lse_to_label(flow->mpls_lse));
+        break;
+
+    case MFF_MPLS_TC:
+        value->u8 = mpls_lse_to_tc(flow->mpls_lse);
+        break;
+
+    case MFF_MPLS_STACK:
+        value->u8 = mpls_lse_to_stack(flow->mpls_lse);
         break;
 
     case MFF_IPV4_SRC:
@@ -1124,6 +1186,18 @@ mf_set_value(const struct mf_field *mf,
         cls_rule_set_nw_ttl(rule, value->u8);
         break;
 
+    case MFF_MPLS_LABEL:
+        cls_rule_set_mpls_label(rule, value->be32);
+        break;
+
+    case MFF_MPLS_TC:
+        cls_rule_set_mpls_tc(rule, value->u8);
+        break;
+
+    case MFF_MPLS_STACK:
+        cls_rule_set_mpls_stack(rule, value->u8);
+        break;
+
     case MFF_IP_FRAG:
         cls_rule_set_nw_frag(rule, value->u8);
         break;
@@ -1228,6 +1302,18 @@ mf_set_flow_value(const struct mf_field *mf,
 
     case MFF_VLAN_PCP:
         flow_set_vlan_pcp(flow, value->u8);
+        break;
+
+    case MFF_MPLS_LABEL:
+        flow_set_mpls_label(flow, value->be32);
+        break;
+
+    case MFF_MPLS_TC:
+        flow_set_mpls_tc(flow, value->u8);
+        break;
+
+    case MFF_MPLS_STACK:
+        flow_set_mpls_stack(flow, value->u8);
         break;
 
     case MFF_IPV4_SRC:
@@ -1430,6 +1516,21 @@ mf_set_wild(const struct mf_field *mf, struct cls_rule *rule)
         rule->flow.nw_ttl = 0;
         break;
 
+    case MFF_MPLS_LABEL:
+        rule->wc.wildcards |= FWW_MPLS_LABEL;
+        rule->flow.mpls_lse &= ~htonl(MPLS_LABEL_MASK);
+        break;
+
+    case MFF_MPLS_TC:
+        rule->wc.wildcards |= FWW_MPLS_TC;
+        rule->flow.mpls_lse &= ~htonl(MPLS_TC_MASK);
+        break;
+
+    case MFF_MPLS_STACK:
+        rule->wc.wildcards |= FWW_MPLS_STACK;
+        rule->flow.mpls_lse &= ~htonl(MPLS_STACK_MASK);
+        break;
+
     case MFF_IP_FRAG:
         rule->wc.nw_frag_mask |= FLOW_NW_FRAG_MASK;
         rule->flow.nw_frag &= ~FLOW_NW_FRAG_MASK;
@@ -1508,6 +1609,9 @@ mf_set(const struct mf_field *mf,
     case MFF_ETH_TYPE:
     case MFF_VLAN_PCP:
     case MFF_IPV6_LABEL:
+    case MFF_MPLS_LABEL:
+    case MFF_MPLS_TC:
+    case MFF_MPLS_STACK:
     case MFF_IP_PROTO:
     case MFF_IP_TTL:
     case MFF_IP_DSCP:
@@ -1718,6 +1822,18 @@ mf_random_value(const struct mf_field *mf, union mf_value *value)
 
     case MFF_VLAN_PCP:
         value->u8 &= 0x07;
+        break;
+
+    case MFF_MPLS_LABEL:
+        value->be32 &= htonl(MPLS_LABEL_MASK >> MPLS_LABEL_SHIFT);
+        break;
+
+    case MFF_MPLS_TC:
+        value->u8 &= 0x07;
+        break;
+
+    case MFF_MPLS_STACK:
+        value->u8 &= 0x01;
         break;
 
     case MFF_N_IDS:

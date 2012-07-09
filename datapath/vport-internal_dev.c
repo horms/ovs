@@ -100,10 +100,19 @@ static int internal_dev_mac_addr(struct net_device *dev, void *p)
 /* Called with rcu_read_lock_bh. */
 static int internal_dev_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
+	struct ethhdr *eth;
 	if (unlikely(compute_ip_summed(skb, true))) {
 		kfree_skb(skb);
 		return 0;
 	}
+
+	/* Set skb->protocol since some sources don't */
+	skb_reset_mac_header(skb);
+        eth = eth_hdr(skb);
+        if (ntohs(eth->h_proto) >= 1536)
+		skb->protocol = eth->h_proto;
+	else
+		skb->protocol = htons(ETH_P_802_2);
 
 	vlan_copy_skb_tci(skb);
 	OVS_CB(skb)->flow = NULL;

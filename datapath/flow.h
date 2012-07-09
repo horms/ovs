@@ -53,6 +53,10 @@ struct sw_flow_key {
 		__be16 type;		/* Ethernet frame type. */
 	} eth;
 	struct {
+		__be32 mpls_lse;	/* 0 if no MPLS, otherwise MPLS label Stack entry. */
+		__be32 inner_mpls_lse;	/* 0 if no inner MPLS, otherwise MPLS label Stack entry. */
+	} mpls;
+	struct {
 		u8     proto;		/* IP protocol or lower 8 bits of ARP opcode. */
 		u8     tos;		/* IP ToS. */
 		u8     ttl;		/* IP TTL/hop limit. */
@@ -124,6 +128,28 @@ struct arp_eth_header {
 	unsigned char       ar_sip[4];		/* sender IP address        */
 	unsigned char       ar_tha[ETH_ALEN];	/* target hardware address  */
 	unsigned char       ar_tip[4];		/* target IP address        */
+} __packed;
+
+/* Minimum value for an Ethernet type.  Values below this are IEEE 802.2 frame
+ * lengths. */
+#define ETH_TYPE_MIN           0x600
+
+/* MPLS related definitions */
+#define MPLS_HLEN           4
+#define MPLS_TTL_MASK       0x000000ff
+#define MPLS_TTL_SHIFT      0
+
+#define MPLS_STACK_MASK     0x00000100
+#define MPLS_STACK_SHIFT    8
+
+#define MPLS_TC_MASK        0x00000e00
+#define MPLS_TC_SHIFT       9
+
+#define MPLS_LABEL_MASK     0xfffff000
+#define MPLS_LABEL_SHIFT    12
+
+struct mpls_hdr {
+	__be32 mpls_lse;
 } __packed;
 
 int ovs_flow_init(void);

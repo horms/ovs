@@ -288,6 +288,11 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
     struct ofpact_tunnel *tunnel;
     struct ofpact_resubmit *resubmit;
     struct ofpact_inst_actions *inst_actions;
+    struct nx_action_mpls_label *naml;
+    struct nx_action_mpls_tc *namtc;
+    struct nx_action_mpls_ttl *namttl;
+    struct nx_action_push_mpls *nampush;
+    struct nx_action_pop_mpls *nampop;
     uint16_t vid;
     ovs_be32 ip;
     uint8_t pcp;
@@ -429,6 +434,43 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         learn_parse(arg, flow, ofpacts);
         break;
 
+    case OFPUTIL_NXAST_COPY_TTL_OUT:
+        ofputil_put_NXAST_COPY_TTL_OUT(b);
+        break;
+
+    case OFPUTIL_NXAST_COPY_TTL_IN:
+        ofputil_put_NXAST_COPY_TTL_IN(b);
+        break;
+
+    case OFPUTIL_NXAST_SET_MPLS_LABEL:
+        naml = ofputil_put_NXAST_SET_MPLS_LABEL(b);
+        naml->mpls_label = htonl(str_to_u32(arg));
+        break;
+
+    case OFPUTIL_NXAST_SET_MPLS_TC:
+        namtc = ofputil_put_NXAST_SET_MPLS_TC(b);
+        namtc->mpls_tc = str_to_u32(arg);
+        break;
+
+    case OFPUTIL_NXAST_SET_MPLS_TTL:
+        namttl = ofputil_put_NXAST_SET_MPLS_TTL(b);
+        namttl->mpls_ttl = str_to_u32(arg);
+        break;
+
+    case OFPUTIL_NXAST_DEC_MPLS_TTL:
+        ofputil_put_NXAST_DEC_MPLS_TTL(b);
+        break;
+
+    case OFPUTIL_NXAST_PUSH_MPLS:
+        nampush = ofputil_put_NXAST_PUSH_MPLS(b);
+        nampush->ethertype = htons(str_to_u16(arg, "push_mpls"));
+        break;
+
+    case OFPUTIL_NXAST_POP_MPLS:
+        nampop = ofputil_put_NXAST_POP_MPLS(b);
+        nampop->ethertype = htons(str_to_u16(arg, "pop_mpls"));
+        break;
+
     case OFPUTIL_NXAST_EXIT:
         ofpact_put_EXIT(ofpacts);
         break;
@@ -538,6 +580,8 @@ parse_protocol(const char *name, const struct protocol **p_out)
         { "icmp6", ETH_TYPE_IPV6, IPPROTO_ICMPV6 },
         { "tcp6", ETH_TYPE_IPV6, IPPROTO_TCP },
         { "udp6", ETH_TYPE_IPV6, IPPROTO_UDP },
+        { "mpls", ETH_TYPE_MPLS, 0 },
+        { "mplsm", ETH_TYPE_MPLS_MCAST, 0 },
     };
     const struct protocol *p;
 
