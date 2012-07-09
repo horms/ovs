@@ -298,6 +298,8 @@ static int internal_dev_recv(struct vport *vport, struct sk_buff *skb)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
 	if (unlikely(vlan_deaccel_tag(skb)))
 		return 0;
+	if (unlikely(vlan_deaccel_qinq_tag(skb)))
+		return 0;
 #endif
 
 	len = skb->len;

@@ -55,4 +55,46 @@ struct sk_buff *__vlan_hwaccel_put_tag(struct sk_buff *skb, u16 vlan_tci)
 	OVS_CB(skb)->vlan_tci = vlan_tci | VLAN_TAG_PRESENT;
 	return skb;
 }
+
 #endif /* NEED_VLAN_FIELD */
+
+__be16 vlan_get_tpid(struct sk_buff *skb)
+{
+	return OVS_CB(skb)->vlan_tpid;
+}
+
+void vlan_set_tpid(struct sk_buff *skb, __be16 vlan_tpid)
+{
+	OVS_CB(skb)->vlan_tpid = vlan_tpid;
+}
+
+void vlan_copy_skb_qinq_tci(struct sk_buff *skb)
+{
+	OVS_CB(skb)->vlan_qinq_tci = 0;
+}
+
+u16 vlan_get_qinq_tci(struct sk_buff *skb)
+{
+	return OVS_CB(skb)->vlan_qinq_tci;
+}
+
+void vlan_set_qinq_tci(struct sk_buff *skb, u16 vlan_qinq_tci)
+{
+	OVS_CB(skb)->vlan_qinq_tci = vlan_qinq_tci;
+}
+
+bool vlan_tx_qinq_tag_present(struct sk_buff *skb)
+{
+	return OVS_CB(skb)->vlan_qinq_tci & VLAN_TAG_PRESENT;
+}
+
+u16 vlan_tx_qinq_tag_get(struct sk_buff *skb)
+{
+	return OVS_CB(skb)->vlan_qinq_tci & ~VLAN_TAG_PRESENT;
+}
+
+struct sk_buff *__vlan_hwaccel_put_qinq_tag(struct sk_buff *skb, u16 vlan_qinq_tci)
+{
+	OVS_CB(skb)->vlan_qinq_tci = vlan_qinq_tci | VLAN_TAG_PRESENT;
+	return skb;
+}

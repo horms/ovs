@@ -13,6 +13,7 @@ static inline unsigned int nf_bridge_encap_header_len(const struct sk_buff *skb)
 {
 	switch (skb->protocol) {
 	case __constant_htons(ETH_P_8021Q):
+	case __constant_htons(ETH_P_8021AD):
 		return VLAN_HLEN;
 	default:
 		return 0;

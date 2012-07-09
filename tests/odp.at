@@ -52,6 +52,14 @@ s/$/)/' odp-base.txt
  sed 's/\(eth([[^)]]*)\),*/\1,eth_type(0x8848),mpls(label=100,tc=7,ttl=64,bos=1)' odp-base.txt
 
  echo
+ echo '# Valid forms with VLAN QinQ (8021Q) header.'
+ sed 's/\(eth([[^)]]*)\),*/\1,eth_type(0x8100),vlan(vid=99,pcp=7),vlan_qinq(vid=99,pcp=7),encap(/s/$/)/' odp-base.txt
+
+ echo
+ echo '# Valid forms with VLAN QinQ (8021AD) header.'
+ sed 's/\(eth([[^)]]*)\),*/\1,eth_type(0x88a8),vlan(vid=99,pcp=7),vlan_qinq(vid=99,pcp=7),encap(/s/$/)/' odp-base.txt
+
+ echo
  echo '# Valid forms with QoS priority.'
  sed 's/^/priority(1234),/' odp-base.txt
 
@@ -62,10 +70,30 @@ s/\(eth([[^)]]*)\),*/\1,eth_type(0x8100),vlan(vid=99,pcp=7),encap(/
 s/$/)/' odp-base.txt
 
  echo
+ echo '# Valid forms with tun_id and VLAN QinQ (8021Q) headers.'
+ sed 's/^/tun_id(0xfedcba9876543210),/
+s/\(eth([[^)]]*)\),*/\1,eth_type(0x8100),vlan(vid=99,pcp=7),vlan_qinq(vid=99,pcp=7),encap(/s/$/)/' odp-base.txt
+
+ echo
+ echo '# Valid forms with tun_id and VLAN QinQ (8021AD) headers.'
+ sed 's/^/tun_id(0xfedcba9876543210),/
+s/\(eth([[^)]]*)\),*/\1,eth_type(0x88a8),vlan(vid=99,pcp=7),vlan_qinq(vid=99,pcp=7),encap(/s/$/)/' odp-base.txt
+
+ echo
  echo '# Valid forms with QOS priority, tun_id, and VLAN headers.'
  sed 's/^/priority(1234),tun_id(0xfedcba9876543210),/
 s/\(eth([[^)]]*)\),*/\1,eth_type(0x8100),vlan(vid=99,pcp=7),encap(/
 s/$/)/' odp-base.txt
+
+ echo
+ echo '# Valid forms with QOS priority, tun_id, and VLAN QinQ (8021Q) headers.'
+ sed 's/^/priority(1234),tun_id(0xfedcba9876543210),/
+s/\(eth([[^)]]*)\),*/\1,eth_type(0x8100),vlan(vid=99,pcp=7),vlan_qinq(vid=99,pcp=7),encap(/s/$/)/' odp-base.txt
+
+ echo
+ echo '# Valid forms with QOS priority, tun_id, and VLAN QinQ (8021AD) headers.'
+ sed 's/^/priority(1234),tun_id(0xfedcba9876543210),/
+s/\(eth([[^)]]*)\),*/\1,eth_type(0x88a8),vlan(vid=99,pcp=7),vlan_qinq(vid=99,pcp=7),encap(/s/$/)/' odp-base.txt
 
  echo
  echo '# Valid forms with IP first fragment.'
@@ -98,10 +126,12 @@ set(udp(src=81,dst=6632))
 set(icmp(type=1,code=2))
 set(ipv6(src=::1,dst=::2,label=0,proto=10,tclass=0x70,hlimit=128,frag=no))
 set(icmpv6(type=1,code=2))
-push_vlan(vid=12,pcp=0)
-push_vlan(vid=13,pcp=5,cfi=0)
+push_vlan(tpid=0x8100,vid=12,pcp=0)
+push_vlan(tpid=0x8100,vid=13,pcp=5,cfi=0)
 push_vlan(tpid=0x9100,vid=13,pcp=5)
 push_vlan(tpid=0x9100,vid=13,pcp=5,cfi=0)
+push_vlan(tpid=0x88a8,vid=13,pcp=5)
+push_vlan(tpid=0x88a8,vid=13,pcp=5,cfi=0)
 push_mpls(eth_type=0x8847)
 push_mpls(eth_type=0x8848)
 mpls_lse(label=100,tc=3,ttl=64,bos=0)
@@ -110,7 +140,7 @@ dec_mpls_ttl(ttl=64)
 copy_ttl_in(ttl=64)
 copy_ttl_out(ttl=64)
 pop_vlan
-sample(sample=9.7%,actions(1,2,3,push_vlan(vid=1,pcp=2)))
+sample(sample=9.7%,actions(1,2,3,push_vlan(tpid=0x8100,vid=1,pcp=2)))
 ])
 AT_CHECK_UNQUOTED([test-odp parse-actions < actions.txt], [0],
   [`cat actions.txt`

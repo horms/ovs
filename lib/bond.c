@@ -533,7 +533,7 @@ bond_compose_learning_packet(struct bond *bond,
     packet = ofpbuf_new(0);
     compose_rarp(packet, eth_src);
     if (vlan) {
-        eth_push_vlan(packet, htons(vlan));
+        eth_push_vlan(packet, htons(vlan), htons(ETH_TYPE_VLAN));
     }
 
     *port_aux = slave->aux;

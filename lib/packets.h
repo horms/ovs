@@ -137,7 +137,7 @@ bool eth_addr_from_string(const char *, uint8_t ea[ETH_ADDR_LEN]);
 
 void compose_rarp(struct ofpbuf *, const uint8_t eth_src[ETH_ADDR_LEN]);
 
-void eth_push_vlan(struct ofpbuf *, ovs_be16 tci);
+void eth_push_vlan(struct ofpbuf *, ovs_be16 tci, ovs_be16 tpid);
 void eth_pop_vlan(struct ofpbuf *);
 
 const char *eth_from_hex(const char *hex, struct ofpbuf **packetp);
@@ -186,12 +186,14 @@ void pop_mpls(struct ofpbuf *, ovs_be16 ethtype);
 
 #define ETH_TYPE_IP            0x0800
 #define ETH_TYPE_ARP           0x0806
-#define ETH_TYPE_VLAN          0x8100
 #define ETH_TYPE_IPV6          0x86dd
 #define ETH_TYPE_LACP          0x8809
 #define ETH_TYPE_RARP          0x8035
 #define ETH_TYPE_MPLS          0x8847
 #define ETH_TYPE_MPLS_MCAST    0x8848
+#define ETH_TYPE_VLAN_8021Q    0x8100
+#define ETH_TYPE_VLAN_8021AD   0x88a8
+#define ETH_TYPE_VLAN          ETH_TYPE_VLAN_8021Q
 
 /* Minimum value for an Ethernet type.  Values below this are IEEE 802.2 frame
  * lengths. */
@@ -292,7 +294,8 @@ BUILD_ASSERT_DECL(VLAN_HEADER_LEN == sizeof(struct vlan_header));
 struct vlan_eth_header {
     uint8_t veth_dst[ETH_ADDR_LEN];
     uint8_t veth_src[ETH_ADDR_LEN];
-    ovs_be16 veth_type;         /* Always htons(ETH_TYPE_VLAN). */
+    ovs_be16 veth_type;         /* Always htons(ETH_TYPE_VLAN) or
+                                          hotns(ETH_TYPE_VLAN_8021ad). */
     ovs_be16 veth_tci;          /* Lowest 12 bits are VLAN ID. */
     ovs_be16 veth_next_type;
 } __attribute__((packed));

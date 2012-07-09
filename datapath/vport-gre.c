@@ -253,7 +253,8 @@ static void gre_err(struct sk_buff *skb, u32 info)
 	tot_hdr_len = tunnel_hdr_len + ETH_HLEN;
 
 	skb->protocol = eth_hdr(skb)->h_proto;
-	if (skb->protocol == htons(ETH_P_8021Q)) {
+	if (skb->protocol == htons(ETH_P_8021Q) ||
+		skb->protocol == htons(ETH_P_8021AD)) {
 		tot_hdr_len += VLAN_HLEN;
 		skb->protocol = vlan_eth_hdr(skb)->h_vlan_encapsulated_proto;
 	}

@@ -887,11 +887,13 @@ do_normalize_actions(int argc, char *argv[])
         switch(nl_attr_type(a)) {
         case OVS_ACTION_ATTR_POP_VLAN:
             flow.vlan_tci = htons(0);
+            flow.vlan_tpid = htons(0);
             continue;
 
         case OVS_ACTION_ATTR_PUSH_VLAN:
             push = nl_attr_get_unspec(a, sizeof *push);
             flow.vlan_tci = push->vlan_tci;
+            flow.vlan_tpid = push->vlan_tpid;
             continue;
 
         case OVS_ACTION_ATTR_PUSH_MPLS:

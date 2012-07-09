@@ -460,7 +460,7 @@ void ovs_flow_deferred_free_acts(struct sw_flow_actions *sf_acts)
 static int parse_vlan(struct sk_buff *skb, struct sw_flow_key *key)
 {
 	struct qtag_prefix {
-		__be16 eth_type; /* ETH_P_8021Q */
+		__be16 eth_type; /* ETH_P_8021Q or ETH_P_8021AD. */
 		__be16 tci;
 	};
 	struct qtag_prefix *qp;
@@ -474,6 +474,29 @@ static int parse_vlan(struct sk_buff *skb, struct sw_flow_key *key)
 
 	qp = (struct qtag_prefix *) skb->data;
 	key->eth.tci = qp->tci | htons(VLAN_TAG_PRESENT);
+	key->vlan.type = qp->eth_type;
+	__skb_pull(skb, sizeof(struct qtag_prefix));
+
+	return 0;
+}
+
+static int parse_vlan_qinq(struct sk_buff *skb, struct sw_flow_key *key)
+{
+	struct qtag_prefix {
+		__be16 eth_type; /* ETH_P_8021Q */
+		__be16 tci;
+	};
+	struct qtag_prefix *qp;
+
+	if (unlikely(skb->len < sizeof(struct qtag_prefix) + sizeof(__be16)))
+		return 0;
+
+	if (unlikely(!pskb_may_pull(skb, sizeof(struct qtag_prefix) +
+					 sizeof(__be16))))
+		return -ENOMEM;
+
+	qp = (struct qtag_prefix *) skb->data;
+	key->vlan.qinq_tci = qp->tci | htons(VLAN_TAG_PRESENT);
 	__skb_pull(skb, sizeof(struct qtag_prefix));
 
 	return 0;
@@ -700,11 +723,37 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 
 	__skb_pull(skb, 2 * ETH_ALEN);
 
-	if (vlan_tx_tag_present(skb))
+	if (vlan_tx_tag_present(skb)) {
 		key->eth.tci = htons(vlan_get_tci(skb));
-	else if (eth->h_proto == htons(ETH_P_8021Q))
+		key->vlan.type = skb->protocol;
+		if (vlan_tx_qinq_tag_present(skb)) {
+			key->vlan.qinq_tci = htons(vlan_get_qinq_tci(skb));
+			key_len = SW_FLOW_KEY_OFFSET(vlan.qinq_tci);
+		} else {
+			/* Find next tpid if present. */
+			__be16 proto;
+			proto = *(__be16 *) skb->data;
+			if (proto == htons(ETH_P_8021Q)) {
+				if (unlikely(parse_vlan_qinq(skb, key)))
+					return -ENOMEM;
+				key_len = SW_FLOW_KEY_OFFSET(vlan.qinq_tci);
+			}
+		}
+	} else if (eth->h_proto == htons(ETH_P_8021Q) ||
+			   eth->h_proto == htons(ETH_P_8021AD)) {
 		if (unlikely(parse_vlan(skb, key)))
 			return -ENOMEM;
+		else {
+			/* Find next tpid if present. */
+			__be16 proto;
+			proto = *(__be16 *) skb->data;
+			if (proto == htons(ETH_P_8021Q)) {
+				if (unlikely(parse_vlan_qinq(skb, key)))
+					return -ENOMEM;
+				key_len = SW_FLOW_KEY_OFFSET(vlan.qinq_tci);
+			}
+		}
+	}
 
 	key->eth.type = parse_ethertype(skb);
 	if (unlikely(key->eth.type == htons(0)))
@@ -904,6 +953,7 @@ const int ovs_key_lens[OVS_KEY_ATTR_MAX + 1] = {
 	[OVS_KEY_ATTR_IN_PORT] = sizeof(u32),
 	[OVS_KEY_ATTR_ETHERNET] = sizeof(struct ovs_key_ethernet),
 	[OVS_KEY_ATTR_VLAN] = sizeof(__be16),
+	[OVS_KEY_ATTR_VLAN_QINQ] = sizeof(__be16),
 	[OVS_KEY_ATTR_ETHERTYPE] = sizeof(__be16),
 	[OVS_KEY_ATTR_IPV4] = sizeof(struct ovs_key_ipv4),
 	[OVS_KEY_ATTR_IPV6] = sizeof(struct ovs_key_ipv6),
@@ -1108,20 +1158,39 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 	memcpy(swkey->eth.dst, eth_key->eth_dst, ETH_ALEN);
 
 	if (attrs & (1u << OVS_KEY_ATTR_ETHERTYPE) &&
-	    nla_get_be16(a[OVS_KEY_ATTR_ETHERTYPE]) == htons(ETH_P_8021Q)) {
+	    (nla_get_be16(a[OVS_KEY_ATTR_ETHERTYPE]) == htons(ETH_P_8021Q) ||
+		 nla_get_be16(a[OVS_KEY_ATTR_ETHERTYPE]) == htons(ETH_P_8021AD))) {
 		const struct nlattr *encap;
-		__be16 tci;
+		__be16 tci, qinq_tci;
+		__be16 tpid;
 
-		if (attrs != ((1 << OVS_KEY_ATTR_VLAN) |
-			      (1 << OVS_KEY_ATTR_ETHERTYPE) |
-			      (1 << OVS_KEY_ATTR_ENCAP)))
+		if (!(attrs & ((1 << OVS_KEY_ATTR_VLAN) |
+			           (1 << OVS_KEY_ATTR_ETHERTYPE) |
+					   (1 << OVS_KEY_ATTR_ENCAP))))
 			return -EINVAL;
 
 		encap = a[OVS_KEY_ATTR_ENCAP];
 		tci = nla_get_be16(a[OVS_KEY_ATTR_VLAN]);
+		tpid = nla_get_be16(a[OVS_KEY_ATTR_ETHERTYPE]);
 		if (tci & htons(VLAN_TAG_PRESENT)) {
 			swkey->eth.tci = tci;
+			swkey->vlan.type = tpid;
 
+			/* Handle vlan qinq if present. */
+			if (attrs & (1 << OVS_KEY_ATTR_VLAN_QINQ)) {
+				qinq_tci = nla_get_be16(a[OVS_KEY_ATTR_VLAN_QINQ]);
+				if (qinq_tci & htons(VLAN_TAG_PRESENT)) {
+					swkey->vlan.qinq_tci = qinq_tci;
+				} else if (!qinq_tci) {
+					/* Corner case for truncated 802.1AD header. */
+					*key_lenp = key_len;
+					return 0;
+				} else {
+					return -EINVAL;
+				}
+				attrs &= ~(1 << OVS_KEY_ATTR_VLAN_QINQ);
+				key_len = SW_FLOW_KEY_OFFSET(vlan.qinq_tci);
+			}
 			err = parse_flow_nlattrs(encap, a, &attrs);
 			if (err)
 				return err;
@@ -1130,7 +1199,7 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 			if (nla_len(encap))
 				return -EINVAL;
 
-			swkey->eth.type = htons(ETH_P_8021Q);
+			swkey->eth.type = tpid;
 			*key_lenp = key_len;
 			return 0;
 		} else {
@@ -1319,10 +1388,21 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 	memcpy(eth_key->eth_src, swkey->eth.src, ETH_ALEN);
 	memcpy(eth_key->eth_dst, swkey->eth.dst, ETH_ALEN);
 
-	if (swkey->eth.tci || swkey->eth.type == htons(ETH_P_8021Q)) {
-		if (nla_put_be16(skb, OVS_KEY_ATTR_ETHERTYPE, htons(ETH_P_8021Q)) ||
-		    nla_put_be16(skb, OVS_KEY_ATTR_VLAN, swkey->eth.tci))
-			goto nla_put_failure;
+	if (swkey->eth.tci ||
+		swkey->eth.type == htons(ETH_P_8021Q) ||
+		swkey->vlan.qinq_tci) {
+		if (swkey->vlan.qinq_tci) {
+			if (nla_put_be16(skb, OVS_KEY_ATTR_ETHERTYPE, swkey->vlan.type) ||
+				nla_put_be16(skb, OVS_KEY_ATTR_VLAN, swkey->eth.tci) ||
+				nla_put_be16(skb, OVS_KEY_ATTR_VLAN_QINQ, swkey->vlan.qinq_tci)) {
+				goto nla_put_failure;
+			}
+		} else {
+			if (nla_put_be16(skb, OVS_KEY_ATTR_ETHERTYPE, htons(ETH_P_8021Q)) ||
+				nla_put_be16(skb, OVS_KEY_ATTR_VLAN, swkey->eth.tci)) {
+				goto nla_put_failure;
+			}
+		}
 		encap = nla_nest_start(skb, OVS_KEY_ATTR_ENCAP);
 		if (!swkey->eth.tci)
 			goto unencap;

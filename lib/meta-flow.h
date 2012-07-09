@@ -68,6 +68,11 @@ enum mf_field_id {
     MFF_VLAN_VID,               /* be16 */
     MFF_VLAN_PCP,               /* u8 */
 
+    /* QinQ */
+    MFF_VLAN_TPID,              /* be16 */
+    MFF_VLAN_QINQ_VID,          /* be16 */
+    MFF_VLAN_QINQ_PCP,          /* u8 */
+
     /* L2.5 */
     MFF_MPLS_LABEL,             /* be32 */
     MFF_MPLS_TC,                /* u8 */
@@ -159,6 +164,7 @@ enum mf_prereqs {
     /* L2 requirements. */
     MFP_ARP,
     MFP_VLAN_VID,
+    MFP_VLAN_TPID,
     MFP_MPLS,
     MFP_IPV4,
     MFP_IPV6,
@@ -213,6 +219,8 @@ struct mf_field {
      *
      *     - "dl_vlan" is 2 bytes but only 12 bits.
      *     - "dl_vlan_pcp" is 1 byte but only 3 bits.
+     *     - "dl_vlan_qinq_vid" is 2 bytes but only 12 bits.
+     *     - "dl_vlan_qinq_pcp" is 1 byte but only 3 bits.
      *     - "is_frag" is 1 byte but only 2 bits.
      *     - "ipv6_label" is 4 bytes but only 20 bits.
      *     - "mpls_label" is 4 bytes but only 20 bits.

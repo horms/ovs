@@ -82,8 +82,9 @@ static int pop_vlan(struct sk_buff *skb)
 	if (likely(vlan_tx_tag_present(skb))) {
 		vlan_set_tci(skb, 0);
 	} else {
-		if (unlikely(skb->protocol != htons(ETH_P_8021Q) ||
-			     skb->len < VLAN_ETH_HLEN))
+		if (unlikely((skb->protocol != htons(ETH_P_8021Q) &&
+					  skb->protocol != htons(ETH_P_8021AD)) ||
+					  skb->len < VLAN_ETH_HLEN))
 			return 0;
 
 		err = __pop_vlan_tci(skb, &tci);
@@ -91,8 +92,9 @@ static int pop_vlan(struct sk_buff *skb)
 			return err;
 	}
 	/* move next vlan tag to hw accel tag */
-	if (likely(skb->protocol != htons(ETH_P_8021Q) ||
-		   skb->len < VLAN_ETH_HLEN))
+	if (likely((skb->protocol != htons(ETH_P_8021Q) &&
+				skb->protocol != htons(ETH_P_8021AD)) ||
+				skb->len < VLAN_ETH_HLEN))
 		return 0;
 
 	err = __pop_vlan_tci(skb, &tci);
@@ -111,8 +113,13 @@ static int push_vlan(struct sk_buff *skb, const struct ovs_action_push_vlan *vla
 		/* push down current VLAN tag */
 		current_tag = vlan_tx_tag_get(skb);
 
-		if (!__vlan_put_tag(skb, current_tag))
-			return -ENOMEM;
+		if (skb->protocol == htons(ETH_P_8021AD)) {
+			if (!__vlan_put_qinq_tag(skb, current_tag))
+				return -ENOMEM;
+		} else {
+			if (!__vlan_put_tag(skb, current_tag))
+				return -ENOMEM;
+		}
 
 		if (get_ip_summed(skb) == OVS_CSUM_COMPLETE)
 			skb->csum = csum_add(skb->csum, csum_partial(skb->data
@@ -120,6 +127,7 @@ static int push_vlan(struct sk_buff *skb, const struct ovs_action_push_vlan *vla
 
 	}
 	__vlan_hwaccel_put_tag(skb, ntohs(vlan->vlan_tci) & ~VLAN_TAG_PRESENT);
+	vlan_set_tpid(skb, vlan->vlan_tpid);
 	return 0;
 }
 
@@ -149,7 +157,8 @@ static char *get_mpls_hdr(const struct sk_buff *skb)
 		dl_type = eth->h_proto;
 
 	/* Check for a VLAN tag. */
-	while (dl_type == htons(ETH_P_8021Q) &&
+	while ((dl_type == htons(ETH_P_8021Q) ||
+			dl_type == htons(ETH_P_8021AD)) &&
 			skb->len >= nh_ofs + sizeof(struct vlan_hdr)) {
 		struct vlan_hdr *vh = (struct vlan_hdr*)(skb->data + nh_ofs);
 		dl_type = vh->h_vlan_encapsulated_proto;
@@ -173,7 +182,8 @@ static char *get_next_mpls_hdr(const struct sk_buff *skb)
 		dl_type = eth->h_proto;
 
 	/* Check for a VLAN tag. */
-	while (dl_type == htons(ETH_P_8021Q) &&
+	while ((dl_type == htons(ETH_P_8021Q) ||
+			dl_type == htons(ETH_P_8021AD)) &&
 			skb->len >= nh_ofs + sizeof(struct vlan_hdr)) {
 		struct vlan_hdr *vh = (struct vlan_hdr*)(skb->data + nh_ofs);
 		dl_type = vh->h_vlan_encapsulated_proto;
@@ -195,7 +205,8 @@ static __be16 get_ethertype(struct sk_buff *skb)
 	struct ethhdr *eth = eth_hdr(skb);
 	__be16 eth_type = htons(0);
 	if (likely(ntohs(eth->h_proto) >= ETH_TYPE_MIN)) {
-		if (eth->h_proto == htons(ETH_P_8021Q)) {
+		if (eth->h_proto == htons(ETH_P_8021Q) ||
+			eth->h_proto == htons(ETH_P_8021AD)) {
 			eth_type = *(__be16 *)(get_mpls_hdr(skb) - 2);
 			return eth_type;
 		} else {
@@ -211,7 +222,8 @@ static void set_ethertype(struct sk_buff *skb, __be16 eth_type)
 {
 	struct ethhdr *eth = eth_hdr(skb);
 	if (likely(ntohs(eth->h_proto) >= ETH_TYPE_MIN)) {
-		if (eth->h_proto != htons(ETH_P_8021Q)) {
+		if (eth->h_proto != htons(ETH_P_8021Q) &&
+			eth->h_proto != htons(ETH_P_8021AD)) {
 			skb->protocol = eth->h_proto = eth_type;
         } else {
 			/* 2 bytes before L2.5(MPLS) or L3 header is the

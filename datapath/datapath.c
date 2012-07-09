@@ -466,6 +466,11 @@ static int queue_userspace_packet(struct net *net, int dp_ifindex,
 		if (err)
 			return err;
 
+		if (vlan_tx_qinq_tag_present(skb)) {
+			err = vlan_deaccel_qinq_tag(nskb);
+			if (err)
+				return err;
+		}
 		skb = nskb;
 	}
 
@@ -706,7 +711,8 @@ static int validate_actions(const struct nlattr *attr,
 
 		case OVS_ACTION_ATTR_PUSH_VLAN:
 			vlan = nla_data(a);
-			if (vlan->vlan_tpid != htons(ETH_P_8021Q))
+			if (vlan->vlan_tpid != htons(ETH_P_8021Q) &&
+				vlan->vlan_tpid != htons(ETH_P_8021AD))
 				return -EINVAL;
 			if (!(vlan->vlan_tci & htons(VLAN_TAG_PRESENT)))
 				return -EINVAL;

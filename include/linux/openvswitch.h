@@ -269,6 +269,7 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_IN_PORT,   /* u32 OVS dp port number */
 	OVS_KEY_ATTR_ETHERNET,  /* struct ovs_key_ethernet */
 	OVS_KEY_ATTR_VLAN,	/* be16 VLAN TCI */
+	OVS_KEY_ATTR_VLAN_QINQ,	/* be16 VLAN QINQ TCI */
 	OVS_KEY_ATTR_ETHERTYPE,	/* be16 Ethernet type */
 	OVS_KEY_ATTR_IPV4,      /* struct ovs_key_ipv4 */
 	OVS_KEY_ATTR_IPV6,      /* struct ovs_key_ipv6 */
@@ -444,13 +445,13 @@ enum ovs_userspace_attr {
  * @vlan_tci: Tag control identifier (TCI) to push.  The CFI bit must be set
  * (but it will not be set in the 802.1Q header that is pushed).
  *
- * The @vlan_tpid value is typically %ETH_P_8021Q.  The only acceptable TPID
- * values are those that the kernel module also parses as 802.1Q headers, to
- * prevent %OVS_ACTION_ATTR_PUSH_VLAN followed by %OVS_ACTION_ATTR_POP_VLAN
- * from having surprising results.
+ * The @vlan_tpid value is typically %ETH_P_8021Q or %ETH_P_8021AD.
+ * The only acceptable TPID values are those that the kernel module also
+ * parses as 802.1Q or 802.1AD headers, to prevent %OVS_ACTION_ATTR_PUSH_VLAN
+ * followed by %OVS_ACTION_ATTR_POP_VLAN from having surprising results.
  */
 struct ovs_action_push_vlan {
-	__be16 vlan_tpid;	/* 802.1Q TPID. */
+	__be16 vlan_tpid;	/* 802.1Q or 802.1AD TPID. */
 	__be16 vlan_tci;	/* 802.1Q TCI (VLAN ID and priority). */
 };
 

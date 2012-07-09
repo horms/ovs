@@ -5,6 +5,10 @@
 #include <linux/version.h>
 #include_next <linux/if_vlan.h>
 
+#ifndef                ETH_P_8021AD
+#define                ETH_P_8021AD            0x88a8
+#endif
+
 /*
  * The behavior of __vlan_put_tag() has changed over time:
  *
@@ -45,6 +49,39 @@ static inline struct sk_buff *__vlan_put_tag(struct sk_buff *skb, u16 vlan_tci)
 	return skb;
 }
 
+/*
+ * The behavior of __vlan_put_qinq_tag() is similar to __vlan_put_tag()
+ * it adds new vlan tpid 0x88a8 as an outer tag.
+ * Works for kernel version < 2.6.39.
+ * for kernel > 2.6.39, similar function needs to be added to upstream
+ * kernel.
+ *
+ */
+static inline struct sk_buff *
+__vlan_put_qinq_tag(struct sk_buff *skb, u16 vlan_tci)
+{
+	struct vlan_ethhdr *veth;
+
+	if (skb_cow_head(skb, VLAN_HLEN) < 0) {
+		kfree_skb(skb);
+		return NULL;
+	}
+	veth = (struct vlan_ethhdr *)skb_push(skb, VLAN_HLEN);
+
+	/* Move the mac addresses to the beginning of the new header. */
+	memmove(skb->data, skb->data + VLAN_HLEN, 2 * ETH_ALEN);
+	skb->mac_header -= VLAN_HLEN;
+
+	/* first, the ethernet type */
+	veth->h_vlan_proto = htons(ETH_P_8021AD);
+
+	/* now, the TCI */
+	veth->h_vlan_TCI = htons(vlan_tci);
+
+	skb->protocol = htons(ETH_P_8021AD);
+
+	return skb;
+}
 
 /* All of these were introduced in a single commit preceding 2.6.33, so
  * presumably all of them or none of them are present. */

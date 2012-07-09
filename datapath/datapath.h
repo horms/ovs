@@ -104,6 +104,10 @@ struct datapath {
  * packet was not received on a tunnel.
  * @vlan_tci: Provides a substitute for the skb->vlan_tci field on kernels
  * before 2.6.27.
+ * @vlan_qinq_tci: Provides vlan qinq inner tag value.
+ * @vlan_tpid: Provides outer vlan tpid, currently 0x88a8 and 0x8100 are
+ * supported.
+ * before 2.6.27.
  */
 struct ovs_skb_cb {
 	struct sw_flow		*flow;
@@ -114,6 +118,11 @@ struct ovs_skb_cb {
 #endif
 #ifdef NEED_VLAN_FIELD
 	u16			vlan_tci;
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)
+	__be16		vlan_tpid;
+	u16			vlan_qinq_tci;
 #endif
 };
 #define OVS_CB(skb) ((struct ovs_skb_cb *)(skb)->cb)

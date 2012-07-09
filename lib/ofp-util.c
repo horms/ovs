@@ -104,7 +104,7 @@ static const flow_wildcards_t WC_INVARIANTS = 0
 void
 ofputil_wildcard_from_ofpfw10(uint32_t ofpfw, struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     /* Initialize most of rule->wc. */
     flow_wildcards_init_catchall(wc);
@@ -113,7 +113,8 @@ ofputil_wildcard_from_ofpfw10(uint32_t ofpfw, struct flow_wildcards *wc)
     /* Wildcard fields that aren't defined by ofp10_match or tun_id. */
     wc->wildcards |= (FWW_ARP_SHA | FWW_ARP_THA | FWW_NW_ECN | FWW_NW_TTL
                       | FWW_IPV6_LABEL | FWW_MPLS_LABEL | FWW_MPLS_TC
-                      | FWW_MPLS_STACK);
+                      | FWW_MPLS_STACK | FWW_VLAN_TPID | FWW_VLAN_QINQ_VID
+                      | FWW_VLAN_QINQ_PCP);
 
     if (ofpfw & OFPFW10_NW_TOS) {
         /* OpenFlow 1.0 defines a TOS wildcard, but it's much later in
@@ -1508,7 +1509,7 @@ ofputil_usable_protocols(const struct cls_rule *rule)
 {
     const struct flow_wildcards *wc = &rule->wc;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     /* NXM and OF1.1+ supports bitwise matching on ethernet addresses. */
     if (!eth_mask_is_exact(wc->dl_src_mask)
@@ -1584,6 +1585,21 @@ ofputil_usable_protocols(const struct cls_rule *rule)
 
     /* Only NXM supports matching mpls stack */
     if (!(wc->wildcards & FWW_MPLS_STACK)) {
+        return OFPUTIL_P_NXM_ANY;
+    }
+
+    /* Only NXM supports matching vlan tpid */
+    if (!(wc->wildcards & FWW_VLAN_TPID)) {
+        return OFPUTIL_P_NXM_ANY;
+    }
+
+    /* Only NXM supports matching vlan qinq vid */
+    if (!(wc->wildcards & FWW_VLAN_QINQ_VID)) {
+        return OFPUTIL_P_NXM_ANY;
+    }
+
+    /* Only NXM supports matching vlan qinq pcp */
+    if (!(wc->wildcards & FWW_VLAN_QINQ_PCP)) {
         return OFPUTIL_P_NXM_ANY;
     }
 
@@ -4402,6 +4418,7 @@ ofputil_normalize_rule(struct cls_rule *rule)
         MAY_IPV6        = 1 << 6, /* ipv6_src, ipv6_dst, ipv6_label */
         MAY_ND_TARGET   = 1 << 7, /* nd_target */
         MAY_MPLS        = 1 << 8, /* mpls label and tc */
+        MAY_VLAN_QINQ   = 1 << 9, /* vlan qinq tci */
     } may_match;
 
     struct flow_wildcards wc;
@@ -4432,6 +4449,10 @@ ofputil_normalize_rule(struct cls_rule *rule)
     } else if (rule->flow.dl_type == htons(ETH_TYPE_MPLS) ||
                rule->flow.dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
         may_match = MAY_MPLS;
+    } else if ((rule->flow.vlan_tpid == htons(ETH_TYPE_VLAN) ||
+                rule->flow.vlan_tpid == htons(ETH_TYPE_VLAN_8021AD)) &&
+               rule->flow.vlan_qinq_tci != htons(0)) {
+        may_match = MAY_VLAN_QINQ;
     } else {
         may_match = 0;
     }

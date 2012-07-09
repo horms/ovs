@@ -84,17 +84,44 @@ u16 vlan_tx_tag_get(struct sk_buff *skb);
 struct sk_buff *__vlan_hwaccel_put_tag(struct sk_buff *skb, u16 vlan_tci);
 #endif /* NEED_VLAN_FIELD */
 
+__be16 vlan_get_tpid(struct sk_buff *skb);
+void vlan_set_tpid(struct sk_buff *skb, __be16 vlan_tpid);
+void vlan_copy_skb_qinq_tci(struct sk_buff *skb);
+u16 vlan_get_qinq_tci(struct sk_buff *skb);
+void vlan_set_qinq_tci(struct sk_buff *skb, u16 vlan_tci);
+bool vlan_tx_qinq_tag_present(struct sk_buff *skb);
+u16 vlan_tx_qinq_tag_get(struct sk_buff *skb);
+struct sk_buff *__vlan_hwaccel_put_qinq_tag(struct sk_buff *skb, u16 vlan_tci);
+
 static inline int vlan_deaccel_tag(struct sk_buff *skb)
 {
 	if (!vlan_tx_tag_present(skb))
 		return 0;
 
-	skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
-	if (unlikely(!skb))
-		return -ENOMEM;
+	if (skb->protocol == htons(ETH_P_8021AD)) {
+		skb = __vlan_put_qinq_tag(skb, vlan_tx_tag_get(skb));
+		if (unlikely(!skb))
+			return -ENOMEM;
+	} else {
+		skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
+		if (unlikely(!skb))
+			return -ENOMEM;
+	}
 
 	vlan_set_tci(skb, 0);
 	return 0;
 }
 
+static inline int vlan_deaccel_qinq_tag(struct sk_buff *skb)
+{
+	if (!vlan_tx_qinq_tag_present(skb))
+		return 0;
+
+	skb = __vlan_put_tag(skb, vlan_tx_qinq_tag_get(skb));
+	if (unlikely(!skb))
+		return -ENOMEM;
+
+	vlan_set_qinq_tci(skb, 0);
+	return 0;
+}
 #endif /* vlan.h */

@@ -288,6 +288,7 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
     struct ofpact_tunnel *tunnel;
     struct ofpact_resubmit *resubmit;
     struct ofpact_inst_actions *inst_actions;
+    struct nx_action_push_vlan *navpush;
     uint16_t vid;
     ovs_be32 ip;
     uint8_t pcp;
@@ -515,6 +516,11 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
 
     case OFPUTIL_OFPIT11_CLEAR_ACTIONS:
         ofpact_put_CLEAR_ACTIONS(ofpacts);
+        break;
+
+    case OFPUTIL_NXAST_PUSH_VLAN:
+        navpush = ofputil_put_NXAST_PUSH_VLAN(b);
+        navpush->tpid = htons(str_to_u32(arg));
         break;
     }
 }

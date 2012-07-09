@@ -116,7 +116,39 @@ parse_mpls(struct ofpbuf *b, struct flow *flow)
 }
 
 static void
+parse_remaining_vlans(struct ofpbuf *b)
+{
+    struct qtag_prefix {
+        ovs_be16 eth_type;      /* ETH_TYPE_VLAN */
+        ovs_be16 tci;
+    };
+    ovs_be16 ethtype = *((ovs_be16 *)b->data);
+
+    while ((ethtype == htons(ETH_TYPE_VLAN) ||
+            ethtype == htons(ETH_TYPE_VLAN_8021AD)) &&
+           (b->size >= sizeof(struct qtag_prefix) + sizeof(ovs_be16))) {
+        struct qtag_prefix *qp = ofpbuf_pull(b, sizeof *qp);
+        ethtype = qp->eth_type;
+    }
+}
+
+static void
 parse_vlan(struct ofpbuf *b, struct flow *flow)
+{
+    struct qtag_prefix {
+        ovs_be16 eth_type;      /* ETH_TYPE_VLAN or ETH_TYPE_VLAN_8021ad */
+        ovs_be16 tci;
+    };
+
+    if (b->size >= sizeof(struct qtag_prefix) + sizeof(ovs_be16)) {
+        struct qtag_prefix *qp = ofpbuf_pull(b, sizeof *qp);
+        flow->vlan_tci = qp->tci | htons(VLAN_CFI);
+        flow->vlan_tpid = qp->eth_type;
+    }
+}
+
+static void
+parse_vlan_qinq(struct ofpbuf *b, struct flow *flow)
 {
     struct qtag_prefix {
         ovs_be16 eth_type;      /* ETH_TYPE_VLAN */
@@ -125,7 +157,7 @@ parse_vlan(struct ofpbuf *b, struct flow *flow)
 
     if (b->size >= sizeof(struct qtag_prefix) + sizeof(ovs_be16)) {
         struct qtag_prefix *qp = ofpbuf_pull(b, sizeof *qp);
-        flow->vlan_tci = qp->tci | htons(VLAN_CFI);
+        flow->vlan_qinq_tci = qp->tci | htons(VLAN_CFI);
     }
 }
 
@@ -389,8 +421,17 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
 
     /* dl_type, vlan_tci. */
     ofpbuf_pull(&b, ETH_ADDR_LEN * 2);
-    if (eth->eth_type == htons(ETH_TYPE_VLAN)) {
+    if (eth->eth_type == htons(ETH_TYPE_VLAN) ||
+        eth->eth_type == htons(ETH_TYPE_VLAN_8021AD)) {
+        ovs_be16 next_ethtype;
         parse_vlan(&b, flow);
+        /* Parse next vlan tag and skip over any other vlan tags. */
+        next_ethtype = *((ovs_be16 *)b.data);
+        if (next_ethtype == htons(ETH_TYPE_VLAN) ||
+            next_ethtype == htons(ETH_TYPE_VLAN_8021AD)) {
+            parse_vlan_qinq(&b, flow);
+            parse_remaining_vlans(&b);
+        }
     }
 
     flow->dl_type = parse_ethertype(&b);
@@ -494,7 +535,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
     const flow_wildcards_t wc = wildcards->wildcards;
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         flow->regs[i] &= wildcards->reg_masks[i];
@@ -541,6 +582,16 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
     if (wc & FWW_MPLS_STACK) {
         flow->mpls_lse &= ~htonl(MPLS_STACK_MASK);
     }
+    if (wc & FWW_VLAN_TPID) {
+        flow->vlan_tpid = 0;
+    }
+    flow->vlan_qinq_tci &= ~htons(VLAN_CFI);
+    if (wc & FWW_VLAN_QINQ_VID) {
+        flow->vlan_qinq_tci &= ~htons(VLAN_VID_MASK);
+    }
+    if (wc & FWW_VLAN_QINQ_PCP) {
+        flow->vlan_qinq_tci &= ~htons(VLAN_PCP_MASK);
+    }
     flow->nw_frag &= wildcards->nw_frag_mask;
     if (wc & FWW_ARP_SHA) {
         memset(flow->arp_sha, 0, sizeof flow->arp_sha);
@@ -561,7 +612,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     fmd->tun_id = flow->tun_id;
     fmd->tun_id_mask = htonll(UINT64_MAX);
@@ -595,6 +646,14 @@ flow_format(struct ds *ds, const struct flow *flow)
         ds_put_format(ds, "vlan:%"PRIu16",pcp:%d",
                       vlan_tci_to_vid(flow->vlan_tci),
                       vlan_tci_to_pcp(flow->vlan_tci));
+    } else {
+        ds_put_char(ds, '0');
+    }
+    ds_put_format(ds, "),qinq_tci(");
+    if (flow->vlan_qinq_tci) {
+        ds_put_format(ds, "vlan:%"PRIu16",pcp:%d",
+                      vlan_tci_to_vid(flow->vlan_qinq_tci),
+                      vlan_tci_to_pcp(flow->vlan_qinq_tci));
     } else {
         ds_put_char(ds, '0');
     }
@@ -662,7 +721,7 @@ flow_print(FILE *stream, const struct flow *flow)
 void
 flow_wildcards_init_catchall(struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     wc->wildcards = FWW_ALL;
     wc->tun_id_mask = htonll(0);
@@ -686,7 +745,7 @@ flow_wildcards_init_catchall(struct flow_wildcards *wc)
 void
 flow_wildcards_init_exact(struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     wc->wildcards = 0;
     wc->tun_id_mask = htonll(UINT64_MAX);
@@ -712,7 +771,7 @@ flow_wildcards_is_exact(const struct flow_wildcards *wc)
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     if (wc->wildcards
         || wc->tun_id_mask != htonll(UINT64_MAX)
@@ -746,7 +805,7 @@ flow_wildcards_is_catchall(const struct flow_wildcards *wc)
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     if (wc->wildcards != FWW_ALL
         || wc->tun_id_mask != htonll(0)
@@ -783,7 +842,7 @@ flow_wildcards_combine(struct flow_wildcards *dst,
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     dst->wildcards = src1->wildcards | src2->wildcards;
     dst->tun_id_mask = src1->tun_id_mask & src2->tun_id_mask;
@@ -824,7 +883,7 @@ flow_wildcards_equal(const struct flow_wildcards *a,
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     if (a->wildcards != b->wildcards
         || a->tun_id_mask != b->tun_id_mask
@@ -860,7 +919,7 @@ flow_wildcards_has_extra(const struct flow_wildcards *a,
     uint8_t eth_masked[ETH_ADDR_LEN];
     struct in6_addr ipv6_masked;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         if ((a->reg_masks[i] & b->reg_masks[i]) != b->reg_masks[i]) {
@@ -921,6 +980,7 @@ flow_hash_symmetric_l4(const struct flow *flow, uint32_t basis)
         };
         ovs_be16 eth_type;
         ovs_be16 vlan_tci;
+        ovs_be16 vlan_qinq_tci;
         ovs_be16 tp_port;
         uint8_t eth_addr[ETH_ADDR_LEN];
         uint8_t ip_proto;
@@ -933,6 +993,7 @@ flow_hash_symmetric_l4(const struct flow *flow, uint32_t basis)
         fields.eth_addr[i] = flow->dl_src[i] ^ flow->dl_dst[i];
     }
     fields.vlan_tci = flow->vlan_tci & htons(VLAN_VID_MASK);
+    fields.vlan_qinq_tci = flow->vlan_qinq_tci & htons(VLAN_VID_MASK);
     fields.eth_type = flow->dl_type;
 
     /* UDP source and destination port are not taken into account because they
@@ -1033,6 +1094,38 @@ flow_set_vlan_pcp(struct flow *flow, uint8_t pcp)
     flow->vlan_tci |= htons((pcp << VLAN_PCP_SHIFT) | VLAN_CFI);
 }
 
+/* Sets the VLAN tpid (outer tag) tpid that 'flow' matches. */
+void
+flow_set_vlan_tpid(struct flow *flow, ovs_be16 vlan_tpid)
+{
+    flow->vlan_tpid = vlan_tpid;
+}
+
+/* Sets the VLAN QinQ VID that 'flow' matches to 'vid'
+ * If it is in the range 0...4095, 'flow->vlan_tci' is set to match
+ * that VLAN.  Any existing PCP match is unchanged. */
+void
+flow_set_vlan_qinq_vid(struct flow *flow, ovs_be16 qinq_vid)
+{
+    if (qinq_vid == htons(OFP_VLAN_NONE)) {
+        flow->vlan_qinq_tci = htons(0);
+    } else {
+        qinq_vid &= htons(VLAN_VID_MASK);
+        flow->vlan_qinq_tci &= ~htons(VLAN_VID_MASK);
+        flow->vlan_qinq_tci |= qinq_vid;
+    }
+}
+
+/* Sets the VLAN PCP that 'flow' matches to 'pcp', which should be in the
+ * range 0...7. */
+void
+flow_set_vlan_qinq_pcp(struct flow *flow, uint8_t qinq_pcp)
+{
+    qinq_pcp &= 0x07;
+    flow->vlan_qinq_tci &= ~htons(VLAN_PCP_MASK);
+    flow->vlan_qinq_tci |= htons((qinq_pcp << VLAN_PCP_SHIFT));
+}
+
 /* Sets the MPLS Label that 'flow' matches to 'label', which is interpreted
  * as an OpenFlow 1.1 "mpls_label" value. */
 void
@@ -1083,7 +1176,11 @@ flow_compose(struct ofpbuf *b, const struct flow *flow)
     }
 
     if (flow->vlan_tci & htons(VLAN_CFI)) {
-        eth_push_vlan(b, flow->vlan_tci);
+        eth_push_vlan(b, flow->vlan_tci, flow->vlan_tpid);
+    }
+
+    if (flow->vlan_qinq_tci & htons(VLAN_CFI)) {
+        eth_push_vlan(b, flow->vlan_qinq_tci, htons(ETH_TYPE_VLAN));
     }
 
     if (flow->dl_type == htons(ETH_TYPE_MPLS) ||

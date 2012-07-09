@@ -159,16 +159,16 @@ compose_rarp(struct ofpbuf *b, const uint8_t eth_src[ETH_ADDR_LEN])
  *
  * Also sets 'packet->l2' to point to the new Ethernet header. */
 void
-eth_push_vlan(struct ofpbuf *packet, ovs_be16 tci)
+eth_push_vlan(struct ofpbuf *packet, ovs_be16 tci, ovs_be16 tpid)
 {
     struct eth_header *eh = packet->data;
     struct vlan_eth_header *veh;
 
-    /* Insert new 802.1Q header. */
+    /* Insert new 802.1Q or 802.1AD header. */
     struct vlan_eth_header tmp;
     memcpy(tmp.veth_dst, eh->eth_dst, ETH_ADDR_LEN);
     memcpy(tmp.veth_src, eh->eth_src, ETH_ADDR_LEN);
-    tmp.veth_type = htons(ETH_TYPE_VLAN);
+    tmp.veth_type = tpid;
     tmp.veth_tci = tci & htons(~VLAN_CFI);
     tmp.veth_next_type = eh->eth_type;
 
@@ -186,7 +186,8 @@ eth_pop_vlan(struct ofpbuf *packet)
 {
     struct vlan_eth_header *veh = packet->l2;
     if (packet->size >= sizeof *veh
-        && veh->veth_type == htons(ETH_TYPE_VLAN)) {
+        && (veh->veth_type == htons(ETH_TYPE_VLAN) ||
+            veh->veth_type == htons(ETH_TYPE_VLAN_8021AD))) {
         struct eth_header tmp;
 
         memcpy(tmp.eth_dst, veh->veth_dst, ETH_ADDR_LEN);
@@ -205,7 +206,8 @@ set_ethertype(struct ofpbuf *packet, ovs_be16 eth_type)
 {
     struct eth_header *eh = packet->data;
 
-    if (eh->eth_type == htons(ETH_TYPE_VLAN)) {
+    if (eh->eth_type == htons(ETH_TYPE_VLAN) ||
+        eh->eth_type == htons(ETH_TYPE_VLAN_8021AD)) {
         /* ethtype for VLAN packets is at L3_offset - 2 bytes. */
         ovs_be16 *next_ethtype;
         next_ethtype = (ovs_be16 *)((char *)packet->l3 - 2);
@@ -223,7 +225,8 @@ get_ethertype(struct ofpbuf *packet)
     char *mh = packet->l2_5;
     ovs_be16 *ethtype = NULL;
 
-    if (eh->eth_type == htons(ETH_TYPE_VLAN)) {
+    if (eh->eth_type == htons(ETH_TYPE_VLAN) ||
+        eh->eth_type == htons(ETH_TYPE_VLAN_8021AD)) {
         if (mh != NULL) {
             ethtype = (ovs_be16 *)(mh - 2);
         } else {

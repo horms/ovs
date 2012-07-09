@@ -355,6 +355,7 @@ enum nx_action_subtype {
     NXAST_DEC_MPLS_TTL,         /* struct nx_action_header */
     NXAST_PUSH_MPLS,            /* struct nx_action_push_mpls */
     NXAST_POP_MPLS,             /* struct nx_action_pop_mpls */
+    NXAST_PUSH_VLAN,            /* struct nx_action_push_vlan */
 };
 
 /* Header for Nicira-defined actions. */
@@ -1806,6 +1807,42 @@ OFP_ASSERT(sizeof(struct nx_action_output_reg) == 24);
  * Masking: Not maskable. */
 #define NXM_NX_MPLS_STACK   NXM_HEADER  (0x0001, 33, 1)
 
+/* The vlan_tpid in VLAN QinQ header.
+ *
+ * Prereqs: None
+ *
+ * Format: 16-bit integer
+ *
+ * Masking: Not maskable. */
+#define NXM_NX_VLAN_TPID    NXM_HEADER  (0x0001, 34, 2)
+
+/* The vlan_qinq_tci in VLAN QinQ header.
+ *
+ * Prereqs: None
+ *
+ * Format: 16-bit integer
+ *
+ * Masking: Not maskable. */
+#define NXM_NX_VLAN_QINQ_TCI      NXM_HEADER  (0x0001, 35, 2)
+
+/* The vlan_qinq_vid in VLAN QinQ header.
+ *
+ * Prereqs: None
+ *
+ * Format: 16-bit integer, lower 12 bits
+ *
+ * Masking: Not maskable. */
+#define NXM_NX_VLAN_QINQ_VID      NXM_HEADER  (0x0001, 36, 2)
+
+/* The vlan_qinq_pcp in VLAN QinQ header.
+ *
+ * Prereqs: None
+ *
+ * Format: 8-bit integer, lower 3 bits
+ *
+ * Masking: Not maskable. */
+#define NXM_NX_VLAN_QINQ_PCP      NXM_HEADER  (0x0001, 37, 1)
+
 /* ## --------------------- ## */
 /* ## Requests and replies. ## */
 /* ## --------------------- ## */
@@ -2061,5 +2098,16 @@ struct nx_action_pop_mpls {
     uint8_t  pad[4];
 };
 OFP_ASSERT(sizeof(struct nx_action_pop_mpls) == 16);
+
+/* Action structure for NXAST_PUSH_VLAN. */
+struct nx_action_push_vlan {
+    ovs_be16 type;                  /* OFPAT_PUSH_MPLS. */
+    ovs_be16 len;                   /* Length is 8. */
+    ovs_be32 vendor;                /* NX_VENDOR_ID. */
+    ovs_be16 subtype;               /* NXAST_PUSH_VLAN */
+    ovs_be16 tpid;                  /* VLAN tpid */
+    uint8_t  pad[4];
+};
+OFP_ASSERT(sizeof(struct nx_action_push_vlan) == 16);
 
 #endif /* openflow/nicira-ext.h */

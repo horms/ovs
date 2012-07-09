@@ -53,6 +53,10 @@ struct sw_flow_key {
 		__be16 type;		/* Ethernet frame type. */
 	} eth;
 	struct {
+		__be16 type;		/* VLAN qinq outer frame type either 0x8100 or 0x88a8. */
+		__be16 qinq_tci;	/* 0 if no VLAN, VLAN_TAG_PRESENT set otherwise. */
+	} vlan;
+	struct {
 		__be32 mpls_lse;	/* 0 if no MPLS, otherwise MPLS label Stack entry. */
 		__be32 inner_mpls_lse;	/* 0 if no inner MPLS, otherwise MPLS label Stack entry. */
 	} mpls;

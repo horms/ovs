@@ -2036,6 +2036,7 @@ ofpact_format(const struct ofpact *a, struct ds *s)
     const struct ofpact_tunnel *tunnel;
     const struct ofpact_inst_actions *inst_actions;
     uint16_t port;
+    const struct nx_action_push_vlan *navpush;
 
     switch (a->type) {
     case OFPACT_END:
@@ -2251,6 +2252,11 @@ ofpact_format(const struct ofpact *a, struct ds *s)
     case OFPACT_POP_MPLS:
         ds_put_format(s, "pop_mpls:0x%"PRIx16,
                       ntohs(ofpact_get_POP_MPLS(a)->ethertype));
+        break;
+
+   case OFPACT_PUSH_VLAN:
+        navpush = (const struct nx_action_push_vlan *) a;
+        ds_put_format(s, "push_vlan:0x%"PRIx16, ntohs(navpush->tpid));
         break;
 
     case OFPACT_APPLY_ACTIONS:

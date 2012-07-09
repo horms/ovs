@@ -52,7 +52,8 @@ u32 rpl_netif_skb_features(struct sk_buff *skb)
 	__be16 protocol = skb->protocol;
 	u32 features = skb->dev->features;
 
-	if (protocol == htons(ETH_P_8021Q)) {
+	if (protocol == htons(ETH_P_8021Q) ||
+		protocol == htons(ETH_P_8021AD)) {
 		struct vlan_ethhdr *veh = (struct vlan_ethhdr *)skb->data;
 		protocol = veh->h_vlan_encapsulated_proto;
 	} else if (!vlan_tx_tag_present(skb)) {
@@ -61,7 +62,8 @@ u32 rpl_netif_skb_features(struct sk_buff *skb)
 
 	features &= (vlan_features | NETIF_F_HW_VLAN_TX);
 
-	if (protocol != htons(ETH_P_8021Q)) {
+	if (protocol != htons(ETH_P_8021Q) &&
+		protocol != htons(ETH_P_8021AD)) {
 		return harmonize_features(skb, protocol, features);
 	} else {
 		features &= NETIF_F_SG | NETIF_F_HIGHDMA | NETIF_F_FRAGLIST |
@@ -77,7 +79,8 @@ struct sk_buff *rpl_skb_gso_segment(struct sk_buff *skb, u32 features)
 	__be16 skb_proto;
 	struct sk_buff *skb_gso;
 
-	while (type == htons(ETH_P_8021Q)) {
+	while (type == htons(ETH_P_8021Q) ||
+		   type == htons(ETH_P_8021AD)) {
 		struct vlan_hdr *vh;
 
 		if (unlikely(!pskb_may_pull(skb, vlan_depth + VLAN_HLEN)))

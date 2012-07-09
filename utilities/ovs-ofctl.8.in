@@ -375,6 +375,19 @@ Matches IEEE 802.1q Priority Code Point (PCP) \fIpriority\fR, which is
 specified as a value between 0 and 7, inclusive.  A higher value
 indicates a higher frame priority level.
 .
+.IP \fBdl_vlan_tpid=\fIvlan_tpid\fR
+Matches IEEE 802.1ad outer Virtual LAN tpid \fIvlan_tpid\fR. Specify either
+0x88a8 or 0x8100 as a tpid to match.
+.
+.IP \fBdl_vlan_qinq_vid=\fIvlan\fR
+Matches IEEE 802.1ad inner Virtual LAN tag \fIvlan\fR. Specify a number
+between 0 and 4095, inclusive, as the 12-bit VLAN ID to match.
+.
+.IP \fBdl_vlan_qinq_pcp=\fIpriority\fR
+Matches IEEE 802.1ad inner Priority Code Point (PCP) \fIpriority\fR, which is
+specified as a value between 0 and 7, inclusive.  A higher value
+indicates a higher frame priority level.
+.
 .IP \fBdl_src=\fIxx\fB:\fIxx\fB:\fIxx\fB:\fIxx\fB:\fIxx\fB:\fIxx\fR
 .IQ \fBdl_dst=\fIxx\fB:\fIxx\fB:\fIxx\fB:\fIxx\fB:\fIxx\fB:\fIxx\fR
 Matches an Ethernet source (or destination) address specified as 6
@@ -855,6 +868,11 @@ Modifies the VLAN priority on a packet.  The VLAN tag is added or modified
 as necessary to match the value specified.  Valid values are between 0
 (lowest) and 7 (highest).  If the VLAN tag is added, a vid of zero is used 
 (see the \fBmod_vlan_vid\fR action to set this).
+.
+.IP \fBpush_vlan\fR:\fIvlan_tpid\fR
+Push new VLAN tag with the tpid specified. VLAN vid and priority of existing
+vlan header is copied onto the new VLAN QinQ header. VLAN CFI for 8021Q or
+VLAN DEI for 8021AD is ignored.
 .
 .IP \fBstrip_vlan\fR
 Strips the VLAN tag from a packet if it is present.

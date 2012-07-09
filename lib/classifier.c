@@ -273,6 +273,33 @@ cls_rule_set_dl_vlan_pcp(struct cls_rule *rule, uint8_t dl_vlan_pcp)
     rule->wc.vlan_tci_mask |= htons(VLAN_CFI | VLAN_PCP_MASK);
 }
 
+/* Modifies 'rule' so that it matches only packets with an outer tag of
+ * 802.1Q or 8021AD header. */
+void
+cls_rule_set_dl_vlan_tpid(struct cls_rule *rule, ovs_be16 dl_vlan_tpid)
+{
+    rule->wc.wildcards &= ~FWW_VLAN_TPID;
+    flow_set_vlan_tpid(&rule->flow, dl_vlan_tpid);
+}
+
+/* Modifies 'rule' to match only packets with an 802.1Q header whose
+ * VID equals the low 12 bits of 'dl_vlan_vid'. */
+void
+cls_rule_set_dl_vlan_qinq_vid(struct cls_rule *rule, ovs_be16 dl_vlan_qinq_vid)
+{
+    rule->wc.wildcards &= ~FWW_VLAN_QINQ_VID;
+    flow_set_vlan_qinq_vid(&rule->flow, dl_vlan_qinq_vid);
+}
+
+/* Modifies 'rule' to match only packets with an 802.1Q header whose
+ * PCP equals the low 3 bits of 'dl_vlan_pcp'. */
+void
+cls_rule_set_dl_vlan_qinq_pcp(struct cls_rule *rule, uint8_t dl_vlan_qinq_pcp)
+{
+    rule->wc.wildcards &= ~FWW_VLAN_QINQ_PCP;
+    flow_set_vlan_qinq_pcp(&rule->flow, dl_vlan_qinq_pcp);
+}
+
 /* Modifies 'rule' depending on 'mpls_label':
  * Makes 'rule' match only packets with an MPLS header whose label equals the
  * low 20 bits of 'mpls_label'. */
@@ -564,7 +591,7 @@ cls_rule_format(const struct cls_rule *rule, struct ds *s)
 
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     if (rule->priority != OFP_DEFAULT_PRIORITY) {
         ds_put_format(s, "priority=%d,", rule->priority);
@@ -664,6 +691,17 @@ cls_rule_format(const struct cls_rule *rule, struct ds *s)
             ds_put_format(s, "vlan_tci=0x%04"PRIx16"/0x%04"PRIx16",",
                           ntohs(f->vlan_tci), ntohs(wc->vlan_tci_mask));
         }
+    }
+    if (!(w & FWW_VLAN_TPID)) {
+        ds_put_format(s, "dl_vlan_tpid=0x%"PRIx16",", ntohs(f->vlan_tpid));
+    }
+    if (!(w & FWW_VLAN_QINQ_VID)) {
+        ds_put_format(s, "dl_vlan_qinq_vid=%"PRIu16",",
+                 vlan_tci_to_vid(f->vlan_qinq_tci));
+    }
+    if (!(w & FWW_VLAN_QINQ_PCP)) {
+        ds_put_format(s, "dl_vlan_qinq_pcp=%d,",
+                 vlan_tci_to_pcp(f->vlan_qinq_tci));
     }
     format_eth_masked(s, "dl_src", f->dl_src, wc->dl_src_mask);
     format_eth_masked(s, "dl_dst", f->dl_dst, wc->dl_dst_mask);
@@ -1243,7 +1281,7 @@ flow_equal_except(const struct flow *a, const struct flow *b,
     const flow_wildcards_t wc = wildcards->wildcards;
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         if ((a->regs[i] ^ b->regs[i]) & wildcards->reg_masks[i]) {
@@ -1277,6 +1315,11 @@ flow_equal_except(const struct flow *a, const struct flow *b,
                 !((a->mpls_lse ^ b->mpls_lse) & htonl(MPLS_TC_MASK)))
             && (wc & FWW_MPLS_STACK ||
                 !((a->mpls_lse ^ b->mpls_lse) & htonl(MPLS_STACK_MASK)))
+            && (wc & FWW_VLAN_TPID || a->vlan_tpid == b->vlan_tpid)
+            && (wc & FWW_VLAN_QINQ_VID ||
+                !((a->vlan_qinq_tci ^ b->vlan_qinq_tci) & htons(VLAN_VID_MASK)))
+            && (wc & FWW_VLAN_QINQ_PCP ||
+                !((a->vlan_qinq_tci ^ b->vlan_qinq_tci) & htons(VLAN_PCP_MASK)))
             && ipv6_equal_except(&a->ipv6_src, &b->ipv6_src,
                     &wildcards->ipv6_src_mask)
             && ipv6_equal_except(&a->ipv6_dst, &b->ipv6_dst,

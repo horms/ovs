@@ -499,7 +499,7 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
     int match_len;
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 12);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 13);
 
     /* Metadata. */
     if (!(wc & FWW_IN_PORT)) {
@@ -540,6 +540,20 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
         nxm_put_16m(b, NXM_OF_VLAN_TCI, flow->vlan_tci, cr->wc.vlan_tci_mask);
     }
 
+    /* 802.1AD */
+    if (!(wc & FWW_VLAN_TPID) &&
+       (flow->vlan_tpid == htons(ETH_TYPE_VLAN) ||
+        flow->vlan_tpid == htons(ETH_TYPE_VLAN_8021AD))) {
+        nxm_put_16(b, NXM_NX_VLAN_TPID, flow->vlan_tpid);
+        if (!(wc & FWW_VLAN_QINQ_PCP)) {
+            nxm_put_8(b, NXM_NX_VLAN_QINQ_PCP,
+                      vlan_tci_to_pcp(flow->vlan_qinq_tci));
+        }
+        if (!(wc & FWW_VLAN_QINQ_VID)) {
+            nxm_put_16(b, NXM_NX_VLAN_QINQ_VID,
+                 htons(vlan_tci_to_vid(flow->vlan_qinq_tci)));
+        }
+    }
 
     /* MPLS. */
     if (!(wc & FWW_DL_TYPE) &&
