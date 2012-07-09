@@ -1127,7 +1127,7 @@ ofp_print_ofpst_port_reply(struct ds *string, const struct ofp_header *oh,
                 return;
             }
 
-            ds_put_format(string, "  port %2"PRIu16": ", ntohs(ps.port_no));
+            ds_put_format(string, "  port %2"PRIu16": ", ntohs(ps10->port_no));
             ps.rx_packets = get_32aligned_be64(&ps10->rx_packets);
             ps.rx_bytes = get_32aligned_be64(&ps10->rx_bytes);
             ps.rx_dropped = get_32aligned_be64(&ps10->rx_dropped);
