@@ -668,6 +668,17 @@ ofpact_from_openflow11(const union ofp_action *a, struct ofpbuf *out)
         ofpact_put_DEC_MPLS_TTL(out);
         break;
 
+    case OFPUTIL_OFPAT11_PUSH_VLAN: {
+        struct ofp11_action_push *oap = (struct ofp11_action_push *)a;
+        ofpact_put_PUSH_VLAN(out)->tpid = oap->ethertype;
+        break;
+    }
+
+    case OFPUTIL_OFPAT11_POP_VLAN: {
+        ofpact_put_POP_VLAN(out);
+        break;
+    }
+
     case OFPUTIL_OFPAT11_PUSH_MPLS: {
         struct ofp11_action_push *oap = (struct ofp11_action_push *)a;
         ofpact_put_PUSH_MPLS(out)->ethertype = oap->ethertype;
@@ -777,6 +788,17 @@ ofpact_from_openflow12(const union ofp_action *a, struct ofpbuf *out)
     case OFPUTIL_OFPAT12_DEC_MPLS_TTL:
         ofpact_put_DEC_MPLS_TTL(out);
         break;
+
+    case OFPUTIL_OFPAT12_PUSH_VLAN: {
+        struct ofp11_action_push *oap = (struct ofp11_action_push *)a;
+        ofpact_put_PUSH_VLAN(out)->tpid = oap->ethertype;
+        break;
+    }
+
+    case OFPUTIL_OFPAT12_POP_VLAN: {
+        ofpact_put_POP_VLAN(out);
+        break;
+    }
 
     case OFPUTIL_OFPAT12_PUSH_MPLS: {
         struct ofp11_action_push *oap = (struct ofp11_action_push *)a;
@@ -1197,6 +1219,10 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports,
         }
         return 0;
 
+    case OFPACT_POP_VLAN:
+        ofpact_get_POP_VLAN(a);
+        return 0;
+
     case OFPACT_APPLY_ACTIONS:
         if (!allow_inst) {
             NOT_REACHED();
@@ -1426,6 +1452,7 @@ ofpact_to_nxast(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_DEC_MPLS_TTL:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
+    case OFPACT_POP_VLAN:
     case OFPACT_COPY_TTL_OUT:
     case OFPACT_COPY_TTL_IN:
         NOT_REACHED();
@@ -1546,6 +1573,7 @@ ofpact_to_openflow10(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_SET_MPLS_TTL:
     case OFPACT_DEC_MPLS_TTL:
     case OFPACT_PUSH_MPLS:
+    case OFPACT_POP_VLAN:
     case OFPACT_POP_MPLS:
     case OFPACT_PUSH_VLAN:
         ofpact_to_nxast(a, out);
@@ -1591,7 +1619,12 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
         break;
 
     case OFPACT_PUSH_VLAN:
-        /* XXX */
+        ofputil_put_OFPAT11_PUSH_VLAN(out)->ethertype =
+            ofpact_get_PUSH_VLAN(a)->tpid;
+        break;
+
+    case OFPACT_POP_VLAN:
+        ofputil_put_OFPAT11_POP_VLAN(out);
         break;
 
     case OFPACT_SET_MPLS_TTL:
@@ -1668,6 +1701,8 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_ENQUEUE:
     case OFPACT_SET_MPLS_TTL:
     case OFPACT_DEC_MPLS_TTL:
+    case OFPACT_PUSH_VLAN:
+    case OFPACT_POP_VLAN:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
         return ofpact_to_openflow11_common(a, out);
@@ -1741,7 +1776,6 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_AUTOPATH:
     case OFPACT_NOTE:
     case OFPACT_EXIT:
-    case OFPACT_PUSH_VLAN:      /* XXX */
         ofpact_to_nxast(a, out);
         break;
     }
@@ -1771,6 +1805,8 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_ENQUEUE:
     case OFPACT_SET_MPLS_TTL:
     case OFPACT_DEC_MPLS_TTL:
+    case OFPACT_PUSH_VLAN:
+    case OFPACT_POP_VLAN:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
         return ofpact_to_openflow11_common(a, out);
@@ -1795,7 +1831,6 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_COPY_TTL_IN:
     case OFPACT_SET_MPLS_LABEL:
     case OFPACT_SET_MPLS_TC:
-    case OFPACT_PUSH_VLAN:      /* XXX */
         ofpact_to_nxast(a, out);
         break;
     }
@@ -1920,6 +1955,7 @@ ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
     case OFPACT_PUSH_VLAN:
+    case OFPACT_POP_VLAN:
     default:
         NOT_REACHED();
     }
@@ -1997,9 +2033,10 @@ ofpact_outputs_to_port(const struct ofpact *ofpact, uint16_t port)
     case OFPACT_SET_MPLS_TC:
     case OFPACT_SET_MPLS_TTL:
     case OFPACT_DEC_MPLS_TTL:
+    case OFPACT_PUSH_VLAN:
+    case OFPACT_POP_VLAN:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
-    case OFPACT_PUSH_VLAN:
     case OFPACT_APPLY_ACTIONS:
     case OFPACT_CLEAR_ACTIONS:
     case OFPACT_WRITE_ACTIONS:
@@ -2295,6 +2332,10 @@ ofpact_format(const struct ofpact *a, struct ds *s)
     case OFPACT_PUSH_VLAN:
         ds_put_format(s, "push_vlan:0x%"PRIx16,
                       ntohs(ofpact_get_PUSH_VLAN(a)->tpid));
+        break;
+
+    case OFPACT_POP_VLAN:
+        ds_put_format(s, "pop_vlan");
         break;
 
     case OFPACT_APPLY_ACTIONS:

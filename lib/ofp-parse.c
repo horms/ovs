@@ -321,6 +321,8 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         ofpact_put_SET_VLAN_PCP(ofpacts)->vlan_pcp = pcp;
         break;
 
+    case OFPUTIL_OFPAT11_POP_VLAN:
+    case OFPUTIL_OFPAT12_POP_VLAN:
     case OFPUTIL_OFPAT10_STRIP_VLAN:
         ofpact_put_STRIP_VLAN(ofpacts);
         break;
@@ -486,6 +488,8 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
             htons(str_to_u16(arg, "pop_mpls"));
         break;
 
+    case OFPUTIL_OFPAT11_PUSH_VLAN:
+    case OFPUTIL_OFPAT12_PUSH_VLAN:
     case OFPUTIL_NXAST_PUSH_VLAN:
         ofpact_put_PUSH_VLAN(ofpacts)->tpid = htons(str_to_u32(arg));
         break;

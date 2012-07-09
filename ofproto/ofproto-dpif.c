@@ -5551,6 +5551,7 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         break;
 
     case OFPACT_STRIP_VLAN:
+    case OFPACT_POP_VLAN:
         if (ctx->flow.vlan_tci != 0) {
             ctx->flow.vlan_tci = htons(0);
             ctx->flow.vlan_tpid = htons(0);

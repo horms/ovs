@@ -83,6 +83,7 @@
     DEFINE_OFPACT(PUSH_MPLS,       ofpact_push,          ofpact)    \
     DEFINE_OFPACT(POP_MPLS,        ofpact_pop_mpls,      ofpact)    \
     DEFINE_OFPACT(PUSH_VLAN,       ofpact_push_vlan,     ofpact)    \
+    DEFINE_OFPACT(POP_VLAN,        ofpact_null,          ofpact)    \
                                                                     \
     /* Metadata. */                                                 \
     DEFINE_OFPACT(SET_TUNNEL,      ofpact_tunnel,        ofpact)    \

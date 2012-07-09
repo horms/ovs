@@ -1668,6 +1668,7 @@ ofputil_usable_protocols_with_action(const struct ofpact *ofpact)
 
     case OFPACT_COPY_TTL_OUT:
     case OFPACT_COPY_TTL_IN:
+    case OFPACT_POP_VLAN:
         protocols &= OFPUTIL_P_OF12; /* XXX: OF11 */
         break;
 
