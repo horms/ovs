@@ -1985,7 +1985,7 @@ ofpacts_insts_to_openflow11(uint8_t ofp_version,
 
     OFPACT_FOR_EACH(a, ofpacts) {
         assert(ofpact_is_instruction(a) || a->type == OFPACT_END);
-        ofpacts_insts_to_openflow11__(ofpacts, openflow, ofpact_to_openflow);
+        ofpacts_insts_to_openflow11__(a, openflow, ofpact_to_openflow);
     }
 }
 
