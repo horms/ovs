@@ -111,7 +111,7 @@ ofputil_wildcard_from_ofpfw10(uint32_t ofpfw, struct flow_wildcards *wc)
     wc->wildcards = (OVS_FORCE flow_wildcards_t) ofpfw & WC_INVARIANTS;
 
     /* Wildcard fields that aren't defined by ofp10_match or tun_id. */
-    wc->wildcards |= (FWW_ARP_SHA | FWW_ARP_THA | FWW_NW_ECN | FWW_NW_TTL
+    wc->wildcards |= (FWW_NW_ECN | FWW_NW_TTL
                       | FWW_MPLS_LABEL | FWW_MPLS_TC | FWW_MPLS_STACK
                       | FWW_VLAN_TPID | FWW_VLAN_QINQ_VID | FWW_VLAN_QINQ_PCP);
 
@@ -1524,7 +1524,8 @@ ofputil_usable_protocols(const struct cls_rule *rule)
     }
 
     /* Only NXM supports matching ARP hardware addresses. */
-    if (!(wc->wildcards & FWW_ARP_SHA) || !(wc->wildcards & FWW_ARP_THA)) {
+    if (!eth_addr_is_zero(wc->arp_sha_mask) ||
+        !eth_addr_is_zero(wc->arp_tha_mask)) {
         return OFPUTIL_P_NXM_ANY;
     }
 
@@ -4624,10 +4625,10 @@ ofputil_normalize_rule(struct cls_rule *rule)
         wc.wildcards |= FWW_NW_TTL;
     }
     if (!(may_match & MAY_ARP_SHA)) {
-        wc.wildcards |= FWW_ARP_SHA;
+        memset(wc.arp_sha_mask, 0, ETH_ADDR_LEN);
     }
     if (!(may_match & MAY_ARP_THA)) {
-        wc.wildcards |= FWW_ARP_THA;
+        memset(wc.arp_tha_mask, 0, ETH_ADDR_LEN);
     }
     if (!(may_match & MAY_IPV6)) {
         wc.ipv6_src_mask = wc.ipv6_dst_mask = in6addr_any;

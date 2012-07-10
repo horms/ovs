@@ -363,7 +363,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
     }, {
         MFF_ARP_SHA, "arp_sha", NULL,
         MF_FIELD_SIZES(mac),
-        MFM_NONE, FWW_ARP_SHA,
+        MFM_FULLY, 0,
         MFS_ETHERNET,
         MFP_ARP,
         false,
@@ -372,7 +372,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
     }, {
         MFF_ARP_THA, "arp_tha", NULL,
         MF_FIELD_SIZES(mac),
-        MFM_NONE, FWW_ARP_THA,
+        MFM_FULLY, 0,
         MFS_ETHERNET,
         MFP_ARP,
         false,
@@ -480,7 +480,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
     }, {
         MFF_ND_SLL, "nd_sll", NULL,
         MF_FIELD_SIZES(mac),
-        MFM_NONE, FWW_ARP_SHA,
+        MFM_NONE, 0,
         MFS_ETHERNET,
         MFP_ND_SOLICIT,
         false,
@@ -489,7 +489,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
     }, {
         MFF_ND_TLL, "nd_tll", NULL,
         MF_FIELD_SIZES(mac),
-        MFM_NONE, FWW_ARP_THA,
+        MFM_NONE, 0,
         MFS_ETHERNET,
         MFP_ND_ADVERT,
         false,
@@ -644,10 +644,6 @@ mf_is_all_wild(const struct mf_field *mf, const struct flow_wildcards *wc)
     case MFF_IP_ECN:
     case MFF_IP_TTL:
     case MFF_ARP_OP:
-    case MFF_ARP_SHA:
-    case MFF_ARP_THA:
-    case MFF_ND_SLL:
-    case MFF_ND_TLL:
     case MFF_MPLS_LABEL:
     case MFF_MPLS_TC:
     case MFF_MPLS_STACK:
@@ -667,6 +663,14 @@ mf_is_all_wild(const struct mf_field *mf, const struct flow_wildcards *wc)
         return eth_addr_is_zero(wc->dl_src_mask);
     case MFF_ETH_DST:
         return eth_addr_is_zero(wc->dl_dst_mask);
+
+    case MFF_ARP_SHA:
+    case MFF_ND_SLL:
+        return eth_addr_is_zero(wc->arp_sha_mask);
+
+    case MFF_ARP_THA:
+    case MFF_ND_TLL:
+        return eth_addr_is_zero(wc->arp_tha_mask);
 
     case MFF_VLAN_TCI:
         return !wc->vlan_tci_mask;
@@ -1654,14 +1658,14 @@ mf_set_wild(const struct mf_field *mf, struct cls_rule *rule)
 
     case MFF_ARP_SHA:
     case MFF_ND_SLL:
-        rule->wc.wildcards |= FWW_ARP_SHA;
-        memset(rule->flow.arp_sha, 0, sizeof rule->flow.arp_sha);
+        memset(rule->flow.arp_sha, 0, ETH_ADDR_LEN);
+        memset(rule->wc.arp_sha_mask, 0, ETH_ADDR_LEN);
         break;
 
     case MFF_ARP_THA:
     case MFF_ND_TLL:
-        rule->wc.wildcards |= FWW_ARP_THA;
-        memset(rule->flow.arp_tha, 0, sizeof rule->flow.arp_tha);
+        memset(rule->flow.arp_tha, 0, ETH_ADDR_LEN);
+        memset(rule->wc.arp_tha_mask, 0, ETH_ADDR_LEN);
         break;
 
     case MFF_TCP_SRC:
@@ -1730,8 +1734,6 @@ mf_set(const struct mf_field *mf,
     case MFF_IP_DSCP:
     case MFF_IP_ECN:
     case MFF_ARP_OP:
-    case MFF_ARP_SHA:
-    case MFF_ARP_THA:
     case MFF_ICMPV4_TYPE:
     case MFF_ICMPV4_CODE:
     case MFF_ICMPV6_TYPE:
@@ -1757,13 +1759,20 @@ mf_set(const struct mf_field *mf,
         cls_rule_set_dl_src_masked(rule, value->mac, mask->mac);
         break;
 
+    case MFF_ARP_SHA:
+        cls_rule_set_arp_sha_masked(rule, value->mac, mask->mac);
+        break;
+
+    case MFF_ARP_THA:
+        cls_rule_set_arp_tha_masked(rule, value->mac, mask->mac);
+        break;
+
     case MFF_VLAN_VID:
         if (mask->be16 == htons(0xfff)) {
             mf_set_value(mf, value, rule);
         } else {
             cls_rule_set_dl_vlan_masked(rule, value->be16, mask->be16);
         }
-        break;
 
     case MFF_VLAN_TCI:
         cls_rule_set_dl_tci_masked(rule, value->be16, mask->be16);

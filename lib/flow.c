@@ -591,12 +591,8 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
         flow->vlan_qinq_tci &= ~htons(VLAN_PCP_MASK);
     }
     flow->nw_frag &= wildcards->nw_frag_mask;
-    if (wc & FWW_ARP_SHA) {
-        memset(flow->arp_sha, 0, sizeof flow->arp_sha);
-    }
-    if (wc & FWW_ARP_THA) {
-        memset(flow->arp_tha, 0, sizeof flow->arp_tha);
-    }
+    eth_addr_bitand(flow->arp_sha, wildcards->arp_sha_mask, flow->arp_sha);
+    eth_addr_bitand(flow->arp_tha, wildcards->arp_tha_mask, flow->arp_tha);
     flow->ipv6_src = ipv6_addr_bitand(&flow->ipv6_src,
             &wildcards->ipv6_src_mask);
     flow->ipv6_dst = ipv6_addr_bitand(&flow->ipv6_dst,
@@ -736,6 +732,8 @@ flow_wildcards_init_catchall(struct flow_wildcards *wc)
     wc->tp_dst_mask = htons(0);
     memset(wc->dl_src_mask, 0, ETH_ADDR_LEN);
     memset(wc->dl_dst_mask, 0, ETH_ADDR_LEN);
+    memset(wc->arp_sha_mask, 0, ETH_ADDR_LEN);
+    memset(wc->arp_tha_mask, 0, ETH_ADDR_LEN);
     memset(wc->zeros, 0, sizeof wc->zeros);
 }
 
@@ -761,6 +759,8 @@ flow_wildcards_init_exact(struct flow_wildcards *wc)
     wc->tp_dst_mask = htons(UINT16_MAX);
     memset(wc->dl_src_mask, 0xff, ETH_ADDR_LEN);
     memset(wc->dl_dst_mask, 0xff, ETH_ADDR_LEN);
+    memset(wc->arp_sha_mask, 0xff, ETH_ADDR_LEN);
+    memset(wc->arp_tha_mask, 0xff, ETH_ADDR_LEN);
     memset(wc->zeros, 0, sizeof wc->zeros);
 }
 
@@ -782,6 +782,8 @@ flow_wildcards_is_exact(const struct flow_wildcards *wc)
         || wc->vlan_tci_mask != htons(UINT16_MAX)
         || !eth_mask_is_exact(wc->dl_src_mask)
         || !eth_mask_is_exact(wc->dl_dst_mask)
+        || !eth_mask_is_exact(wc->arp_sha_mask)
+        || !eth_mask_is_exact(wc->arp_tha_mask)
         || !ipv6_mask_is_exact(&wc->ipv6_src_mask)
         || !ipv6_mask_is_exact(&wc->ipv6_dst_mask)
         || wc->ipv6_label_mask != htonl(UINT32_MAX)
@@ -817,6 +819,8 @@ flow_wildcards_is_catchall(const struct flow_wildcards *wc)
         || wc->vlan_tci_mask != htons(0)
         || !eth_addr_is_zero(wc->dl_src_mask)
         || !eth_addr_is_zero(wc->dl_dst_mask)
+        || !eth_addr_is_zero(wc->arp_sha_mask)
+        || !eth_addr_is_zero(wc->arp_tha_mask)
         || !ipv6_mask_is_any(&wc->ipv6_src_mask)
         || !ipv6_mask_is_any(&wc->ipv6_dst_mask)
         || wc->ipv6_label_mask != htonl(0)
@@ -865,6 +869,8 @@ flow_wildcards_combine(struct flow_wildcards *dst,
     dst->tp_dst_mask = src1->tp_dst_mask & src2->tp_dst_mask;
     eth_addr_bitand(src1->dl_src_mask, src2->dl_src_mask, dst->dl_src_mask);
     eth_addr_bitand(src1->dl_dst_mask, src2->dl_dst_mask, dst->dl_dst_mask);
+    eth_addr_bitand(src1->arp_sha_mask, src2->arp_sha_mask, dst->arp_sha_mask);
+    eth_addr_bitand(src1->arp_tha_mask, src2->arp_tha_mask, dst->arp_tha_mask);
 }
 
 /* Returns a hash of the wildcards in 'wc'. */
@@ -874,7 +880,7 @@ flow_wildcards_hash(const struct flow_wildcards *wc, uint32_t basis)
     /* If you change struct flow_wildcards and thereby trigger this
      * assertion, please check that the new struct flow_wildcards has no holes
      * in it before you update the assertion. */
-    BUILD_ASSERT_DECL(sizeof *wc == 96 + FLOW_N_REGS * 4);
+    BUILD_ASSERT_DECL(sizeof *wc == 104 + FLOW_N_REGS * 4);
     return hash_bytes(wc, sizeof *wc, basis);
 }
 
@@ -900,7 +906,9 @@ flow_wildcards_equal(const struct flow_wildcards *a,
         || a->tp_src_mask != b->tp_src_mask
         || a->tp_dst_mask != b->tp_dst_mask
         || !eth_addr_equals(a->dl_src_mask, b->dl_src_mask)
-        || !eth_addr_equals(a->dl_dst_mask, b->dl_dst_mask)) {
+        || !eth_addr_equals(a->dl_dst_mask, b->dl_dst_mask)
+        || !eth_addr_equals(a->arp_sha_mask, b->arp_sha_mask)
+        || !eth_addr_equals(a->arp_tha_mask, b->arp_tha_mask)) {
         return false;
     }
 
@@ -938,6 +946,16 @@ flow_wildcards_has_extra(const struct flow_wildcards *a,
 
     eth_addr_bitand(a->dl_dst_mask, b->dl_dst_mask, eth_masked);
     if (!eth_addr_equals(eth_masked, b->dl_dst_mask)) {
+        return true;
+    }
+
+    eth_addr_bitand(a->arp_sha_mask, b->arp_sha_mask, eth_masked);
+    if (!eth_addr_equals(eth_masked, b->arp_sha_mask)) {
+        return true;
+    }
+
+    eth_addr_bitand(a->arp_tha_mask, b->arp_tha_mask, eth_masked);
+    if (!eth_addr_equals(eth_masked, b->arp_tha_mask)) {
         return true;
     }
 
