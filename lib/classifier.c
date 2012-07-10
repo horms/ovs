@@ -233,9 +233,6 @@ void
 cls_rule_set_dl_vlan_masked(struct cls_rule *rule, ovs_be16 dl_vlan,
                             ovs_be16 mask)
 {
-    if (!(mask & htons(VLAN_CFI))) {
-        dl_vlan = htons(OFP10_VLAN_NONE);
-    }
     flow_set_vlan_vid(&rule->flow, dl_vlan);
     if (dl_vlan == htons(OFP10_VLAN_NONE)) {
         rule->wc.vlan_tci_mask = htons(UINT16_MAX);

@@ -188,6 +188,8 @@ enum mf_prereqs {
 enum mf_maskable {
     MFM_NONE,                   /* No sub-field masking. */
     MFM_FULLY,                  /* Every bit is individually maskable. */
+    MFM_VLAN_VID,               /* Lower 12 bits are individually maskable,
+				 * OFPVID12_PRESENT is also accepted . */
 };
 
 /* How to format or parse a field's value. */

@@ -102,9 +102,10 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
 
     p = ofpbuf_try_pull(b, nx_padded_match_len(match_len, hdr_len));
     if (!p) {
-        VLOG_DBG_RL(&rl, "nx_match length %u, rounded up to a "
-                    "multiple of 8, is longer than space in message (max "
-                    "length %zu)", match_len, b->size);
+        fprintf(stderr, "nx_match length %u, rounded up to a "
+                    "multiple of 8 (%u), is longer than space in message (max "
+                    "length %zu)", match_len,
+                    nx_padded_match_len(match_len, hdr_len), b->size);
         return OFPERR_OFPBMC_BAD_LEN;
     }
 
@@ -137,11 +138,19 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
             if (!mf_is_value_valid(mf, &value)) {
                 error = OFPERR_OFPBMC_BAD_VALUE;
             } else {
-                if ((header == OXM_OF_VLAN_VID || header == OXM_OF_VLAN_VID_W)
-                    && !(value.be16 & htons(VLAN_CFI))) {
-                    /* Special case for CFI not set, map to OFP10_VLAN_NONE
-                     * which provides the desired behaviour. */
-                    value.be16 = htons(OFP10_VLAN_NONE);
+                if ((header == OXM_OF_VLAN_VID ||
+                     header == OXM_OF_VLAN_VID_W)) {
+                    /* Special case for VLAN_VID */
+                    if (value.be16 == htons(OFPVID12_NONE)) {
+                        /* Map OFPVID12_NONE to OFP10_VLAN_NONE
+                         * which provides the desired behaviour. */
+                        value.be16 = htons(OFP10_VLAN_NONE);
+                    } else {
+                        /* Otherwise force the CFI bit on.
+                         * Internally this is needed for legacy support
+                         * of setting the VID using ovs-ofct set-flows */
+                        value.be16 |= htons(VLAN_CFI);
+                    }
                 }
 
                 if (!NXM_HASMASK(header)) {
@@ -200,6 +209,8 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
         }
     }
 
+    if (match_len)
+        fprintf(stderr, "tail=%d\n", match_len);
     return match_len ? OFPERR_OFPBMC_BAD_LEN : 0;
 }
 
@@ -523,16 +534,24 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
 
     /* 802.1Q. */
     if (oxm) {
-        ovs_be16 vid = flow->vlan_tci & htons(VLAN_VID_MASK | VLAN_CFI);
-        ovs_be16 mask = cr->wc.vlan_tci_mask & htons(VLAN_VID_MASK | VLAN_CFI);
+        ovs_be16 vid = flow->vlan_tci & ~htons(VLAN_PCP_MASK);
+        ovs_be16 mask =  cr->wc.vlan_tci_mask & ~htons(VLAN_PCP_MASK);
 
-        if (mask == htons(VLAN_VID_MASK | VLAN_CFI)) {
+        if (vid != htons(OFPVID12_PRESENT)) {
+            vid = htons(vlan_tci_to_vid(flow->vlan_tci));
+        }
+        if (mask != htons(OFPVID12_PRESENT)) {
+            mask =  htons(vlan_tci_to_vid(cr->wc.vlan_tci_mask));
+        }
+
+        if (mask == htons(VLAN_VID_MASK)) {
             nxm_put_16(b, OXM_OF_VLAN_VID, vid);
         } else if (mask) {
             nxm_put_16m(b, OXM_OF_VLAN_VID, vid, mask);
         }
 
-        if (vid && vlan_tci_to_pcp(cr->wc.vlan_tci_mask)) {
+        if (flow->vlan_tci & htons(VLAN_CFI) &&
+            vlan_tci_to_pcp(cr->wc.vlan_tci_mask)) {
             nxm_put_8(b, OXM_OF_VLAN_PCP, vlan_tci_to_pcp(flow->vlan_tci));
         }
 

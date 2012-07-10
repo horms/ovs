@@ -990,20 +990,17 @@ OXM_OF_ETH_TYPE(0800)
 OXM_OF_ETH_TYPE(0800) OXM_OF_IN_PORT(00000012)
 
 # vlan
-OXM_OF_VLAN_VID(1009) OXM_OF_VLAN_VID(1009) # Duplicate Field
-OXM_OF_VLAN_VID(f009)           # Bad Value
+OXM_OF_VLAN_VID(0009) OXM_OF_VLAN_VID(0009) # Duplicate Field
+OXM_OF_VLAN_VID(1009)           # Bad Value
+OXM_OF_VLAN_VID_W(0009/1fff)    # Bad Value
 OXM_OF_VLAN_PCP(00)             # Bad Pre-Requisite
 OXM_OF_VLAN_VID(0000)           # Packets without 802.1Q header or with VID=0
-OXM_OF_VLAN_VID(1123)           # Packets with VID=123, any PCP
-OXM_OF_VLAN_VID(1123) OXM_OF_VLAN_PCP(01) # Packets with VID=123, PCP=1.
-OXM_OF_VLAN_VID(0123)           # Does not make sense (but supported anyway)
-OXM_OF_VLAN_VID_W(0123/0123)      # Does not make sense (but supported anyway)
-OXM_OF_VLAN_VID_W(1123/0123)      # Does not make sense (but supported anyway)
-OXM_OF_VLAN_VID_W(0123/1123)      # Does not make sense (but supported anyway)
-OXM_OF_VLAN_VID(0123) OXM_OF_VLAN_PCP(01)  #Bad Pre-Requisite
-OXM_OF_VLAN_VID_W(1123/1fff)    # Packets with VID=123, any PCP.
-OXM_OF_VLAN_VID_W(1123/1f0f),   # Packets with # VID=123 (masked)
-OXM_OF_VLAN_VID_W(1123/1f0f), OXM_OF_VLAN_PCP(01)  # Packets with VID=123 (masked), any PCP.
+OXM_OF_VLAN_VID(0123)           # Packets with VID=123, any PCP
+OXM_OF_VLAN_VID(0123) OXM_OF_VLAN_PCP(01) # Packets with VID=123, PCP=1.
+OXM_OF_VLAN_VID_W(0123/0fff)    # Packets with VID=123, any PCP.
+OXM_OF_VLAN_VID_W(0123/0f0f),   # Packets with # VID=123 (masked)
+OXM_OF_VLAN_VID_W(0123/0f0f), OXM_OF_VLAN_PCP(01)  # Packets with VID=123 (masked), any PCP.
+OXM_OF_VLAN_VID(1000)           # Meaningless but allowed
 OXM_OF_VLAN_VID_W(1000/1000)    # Packets with any VID, any PCP
 OXM_OF_VLAN_VID_W(1000/1000), OXM_OF_VLAN_PCP(01)  # Packets with any VID, PCP=1.
 
@@ -1140,18 +1137,15 @@ OXM_OF_IN_PORT(00000012), OXM_OF_ETH_TYPE(0800)
 # vlan
 nx_pull_match() returned error OFPBMC_DUP_FIELD
 nx_pull_match() returned error OFPBMC_BAD_VALUE
+nx_pull_match() returned error OFPBMC_BAD_MASK
 nx_pull_match() returned error OFPBMC_BAD_PREREQ
 OXM_OF_VLAN_VID(0000)
-OXM_OF_VLAN_VID(1123)
-OXM_OF_VLAN_VID(1123), OXM_OF_VLAN_PCP(01)
-OXM_OF_VLAN_VID(0000)
-OXM_OF_VLAN_VID(0000)
-OXM_OF_VLAN_VID(0000)
-OXM_OF_VLAN_VID(0000)
-nx_pull_match() returned error OFPBMC_BAD_PREREQ
-OXM_OF_VLAN_VID(1123)
-OXM_OF_VLAN_VID_W(1123/1f0f)
-OXM_OF_VLAN_VID_W(1123/1f0f), OXM_OF_VLAN_PCP(01)
+OXM_OF_VLAN_VID(0123)
+OXM_OF_VLAN_VID(0123), OXM_OF_VLAN_PCP(01)
+OXM_OF_VLAN_VID(0123)
+OXM_OF_VLAN_VID_W(0123/0f0f)
+OXM_OF_VLAN_VID_W(0123/0f0f), OXM_OF_VLAN_PCP(01)
+OXM_OF_VLAN_VID(1000)
 OXM_OF_VLAN_VID_W(1000/1000)
 OXM_OF_VLAN_VID_W(1000/1000), OXM_OF_VLAN_PCP(01)
 

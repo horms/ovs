@@ -151,7 +151,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
     }, {
         MFF_VLAN_VID, "dl_vlan", NULL,
         sizeof(ovs_be16), 12,
-        MFM_FULLY, 0,
+        MFM_VLAN_VID, 0,
         MFS_DECIMAL,
         MFP_NONE,
         true,
@@ -838,6 +838,10 @@ mf_is_mask_valid(const struct mf_field *mf, const union mf_value *mask)
 
     case MFM_FULLY:
         return true;
+
+    case MFM_VLAN_VID:
+        return !(mask->be16 & htons(VLAN_PCP_MASK | VLAN_CFI)) ||
+                mask->be16 == htons(OFPVID12_PRESENT);
     }
 
     NOT_REACHED();
@@ -971,7 +975,8 @@ mf_is_value_valid(const struct mf_field *mf, const union mf_value *value)
         return !(value->be16 & htons(0xff00));
 
     case MFF_VLAN_VID:
-        return !(value->be16 & htons(VLAN_PCP_MASK));
+        return !(value->be16 & htons(VLAN_PCP_MASK | VLAN_CFI)) ||
+            value->be16 == htons(OFPVID12_PRESENT);
 
     case MFF_VLAN_PCP:
         return !(value->u8 & ~(VLAN_PCP_MASK >> VLAN_PCP_SHIFT));
@@ -1749,7 +1754,11 @@ mf_set(const struct mf_field *mf,
         break;
 
     case MFF_VLAN_VID:
-        cls_rule_set_dl_vlan_masked(rule, value->be16, mask->be16);
+        if (mask->be16 == htons(0xfff)) {
+            mf_set_value(mf, value, rule);
+        } else {
+            cls_rule_set_dl_vlan_masked(rule, value->be16, mask->be16);
+        }
         break;
 
     case MFF_VLAN_TCI:
