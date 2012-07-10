@@ -112,9 +112,8 @@ ofputil_wildcard_from_ofpfw10(uint32_t ofpfw, struct flow_wildcards *wc)
 
     /* Wildcard fields that aren't defined by ofp10_match or tun_id. */
     wc->wildcards |= (FWW_ARP_SHA | FWW_ARP_THA | FWW_NW_ECN | FWW_NW_TTL
-                      | FWW_IPV6_LABEL | FWW_MPLS_LABEL | FWW_MPLS_TC
-                      | FWW_MPLS_STACK | FWW_VLAN_TPID | FWW_VLAN_QINQ_VID
-                      | FWW_VLAN_QINQ_PCP);
+                      | FWW_MPLS_LABEL | FWW_MPLS_TC | FWW_MPLS_STACK
+                      | FWW_VLAN_TPID | FWW_VLAN_QINQ_VID | FWW_VLAN_QINQ_PCP);
 
     if (ofpfw & OFPFW10_NW_TOS) {
         /* OpenFlow 1.0 defines a TOS wildcard, but it's much later in
@@ -1551,7 +1550,7 @@ ofputil_usable_protocols(const struct cls_rule *rule)
     }
 
     /* Only NXM supports matching IPv6 flow label. */
-    if (!(wc->wildcards & FWW_IPV6_LABEL)) {
+    if (wc->ipv6_label_mask) {
         return OFPUTIL_P_NXM_ANY;
     }
 
@@ -4632,7 +4631,7 @@ ofputil_normalize_rule(struct cls_rule *rule)
     }
     if (!(may_match & MAY_IPV6)) {
         wc.ipv6_src_mask = wc.ipv6_dst_mask = in6addr_any;
-        wc.wildcards |= FWW_IPV6_LABEL;
+        wc.ipv6_label_mask = htonl(0);
     }
     if (!(may_match & MAY_ND_TARGET)) {
         wc.nd_target_mask = in6addr_any;
