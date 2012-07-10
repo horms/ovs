@@ -323,6 +323,8 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
 
     case OFPUTIL_OFPAT11_POP_VLAN:
     case OFPUTIL_OFPAT12_POP_VLAN:
+        ofpact_put_POP_VLAN(ofpacts);
+	break;
     case OFPUTIL_OFPAT10_STRIP_VLAN:
         ofpact_put_STRIP_VLAN(ofpacts);
         break;
