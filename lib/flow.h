@@ -34,7 +34,7 @@ struct ofpbuf;
 /* This sequence number should be incremented whenever anything involving flows
  * or the wildcarding of flows changes.  This will cause build assertion
  * failures in places which likely need to be updated. */
-#define FLOW_WC_SEQ 13
+#define FLOW_WC_SEQ 14
 
 #define FLOW_N_REGS 8
 BUILD_ASSERT_DECL(FLOW_N_REGS <= NXM_NX_MAX_REGS);
@@ -103,7 +103,7 @@ BUILD_ASSERT_DECL(sizeof(((struct flow *)0)->nw_frag) == 1);
 BUILD_ASSERT_DECL(sizeof(struct flow) == FLOW_SIG_SIZE + FLOW_PAD_SIZE);
 
 /* Remember to update FLOW_WC_SEQ when changing 'struct flow'. */
-BUILD_ASSERT_DECL(FLOW_SIG_SIZE == 154 && FLOW_WC_SEQ == 13);
+BUILD_ASSERT_DECL(FLOW_SIG_SIZE == 154 && FLOW_WC_SEQ == 14);
 
 void flow_extract(struct ofpbuf *, uint32_t priority, ovs_be64 tun_id,
                   uint16_t in_port, struct flow *);
@@ -172,7 +172,7 @@ typedef unsigned int OVS_BITWISE flow_wildcards_t;
 #define FWW_ALL         ((OVS_FORCE flow_wildcards_t) (((1 << 12)) - 1))
 
 /* Remember to update FLOW_WC_SEQ when adding or removing FWW_*. */
-BUILD_ASSERT_DECL(FWW_ALL == ((1 << 12) - 1) && FLOW_WC_SEQ == 13);
+BUILD_ASSERT_DECL(FWW_ALL == ((1 << 12) - 1) && FLOW_WC_SEQ == 14);
 
 /* Information on wildcards for a flow, as a supplement to "struct flow".
  *
@@ -201,7 +201,7 @@ struct flow_wildcards {
 };
 
 /* Remember to update FLOW_WC_SEQ when updating struct flow_wildcards. */
-BUILD_ASSERT_DECL(sizeof(struct flow_wildcards) == 136 && FLOW_WC_SEQ == 13);
+BUILD_ASSERT_DECL(sizeof(struct flow_wildcards) == 136 && FLOW_WC_SEQ == 14);
 
 void flow_wildcards_init_catchall(struct flow_wildcards *);
 void flow_wildcards_init_exact(struct flow_wildcards *);
