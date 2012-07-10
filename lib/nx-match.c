@@ -163,6 +163,13 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
                     if (!mf_is_mask_valid(mf, &mask)) {
                         error = OFPERR_OFPBMC_BAD_MASK;
                     } else {
+                        if (header == OXM_OF_VLAN_VID_W &&
+                            mask.be16 != htons(OFPVID12_NONE)) {
+                            /* Special case for VLAN_VID
+                            * Enable CFI bit in mask unless
+                            * mask is OFPVID12_NONE */
+                            mask.be16 |= htons(VLAN_CFI);
+                        }
                         error = 0;
                         mf_set(mf, &value, &mask, rule);
                     }
