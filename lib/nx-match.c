@@ -103,7 +103,7 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
     p = ofpbuf_try_pull(b, nx_padded_match_len(match_len, hdr_len));
     if (!p) {
         fprintf(stderr, "nx_match length %u, rounded up to a "
-                    "multiple of 8 (%u), is longer than space in message (max "
+                    "multiple of 8 (%zu), is longer than space in message (max "
                     "length %zu)", match_len,
                     nx_padded_match_len(match_len, hdr_len), b->size);
         return OFPERR_OFPBMC_BAD_LEN;
