@@ -105,7 +105,8 @@ set_field_init(struct ofpact_reg_load *load, const struct mf_field *mf)
 }
 
 enum ofperr
-set_field_check(const struct ofpact_reg_load *load, const struct flow *flow)
+set_field_check(const struct ofpact_reg_load *load,
+                const struct flow *flow OVS_UNUSED /* TODO:XXX */)
 {
     const struct mf_field *mf = load->dst.field;
     assert(load->ofpact.compat == OFPUTIL_OFPAT12_SET_FIELD);
