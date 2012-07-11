@@ -1883,7 +1883,7 @@ ofputil_put_match(struct ofpbuf *msg, const struct cls_rule *cr,
         ofpbuf_put_uninit(msg, sizeof *omh);
         match_len = nx_put_match(msg, true, cr, cookie, cookie_mask) +
             sizeof *omh;
-        omh = (struct ofp11_match_header *)((char *)msg->data + start_len);
+        omh = ofpbuf_at_assert(msg, start_len, sizeof *omh);
         omh->type = htons(OFPMT_OXM);
         omh->length = htons(match_len);
         break;
