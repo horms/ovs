@@ -2983,7 +2983,7 @@ ofputil_encode_packet_in(const struct ofputil_packet_in *pin,
 
     /* Add OFPT_PACKET_IN. */
     if (protocol == OFPUTIL_P_OF12) {
-        struct ofp11_packet_in *opi;
+        struct ofp12_packet_in *opi;
 
         ofputil_encode_packet_in_tail(pin, &packet, sizeof *opi,
                                       OFPUTIL_P_OF12);
