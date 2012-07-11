@@ -3085,6 +3085,7 @@ ofputil_decode_packet_out(struct ofputil_packet_out *po,
                           struct ofpbuf *ofpacts)
 {
     struct ofpbuf b;
+    enum ofperr bad_in_port_err = OFPERR_OFPET_BAD_REQUEST;
 
     memset(po, 0, sizeof *po);
 
@@ -3108,6 +3109,8 @@ ofputil_decode_packet_out(struct ofputil_packet_out *po,
         if (error) {
             return error;
         }
+
+        bad_in_port_err = OFPERR_OFPBRC_BAD_PORT;
     } else if (oh->version == OFP10_VERSION) {
         const struct ofp_packet_out *opo = (const struct ofp_packet_out *) oh;
         enum ofperr error;
@@ -3121,6 +3124,8 @@ ofputil_decode_packet_out(struct ofputil_packet_out *po,
         if (error) {
             return error;
         }
+
+        bad_in_port_err = OFPERR_NXBRC_BAD_IN_PORT;
     } else {
         NOT_REACHED();
     }
@@ -3129,7 +3134,7 @@ ofputil_decode_packet_out(struct ofputil_packet_out *po,
         && po->in_port != OFPP_NONE && po->in_port != OFPP_CONTROLLER) {
         VLOG_WARN_RL(&bad_ofmsg_rl, "packet-out has bad input port %#"PRIx16,
                     po->in_port);
-        return OFPERR_NXBRC_BAD_IN_PORT;
+        return bad_in_port_err;
     }
 
     po->ofpacts = ofpacts->data;
