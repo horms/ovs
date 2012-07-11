@@ -570,14 +570,16 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
     if (!(wc & FWW_VLAN_TPID) &&
        (flow->vlan_tpid == htons(ETH_TYPE_VLAN) ||
         flow->vlan_tpid == htons(ETH_TYPE_VLAN_8021AD))) {
-        nxm_put_16(b, NXM_NX_VLAN_TPID, flow->vlan_tpid);
-        if (!(wc & FWW_VLAN_QINQ_PCP)) {
-            nxm_put_8(b, NXM_NX_VLAN_QINQ_PCP,
-                      vlan_tci_to_pcp(flow->vlan_qinq_tci));
-        }
-        if (!(wc & FWW_VLAN_QINQ_VID)) {
-            nxm_put_16(b, NXM_NX_VLAN_QINQ_VID,
-                 htons(vlan_tci_to_vid(flow->vlan_qinq_tci)));
+        if (!oxm) {
+            nxm_put_16(b, NXM_NX_VLAN_TPID, flow->vlan_tpid);
+            if (!(wc & FWW_VLAN_QINQ_PCP)) {
+                nxm_put_8(b, NXM_NX_VLAN_QINQ_PCP,
+                          vlan_tci_to_pcp(flow->vlan_qinq_tci));
+            }
+            if (!(wc & FWW_VLAN_QINQ_VID)) {
+                nxm_put_16(b, NXM_NX_VLAN_QINQ_VID,
+                           htons(vlan_tci_to_vid(flow->vlan_qinq_tci)));
+            }
         }
     }
 
@@ -655,16 +657,24 @@ nx_put_match(struct ofpbuf *b, bool oxm, const struct cls_rule *cr,
     }
 
     /* Tunnel ID. */
-    nxm_put_64m(b, NXM_NX_TUN_ID, flow->tun_id, cr->wc.tun_id_mask);
+    if (oxm) {
+        /* FIXME: OF13 tun_id */
+    } else {
+        nxm_put_64m(b, NXM_NX_TUN_ID, flow->tun_id, cr->wc.tun_id_mask);
+    }
 
     /* Registers. */
-    for (i = 0; i < FLOW_N_REGS; i++) {
-        nxm_put_32m(b, NXM_NX_REG(i),
-                    htonl(flow->regs[i]), htonl(cr->wc.reg_masks[i]));
+    if (!oxm) {
+        for (i = 0; i < FLOW_N_REGS; i++) {
+            nxm_put_32m(b, NXM_NX_REG(i),
+                        htonl(flow->regs[i]), htonl(cr->wc.reg_masks[i]));
+        }
     }
 
     /* Cookie. */
-    nxm_put_64m(b, NXM_NX_COOKIE, cookie, cookie_mask);
+    if (!oxm) {
+        nxm_put_64m(b, NXM_NX_COOKIE, cookie, cookie_mask);
+    }
 
     match_len = b->size - start_len;
     hdr_len = oxm ? sizeof(struct ofp11_match_header) : 0;
