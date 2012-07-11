@@ -2867,7 +2867,7 @@ ofputil_decode_packet_in(struct ofputil_packet_in *pin,
     memset(pin, 0, sizeof *pin);
 
     if (code == OFPUTIL_OFPT_PACKET_IN && oh->version == OFP12_VERSION) {
-        const struct ofp11_packet_in *opi;
+        const struct ofp12_packet_in *opi;
         struct cls_rule rule;
         struct ofpbuf b;
         int error;
