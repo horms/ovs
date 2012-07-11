@@ -3103,9 +3103,9 @@ ofputil_decode_packet_out(struct ofputil_packet_out *po,
             return error;
         }
 
-        error = ofpacts_pull_openflow11_instructions(oh->version, &b,
-                                                     ntohs(opo->actions_len),
-                                                     ofpacts);
+        error = ofpacts_pull_openflow11_actions(oh->version, &b,
+                                                ntohs(opo->actions_len),
+                                                ofpacts);
         if (error) {
             return error;
         }

@@ -1004,6 +1004,52 @@ exit:
     return error;
 }
 
+
+enum ofperr
+ofpacts_pull_openflow11_actions(uint8_t ofp_version, struct ofpbuf *openflow,
+                                unsigned int actions_len,
+                                struct ofpbuf *ofpacts)
+{
+    const union ofp_action *actions;
+    size_t n_actions = actions_len / OFP11_INSTRUCTION_ALIGN;
+    enum ofperr error;
+
+    ofpbuf_clear(ofpacts);
+
+    if (actions_len % OFP11_INSTRUCTION_ALIGN != 0) {
+        VLOG_WARN_RL(&rl, "OpenFlow message actions length %u is not a "
+                     "multiple of %d", actions_len, OFP11_INSTRUCTION_ALIGN);
+        error = OFPERR_OFPBRC_BAD_LEN;
+        goto exit;
+    }
+
+    actions = ofpbuf_try_pull(openflow, actions_len);
+    if (actions == NULL) {
+        VLOG_WARN_RL(&rl, "OpenFlow message actions length %u exceeds "
+                     "remaining message length (%zu)",
+                     actions_len, openflow->size);
+        error = OFPERR_OFPBRC_BAD_LEN;
+        goto exit;
+    }
+
+    switch (ofp_version) {
+    case OFP12_VERSION:
+        error = ofpacts_from_openflow12(actions, n_actions, ofpacts);
+        break;
+    case OFP11_VERSION:
+        error = ofpacts_from_openflow11(actions, n_actions, ofpacts);
+        break;
+    default:
+        NOT_REACHED();
+    }
+
+exit:
+    if (error) {
+        ofpbuf_clear(ofpacts);
+    }
+    return error;
+}
+
 enum ofperr
 ofpacts_pull_openflow11_instructions(uint8_t ofp_version,
                                      struct ofpbuf *openflow,
