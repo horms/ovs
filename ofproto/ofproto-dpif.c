@@ -5157,11 +5157,12 @@ commit_dec_mpls_ttl_action(struct action_xlate_ctx *ctx)
 {
     uint8_t ttl = mpls_lse_to_ttl(ctx->flow.mpls_lse);
     if (ttl > 1) {
+        ttl--;
         if (ctx->flow.mpls_lse != htonl(0)) {
-            flow_set_mpls_lse_ttl(&ctx->flow.mpls_lse, --ttl);
+            flow_set_mpls_lse_ttl(&ctx->flow.mpls_lse, ttl);
         }
         if (ctx->base_flow.mpls_lse != htonl(0)) {
-            flow_set_mpls_lse_ttl(&ctx->base_flow.mpls_lse, --ttl);
+            flow_set_mpls_lse_ttl(&ctx->base_flow.mpls_lse, ttl);
         }
         nl_msg_put_u8(ctx->odp_actions, OVS_ACTION_ATTR_DEC_MPLS_TTL, ttl);
     } else {
