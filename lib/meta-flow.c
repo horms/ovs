@@ -220,7 +220,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFP_MPLS,
         true,
         NXM_NX_MPLS_TC, "NXM_NX_MPLS_TC",
-        OXM_OF_MPLS_TC, "OXM_OF_MPLS_STACK",
+        OXM_OF_MPLS_TC, "OXM_OF_MPLS_TC",
     }, {
         MFF_MPLS_STACK, "mpls_stack", NULL,
         1, 1,
