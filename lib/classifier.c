@@ -752,7 +752,14 @@ cls_rule_format(const struct cls_rule *rule, struct ds *s)
         format_ipv6_netmask(s, "ipv6_src", &f->ipv6_src, &wc->ipv6_src_mask);
         format_ipv6_netmask(s, "ipv6_dst", &f->ipv6_dst, &wc->ipv6_dst_mask);
         if (wc->ipv6_label_mask) {
-            ds_put_format(s, "ipv6_label=0x%05"PRIx32",", ntohl(f->ipv6_label));
+            if (wc->ipv6_label_mask == htonl(UINT32_MAX)) {
+                ds_put_format(s, "ipv6_label=0x%05"PRIx32",",
+                              ntohl(f->ipv6_label));
+            } else {
+                ds_put_format(s, "ipv6_label=0x%05"PRIx32"/0x%05"PRIx32",",
+                              ntohl(f->ipv6_label),
+                              ntohl(wc->ipv6_label_mask));
+            }
         }
     } else {
         format_ip_netmask(s, "nw_src", f->nw_src, wc->nw_src_mask);
