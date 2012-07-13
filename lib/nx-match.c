@@ -216,8 +216,6 @@ nx_pull_match__(struct ofpbuf *b, unsigned int match_len, size_t hdr_len,
         }
     }
 
-    if (match_len)
-        fprintf(stderr, "tail=%d\n", match_len);
     return match_len ? OFPERR_OFPBMC_BAD_LEN : 0;
 }
 
