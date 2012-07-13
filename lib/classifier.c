@@ -528,7 +528,7 @@ void
 cls_rule_set_ipv6_label_masked(struct cls_rule *rule, ovs_be32 ipv6_label,
                                ovs_be32 mask)
 {
-    rule->flow.ipv6_label = ipv6_label;
+    rule->flow.ipv6_label = ipv6_label & mask;
     rule->wc.ipv6_label_mask = mask;
 }
 
