@@ -239,6 +239,7 @@ struct mf_field {
     enum mf_string string;
     enum mf_prereqs prereqs;
     bool writable;              /* May be written by actions? */
+    bool oxm_writable;          /* writable by OXM set-field action */
 
     /* NXM properties.
      *

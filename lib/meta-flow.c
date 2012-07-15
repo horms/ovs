@@ -52,7 +52,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_HEXADECIMAL,
         MFP_NONE,
-        true,
+        true, false,
         NXM_NX_TUN_ID, "NXM_NX_TUN_ID",
         0, NULL,
     }, {
@@ -61,7 +61,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_IN_PORT,
         MFS_OFP_PORT,
         MFP_NONE,
-        false,
+        false, false,
         NXM_OF_IN_PORT, "NXM_OF_IN_PORT",
         OXM_OF_IN_PORT, "OXM_OF_IN_PORT",
     },
@@ -73,7 +73,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,                           \
         MFS_HEXADECIMAL,                        \
         MFP_NONE,                               \
-        true,                                   \
+        true, false,                            \
         NXM_NX_REG(IDX),                        \
         "NXM_NX_REG" #IDX,                      \
         0, NULL,                                \
@@ -116,7 +116,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_ETHERNET,
         MFP_NONE,
-        true,
+        true, true,
         NXM_OF_ETH_SRC, "NXM_OF_ETH_SRC",
         OXM_OF_ETH_SRC, "OXM_OF_ETH_SRC",
     }, {
@@ -125,7 +125,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_ETHERNET,
         MFP_NONE,
-        true,
+        true, true,
         NXM_OF_ETH_DST, "NXM_OF_ETH_DST",
         OXM_OF_ETH_DST, "OXM_OF_ETH_DST",
     }, {
@@ -134,7 +134,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_DL_TYPE,
         MFS_HEXADECIMAL,
         MFP_NONE,
-        false,
+        false, true,
         NXM_OF_ETH_TYPE, "NXM_OF_ETH_TYPE",
         OXM_OF_ETH_TYPE, "OXM_OF_ETH_TYPE",
     },
@@ -145,7 +145,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_HEXADECIMAL,
         MFP_NONE,
-        true,
+        true, false,
         NXM_OF_VLAN_TCI, "NXM_OF_VLAN_TCI",
         0, NULL,
     }, {
@@ -154,7 +154,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_VLAN_VID, 0,
         MFS_DECIMAL,
         MFP_NONE,
-        true,
+        true, true,
         0, NULL,
         OXM_OF_VLAN_VID, "OXM_OF_VLAN_VID",
     }, {
@@ -163,7 +163,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, 0,
         MFS_DECIMAL,
         MFP_VLAN_VID,
-        true,
+        true, true,
         0, NULL,
         OXM_OF_VLAN_PCP, "OXM_OF_VLAN_PCP",
     },
@@ -177,7 +177,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_VLAN_TPID,
         MFS_HEXADECIMAL,
         MFP_NONE,
-        true,
+        true, false,
         NXM_NX_VLAN_TPID, "NXM_NX_VLAN_TPID",
         0, NULL,
     }, {
@@ -186,7 +186,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_VLAN_QINQ_VID,
         MFS_DECIMAL,
         MFP_VLAN_TPID,
-        true,
+        true, false,
         NXM_NX_VLAN_QINQ_VID, "NXM_NX_VLAN_QINQ_VID",
         0, NULL,
     }, {
@@ -195,7 +195,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_VLAN_QINQ_PCP,
         MFS_DECIMAL,
         MFP_VLAN_TPID,
-        true,
+        true, false,
         NXM_NX_VLAN_QINQ_PCP, "NXM_NX_VLAN_QINQ_PCP",
         0, NULL,
     },
@@ -209,7 +209,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_MPLS_LABEL,
         MFS_DECIMAL,
         MFP_MPLS,
-        true,
+        true, true,
         NXM_NX_MPLS_LABEL, "NXM_NX_MPLS_LABEL",
         OXM_OF_MPLS_LABEL, "OXM_OF_MPLS_LABEL",
     }, {
@@ -218,7 +218,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_MPLS_TC,
         MFS_DECIMAL,
         MFP_MPLS,
-        true,
+        true, true,
         NXM_NX_MPLS_TC, "NXM_NX_MPLS_TC",
         OXM_OF_MPLS_TC, "OXM_OF_MPLS_TC",
     }, {
@@ -227,7 +227,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_MPLS_STACK,
         MFS_DECIMAL,
         MFP_MPLS,
-        true,
+        true, false,
         NXM_NX_MPLS_STACK, "NXM_NX_MPLS_STACK",
         OXM_OF_MPLS_STACK, "OXM_OF_MPLS_STACK",
     },
@@ -242,7 +242,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_IPV4,
         MFP_IPV4,
-        true,
+        true, true,
         NXM_OF_IP_SRC, "NXM_OF_IP_SRC",
         OXM_OF_IPV4_SRC, "OXM_OF_IPV4_SRC",
     }, {
@@ -251,7 +251,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_IPV4,
         MFP_IPV4,
-        true,
+        true, true,
         NXM_OF_IP_DST, "NXM_OF_IP_DST",
         OXM_OF_IPV4_DST, "OXM_OF_IPV4_DST",
     },
@@ -262,7 +262,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_IPV6,
         MFP_IPV6,
-        true,
+        true, true,
         NXM_NX_IPV6_SRC, "NXM_NX_IPV6_SRC",
         OXM_OF_IPV6_SRC, "OXM_OF_IPV6_SRC",
     }, {
@@ -271,7 +271,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_IPV6,
         MFP_IPV6,
-        true,
+        true, true,
         NXM_NX_IPV6_DST, "NXM_NX_IPV6_DST",
         OXM_OF_IPV6_DST, "OXM_OF_IPV6_DST",
     },
@@ -281,7 +281,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_IPV6_LABEL, 0,
         MFS_HEXADECIMAL,
         MFP_IPV6,
-        false,
+        false, true,
         NXM_NX_IPV6_LABEL, "NXM_NX_IPV6_LABEL",
         OXM_OF_IPV6_FLABEL, "OXM_OF_IPV6_FLABEL",
     },
@@ -292,7 +292,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_NW_PROTO,
         MFS_DECIMAL,
         MFP_IP_ANY,
-        false,
+        false, true,
         NXM_OF_IP_PROTO, "NXM_OF_IP_PROTO",
         OXM_OF_IP_PROTO, "OXM_OF_IP_PROTO",
     }, {
@@ -301,7 +301,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_NW_DSCP,
         MFS_DECIMAL,
         MFP_IP_ANY,
-        true,
+        true, true,
         NXM_OF_IP_TOS, "NXM_OF_IP_TOS",
         OXM_OF_IP_DSCP, "OXM_OF_IP_DSCP",
     }, {
@@ -310,7 +310,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_NW_ECN,
         MFS_DECIMAL,
         MFP_IP_ANY,
-        true,
+        true, true,
         NXM_NX_IP_ECN, "NXM_NX_IP_ECN",
         OXM_OF_IP_ECN, "OXM_OF_IP_ECN",
     }, {
@@ -319,7 +319,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_NW_TTL,
         MFS_DECIMAL,
         MFP_IP_ANY,
-        true,
+        true, false,
         NXM_NX_IP_TTL, "NXM_NX_IP_TTL",
         0, NULL,
     }, {
@@ -328,7 +328,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_FRAG,
         MFP_IP_ANY,
-        false,
+        false, false,
         NXM_NX_IP_FRAG, "NXM_NX_IP_FRAG",
         0, NULL,
     },
@@ -339,7 +339,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, FWW_NW_PROTO,
         MFS_DECIMAL,
         MFP_ARP,
-        false,
+        false, true,
         NXM_OF_ARP_OP, "NXM_OF_ARP_OP",
         OXM_OF_ARP_OP, "OXM_OF_ARP_OP",
     }, {
@@ -348,7 +348,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_IPV4,
         MFP_ARP,
-        false,
+        false, true,
         NXM_OF_ARP_SPA, "NXM_OF_ARP_SPA",
         OXM_OF_ARP_SPA, "OXM_OF_ARP_SPA",
     }, {
@@ -357,7 +357,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_IPV4,
         MFP_ARP,
-        false,
+        false, true,
         NXM_OF_ARP_TPA, "NXM_OF_ARP_TPA",
         OXM_OF_ARP_TPA, "OXM_OF_ARP_TPA",
     }, {
@@ -366,7 +366,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_ETHERNET,
         MFP_ARP,
-        false,
+        false, true,
         NXM_NX_ARP_SHA, "NXM_NX_ARP_SHA",
         OXM_OF_ARP_SHA, "OXM_OF_ARP_SHA",
     }, {
@@ -375,7 +375,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_ETHERNET,
         MFP_ARP,
-        false,
+        false, true,
         NXM_NX_ARP_THA, "NXM_NX_ARP_THA",
         OXM_OF_ARP_THA, "OXM_OF_ARP_THA",
     },
@@ -390,7 +390,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_DECIMAL,
         MFP_TCP,
-        true,
+        true, true,
         NXM_OF_TCP_SRC, "NXM_OF_TCP_SRC",
         OXM_OF_TCP_SRC, "OXM_OF_TCP_SRC",
     }, {
@@ -399,7 +399,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_DECIMAL,
         MFP_TCP,
-        true,
+        true, true,
         NXM_OF_TCP_DST, "NXM_OF_TCP_DST",
         OXM_OF_TCP_DST, "OXM_OF_TCP_DST",
     },
@@ -410,7 +410,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_DECIMAL,
         MFP_UDP,
-        true,
+        true, true,
         NXM_OF_UDP_SRC, "NXM_OF_UDP_SRC",
         OXM_OF_UDP_SRC, "OXM_OF_UDP_SRC",
     }, {
@@ -419,7 +419,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_DECIMAL,
         MFP_UDP,
-        true,
+        true, true,
         NXM_OF_UDP_DST, "NXM_OF_UDP_DST",
         OXM_OF_UDP_DST, "OXM_OF_UDP_DST",
     },
@@ -430,7 +430,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, 0,
         MFS_DECIMAL,
         MFP_ICMPV4,
-        false,
+        false, true,
         NXM_OF_ICMP_TYPE, "NXM_OF_ICMP_TYPE",
         OXM_OF_ICMPV4_TYPE, "OXM_OF_ICMPV4_TYPE",
     }, {
@@ -439,7 +439,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, 0,
         MFS_DECIMAL,
         MFP_ICMPV4,
-        false,
+        false, true,
         NXM_OF_ICMP_CODE, "NXM_OF_ICMP_CODE",
         OXM_OF_ICMPV4_CODE, "OXM_OF_ICMPV4_CODE",
     },
@@ -450,7 +450,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, 0,
         MFS_DECIMAL,
         MFP_ICMPV6,
-        false,
+        false, true,
         NXM_NX_ICMPV6_TYPE, "NXM_NX_ICMPV6_TYPE",
         OXM_OF_ICMPV6_TYPE, "OXM_OF_ICMPV6_TYPE",
     }, {
@@ -459,7 +459,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, 0,
         MFS_DECIMAL,
         MFP_ICMPV6,
-        false,
+        false, true,
         NXM_NX_ICMPV6_CODE, "NXM_NX_ICMPV6_CODE",
         OXM_OF_ICMPV6_CODE, "OXM_OF_ICMPV6_CODE",
     },
@@ -474,7 +474,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_FULLY, 0,
         MFS_IPV6,
         MFP_ND,
-        false,
+        false, true,
         NXM_NX_ND_TARGET, "NXM_NX_ND_TARGET",
         OXM_OF_IPV6_ND_TARGET, "OXM_OF_IPV6_ND_TARGET",
     }, {
@@ -483,7 +483,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, 0,
         MFS_ETHERNET,
         MFP_ND_SOLICIT,
-        false,
+        false, true,
         NXM_NX_ND_SLL, "NXM_NX_ND_SLL",
         OXM_OF_IPV6_ND_SLL, "OXM_OF_IPV6_ND_SLL",
     }, {
@@ -492,7 +492,7 @@ static const struct mf_field mf_fields[MFF_N_IDS] = {
         MFM_NONE, 0,
         MFS_ETHERNET,
         MFP_ND_ADVERT,
-        false,
+        false, true,
         NXM_NX_ND_TLL, "NXM_NX_ND_TLL",
         OXM_OF_IPV6_ND_TLL, "OXM_OF_IPV6_ND_TLL",
     }
