@@ -26,75 +26,6 @@
 #include "openvswitch/types.h"
 #include "set-field.h"
 
-static bool
-set_field_mf_allowed(const struct mf_field *mf)
-{
-    if (!mf->writable || mf->oxm_header == 0) {
-        return false;
-    }
-    switch (mf->id) {
-    case MFF_ETH_SRC:
-    case MFF_ETH_DST:
-    case MFF_ETH_TYPE:
-    case MFF_VLAN_VID:
-    case MFF_VLAN_PCP:
-    case MFF_IP_DSCP:
-    case MFF_IP_ECN:
-    case MFF_IP_PROTO:
-    case MFF_IPV4_SRC:
-    case MFF_IPV4_DST:
-    case MFF_TCP_SRC:
-    case MFF_TCP_DST:
-    case MFF_UDP_SRC:
-    case MFF_UDP_DST:
-#if 0
-    /* TODO: sctp */
-    case MFF_SCTP_SRC:
-    case MFF_SCTP_DST:
-#endif
-    case MFF_ICMPV4_TYPE:
-    case MFF_ICMPV4_CODE:
-    case MFF_ARP_OP:
-    case MFF_ARP_SPA:
-    case MFF_ARP_TPA:
-    case MFF_ARP_SHA:
-    case MFF_ARP_THA:
-    case MFF_IPV6_SRC:
-    case MFF_IPV6_DST:
-    case MFF_IPV6_LABEL:
-    case MFF_ICMPV6_TYPE:
-    case MFF_ICMPV6_CODE:
-    case MFF_ND_TARGET:
-    case MFF_ND_SLL:
-    case MFF_ND_TLL:
-    case MFF_MPLS_LABEL:
-    case MFF_MPLS_TC:
-#if 0
-    /* TODO: OF1.3 */
-    case MFF_MPLS_STACK:
-    case MFF_PBB_ISID:
-    case MFF_TUNNEL_ID:
-    case MFF_IPV6_EXTHDR:
-#endif
-        return true;
-
-    case MFF_TUN_ID: /* TODO:XXX OF1.3 */
-    case MFF_MPLS_STACK: /* TODO:XXX OF1.3 */
-    case MFF_IN_PORT:
-    CASE_MFF_REGS:
-    case MFF_VLAN_TCI:
-    case MFF_VLAN_TPID:
-    case MFF_VLAN_QINQ_VID:
-    case MFF_VLAN_QINQ_PCP:
-    case MFF_IP_TTL:
-    case MFF_IP_FRAG:
-    case MFF_N_IDS:
-    default:
-        return false;
-    }
-    return false;
-}
-
 void
 set_field_init(struct ofpact_reg_load *load, const struct mf_field *mf)
 {
@@ -111,7 +42,7 @@ set_field_check(const struct ofpact_reg_load *load,
     const struct mf_field *mf = load->dst.field;
     assert(load->ofpact.compat == OFPUTIL_OFPAT12_SET_FIELD);
 
-    if (!set_field_mf_allowed(mf)) {
+    if (!mf->oxm_writable) {
         return OFPERR_OFPBAC_BAD_ARGUMENT;
     }
     if (!mf_is_value_valid(mf, &load->value)) {
@@ -226,7 +157,7 @@ set_field_parse(const char *arg, struct ofpbuf *ofpacts)
     if (!mf) {
         ovs_fatal(0, "%s is not valid oxm field name", key);
     }
-    if (!set_field_mf_allowed(mf)) {
+    if (!mf->oxm_writable) {
         ovs_fatal(0, "%s is not allowed to set", key);
     }
 
