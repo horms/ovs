@@ -1612,8 +1612,6 @@ ofpact_to_openflow10(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_AUTOPATH:
     case OFPACT_NOTE:
     case OFPACT_EXIT:
-    case OFPACT_COPY_TTL_OUT:
-    case OFPACT_COPY_TTL_IN:
     case OFPACT_SET_MPLS_LABEL:
     case OFPACT_SET_MPLS_TC:
     case OFPACT_SET_MPLS_TTL:
@@ -1623,6 +1621,13 @@ ofpact_to_openflow10(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_POP_MPLS:
     case OFPACT_PUSH_VLAN:
         ofpact_to_nxast(a, out);
+        break;
+
+
+    case OFPACT_COPY_TTL_OUT:
+    case OFPACT_COPY_TTL_IN:
+        /* TODO:XXX return error */
+        NOT_REACHED();
         break;
     }
 }
@@ -1692,7 +1697,15 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
             ofpact_get_POP_MPLS(a)->ethertype;
         break;
 
-    /* TODO: more actions OFPAT_COPY_TTL_OUT ... OFPAT_DEC_NW_TTL */
+    case OFPACT_COPY_TTL_OUT:
+        ofputil_put_OFPAT11_COPY_TTL_OUT(out);
+        break;
+
+    case OFPACT_COPY_TTL_IN:
+        ofputil_put_OFPAT11_COPY_TTL_IN(out);
+        break;
+
+    /* TODO: more actions OFPAT_DEC_NW_TTL (and OFPAT_SET_NW_TTL) */
 
     case OFPACT_END:
     case OFPACT_CONTROLLER:
@@ -1711,8 +1724,6 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_REG_MOVE:
     case OFPACT_REG_LOAD:
     case OFPACT_DEC_TTL:
-    case OFPACT_COPY_TTL_OUT:
-    case OFPACT_COPY_TTL_IN:
     case OFPACT_SET_MPLS_LABEL:
     case OFPACT_SET_MPLS_TC:
     case OFPACT_SET_TUNNEL:
@@ -1751,6 +1762,8 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_POP_VLAN:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
+    case OFPACT_COPY_TTL_OUT:
+    case OFPACT_COPY_TTL_IN:
         return ofpact_to_openflow11_common(a, out);
 
     case OFPACT_SET_VLAN_VID:
@@ -1808,8 +1821,6 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_REG_MOVE:
     case OFPACT_REG_LOAD:
     case OFPACT_DEC_TTL:
-    case OFPACT_COPY_TTL_OUT:
-    case OFPACT_COPY_TTL_IN:
     case OFPACT_SET_MPLS_LABEL:
     case OFPACT_SET_MPLS_TC:
     case OFPACT_SET_TUNNEL:
@@ -1855,6 +1866,8 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_POP_VLAN:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
+    case OFPACT_COPY_TTL_OUT:
+    case OFPACT_COPY_TTL_IN:
         return ofpact_to_openflow11_common(a, out);
 
     case OFPACT_CONTROLLER:
@@ -1873,8 +1886,6 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_AUTOPATH:
     case OFPACT_NOTE:
     case OFPACT_EXIT:
-    case OFPACT_COPY_TTL_OUT:
-    case OFPACT_COPY_TTL_IN:
     case OFPACT_SET_MPLS_LABEL:
     case OFPACT_SET_MPLS_TC:
         ofpact_to_nxast(a, out);
