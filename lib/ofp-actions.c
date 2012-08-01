@@ -912,6 +912,41 @@ enum {
 #undef DEFINE_INST
 };
 
+struct instruction_type_info {
+    enum ovs_instruction_type type;
+    const char *name;
+};
+
+static const struct instruction_type_info inst_info[] = {
+#define DEFINE_INST(ENUM, STRUCT, EXTENSIBLE, NAME)    {OVSINST_##ENUM, NAME},
+OVS_INSTRUCTIONS
+#undef DEFINE_INST
+};
+
+static const char *
+ofpact_instruction_name_from_type(enum ovs_instruction_type type)
+{
+    const struct instruction_type_info *p;
+    for (p = inst_info; p < &inst_info[ARRAY_SIZE(inst_info)]; p++) {
+        if (p->type == type) {
+            return p->name;
+        }
+    }
+    return NULL;
+}
+
+static int
+ofpact_instruction_type_from_name(const char *name)
+{
+    const struct instruction_type_info *p;
+    for (p = inst_info; p < &inst_info[ARRAY_SIZE(inst_info)]; p++) {
+        if (!strcasecmp(name, p->name)) {
+            return p->type;
+        }
+    }
+    return -1;
+}
+
 static inline struct ofp11_instruction *
 instruction_next(const struct ofp11_instruction *inst)
 {
