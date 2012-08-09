@@ -3724,7 +3724,7 @@ ofputil_encode_port_mod(const struct ofputil_port_mod *pm,
         struct ofp11_port_mod *opm;
 
         opm = make_openflow(sizeof *opm, ofp_version, OFPT11_PORT_MOD, &b);
-        opm->port_no = htonl(pm->port_no);
+        opm->port_no = ofputil_port_to_ofp11(pm->port_no);
         memcpy(opm->hw_addr, pm->hw_addr, ETH_ADDR_LEN);
         opm->config = htonl(pm->config & OFPPC11_ALL);
         opm->mask = htonl(pm->mask & OFPPC11_ALL);
