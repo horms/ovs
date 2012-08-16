@@ -5130,7 +5130,7 @@ execute_controller_action(struct action_xlate_ctx *ctx, int len,
 }
 
 static bool
-compose_dec_ttl(struct action_xlate_ctx *ctx)
+compose_dec_ttl(struct action_xlate_ctx *ctx, struct ofpact_cnt_ids *ids)
 {
     if (ctx->flow.dl_type != htons(ETH_TYPE_IP) &&
         ctx->flow.dl_type != htons(ETH_TYPE_IPV6)) {
@@ -5141,7 +5141,12 @@ compose_dec_ttl(struct action_xlate_ctx *ctx)
         ctx->flow.nw_ttl--;
         return false;
     } else {
-        execute_controller_action(ctx, UINT16_MAX, OFPR_INVALID_TTL, 0);
+        size_t i;
+
+        for (i = 0; i < ids->n_controllers; i++) {
+            execute_controller_action(ctx, UINT16_MAX, OFPR_INVALID_TTL,
+                                      ids->cnt_ids[i]);
+        }
 
         /* Stop processing for current table. */
         return true;
@@ -5634,7 +5639,7 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         break;
 
     case OFPACT_DEC_TTL:
-        if (compose_dec_ttl(ctx)) {
+        if (compose_dec_ttl(ctx, ofpact_get_DEC_TTL(a))) {
             return false;
         }
         break;

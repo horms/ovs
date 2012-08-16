@@ -73,7 +73,7 @@
     DEFINE_OFPACT(SET_L4_DST_PORT, ofpact_l4_port,       ofpact)    \
     DEFINE_OFPACT(REG_MOVE,        ofpact_reg_move,      ofpact)    \
     DEFINE_OFPACT(REG_LOAD,        ofpact_reg_load,      ofpact)    \
-    DEFINE_OFPACT(DEC_TTL,         ofpact_null,          ofpact)    \
+    DEFINE_OFPACT(DEC_TTL,         ofpact_cnt_ids,       cnt_ids)   \
     DEFINE_OFPACT(COPY_TTL_OUT,    ofpact_null,          ofpact)    \
     DEFINE_OFPACT(COPY_TTL_IN,     ofpact_null,          ofpact)    \
     DEFINE_OFPACT(SET_MPLS_LABEL,  ofpact_mpls_label,    ofpact)    \
@@ -165,7 +165,7 @@ ofpact_next(const struct ofpact *ofpact)
 
 /* Action structure for each OFPACT_*. */
 
-/* OFPACT_END, OFPACT_STRIP_VLAN, OFPACT_DEC_TTL, OFPACT_POP_QUEUE,
+/* OFPACT_END, OFPACT_STRIP_VLAN, OFPACT_POP_QUEUE,
  * OFPACT_EXIT.
  *
  * Used for OFPAT10_STRIP_VLAN, NXAST_DEC_TTL, NXAST_POP_QUEUE, NXAST_EXIT.
@@ -477,6 +477,18 @@ struct ofpact_inst_actions {
     struct ofpact ofpacts[];
 };
 BUILD_ASSERT_DECL((sizeof(struct ofpact_inst_actions) % OFPACT_ALIGNTO) == 0);
+
+/* OFPACT_DEC_TTL.
+ *
+ * Used for NXAST_DEC_TTL and NXAST_DEC_TTL_CNT_IDS. */
+struct ofpact_cnt_ids {
+    struct ofpact ofpact;
+
+    /* Controller ids. */
+    unsigned int n_controllers;
+    uint16_t cnt_ids[];
+
+};
 
 /* Converting OpenFlow to ofpacts. */
 enum ofperr ofpacts_pull_openflow10(struct ofpbuf *openflow,
