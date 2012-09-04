@@ -854,6 +854,8 @@ static const struct ofputil_msg_type ofputil_msg_types[] = {
            sizeof(struct ofp_switch_config), 0),
     OFPT12(OFPT_FLOW_REMOVED,       OFPT_FLOW_REMOVED,
            sizeof(struct ofp12_flow_removed), 8),
+    OFPT12(OFPT_PORT_STATUS,    OFPT_PORT_STATUS,
+           sizeof(struct ofp_port_status) + sizeof(struct ofp11_port), 0),
     OFPT12(OFPT_PACKET_IN,          OFPT_PACKET_IN,
            offsetof(struct ofp_packet_in, data), 1),
     OFPT12(OFPT_PACKET_OUT,     OFPT11_PACKET_OUT,
