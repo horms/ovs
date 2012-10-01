@@ -325,6 +325,7 @@ struct ofputil_flow_removed {
     struct cls_rule rule;
     ovs_be64 cookie;
     uint8_t reason;             /* One of OFPRR_*. */
+    uint8_t table_id;
     uint32_t duration_sec;
     uint32_t duration_nsec;
     uint16_t idle_timeout;

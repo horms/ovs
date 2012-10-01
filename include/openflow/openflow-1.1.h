@@ -793,4 +793,13 @@ struct ofp11_flow_removed {
 };
 OFP_ASSERT(sizeof(struct ofp11_flow_removed) == 48);
 
+enum ofp_table {
+    /* Last usable table number. */
+    OFPTT_MAX = 0xfe,
+    /* Fake tables. */
+    OFPTT_ALL = 0xff
+    /* Wildcard table used for table config, flow stats and flow deletes. */
+};
+
+
 #endif /* openflow/openflow-1.1.h */
