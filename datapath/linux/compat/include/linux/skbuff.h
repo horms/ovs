@@ -251,4 +251,14 @@ static inline void skb_reset_mac_len(struct sk_buff *skb)
 	skb->mac_len = skb->network_header - skb->mac_header;
 }
 #endif
+
+#ifdef HAVE_INNER_PROTOCOL
+static inline void skb_set_inner_protocol(struct sk_buff *skb, __be16 ethertype)
+{
+	skb->inner_protocol = ethertype;
+}
+#else
+/* MPLS GSO is not supported */
+static inline void skb_set_inner_protocol(struct sk_buff *skb, __be16 ethertype) { }
+#endif
 #endif
