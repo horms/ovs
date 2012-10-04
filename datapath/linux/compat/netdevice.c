@@ -1,6 +1,9 @@
 #include <linux/netdevice.h>
 #include <linux/if_vlan.h>
 
+#include "mpls.h"
+#include "gso.h"
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
 #ifndef HAVE_CAN_CHECKSUM_PROTOCOL
 static bool can_checksum_protocol(unsigned long features, __be16 protocol)
@@ -67,13 +70,18 @@ u32 rpl_netif_skb_features(struct sk_buff *skb)
 		return harmonize_features(skb, protocol, features);
 	}
 }
+#endif	/* kernel version < 2.6.38 */
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
 struct sk_buff *rpl_skb_gso_segment(struct sk_buff *skb, u32 features)
 {
 	int vlan_depth = ETH_HLEN;
 	__be16 type = skb->protocol;
 	__be16 skb_proto;
 	struct sk_buff *skb_gso;
+
+	if (eth_p_mpls(skb->protocol))
+		type = ovs_skb_get_inner_protocol(skb);
 
 	while (type == htons(ETH_P_8021Q)) {
 		struct vlan_hdr *vh;
@@ -95,4 +103,4 @@ struct sk_buff *rpl_skb_gso_segment(struct sk_buff *skb, u32 features)
 	skb->protocol = skb_proto;
 	return skb_gso;
 }
-#endif	/* kernel version < 2.6.38 */
+#endif	/* kernel version < 3.11.0 */
