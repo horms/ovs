@@ -73,10 +73,12 @@ static inline struct net_device *dev_get_by_index_rcu(struct net *net, int ifind
 #define NETIF_F_FSO 0
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
 #define skb_gso_segment rpl_skb_gso_segment
 struct sk_buff *rpl_skb_gso_segment(struct sk_buff *skb, u32 features);
+#endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
 #define netif_skb_features rpl_netif_skb_features
 u32 rpl_netif_skb_features(struct sk_buff *skb);
 
@@ -125,7 +127,7 @@ static inline struct net_device *netdev_master_upper_dev_get(struct net_device *
 }
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
 #define dev_queue_xmit rpl_dev_queue_xmit
 int dev_queue_xmit(struct sk_buff *skb);
 #endif
