@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/if.h>
 #include <linux/if_tunnel.h>
+#include <linux/if_vlan.h>
 #include <linux/icmp.h>
 #include <linux/in.h>
 #include <linux/ip.h>
@@ -35,6 +36,8 @@
 #include <net/xfrm.h>
 
 #include "gso.h"
+#include "mpls.h"
+#include "vlan.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37) && \
 	!defined(HAVE_VLAN_BUG_WORKAROUND)
@@ -47,13 +50,30 @@ MODULE_PARM_DESC(vlan_tso, "Enable TSO for VLAN packets");
 #define vlan_tso true
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
 static bool dev_supports_vlan_tx(struct net_device *dev)
 {
-#if defined(HAVE_VLAN_BUG_WORKAROUND)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
+	return true;
+#elif defined(HAVE_VLAN_BUG_WORKAROUND)
 	return dev->features & NETIF_F_HW_VLAN_TX;
 #else
 	/* Assume that the driver is buggy. */
+	return false;
+#endif
+}
+
+/* Strictly this is not needed and will be optimised out
+ * as this code is guarded by if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0).
+ * It is here to make things explicit should the compatibility
+ * code be extended in some way prior extending its life-span
+ * beyond v3.11.
+ */
+static bool supports_mpls_gso(void)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
+	return true;
+#else
 	return false;
 #endif
 }
@@ -62,20 +82,45 @@ int rpl_dev_queue_xmit(struct sk_buff *skb)
 {
 #undef dev_queue_xmit
 	int err = -ENOMEM;
+	bool vlan, mpls;
 
-	if (vlan_tx_tag_present(skb) && !dev_supports_vlan_tx(skb->dev)) {
+	vlan = mpls = false;
+
+	if (eth_p_mpls(skb->protocol) && !supports_mpls_gso())
+		mpls = true;
+
+	if (vlan_tx_tag_present(skb) && !dev_supports_vlan_tx(skb->dev))
+		vlan = true;
+
+	if (vlan || mpls) {
 		int features;
 
 		features = netif_skb_features(skb);
 
-		if (!vlan_tso)
-			features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
-				      NETIF_F_UFO | NETIF_F_FSO);
+		if (vlan) {
+			if (!vlan_tso)
+				features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
+					      NETIF_F_UFO | NETIF_F_FSO);
 
-		skb = __vlan_put_tag(skb, skb->vlan_proto, vlan_tx_tag_get(skb));
-		if (unlikely(!skb))
-			return err;
-		vlan_set_tci(skb, 0);
+			skb = __vlan_put_tag(skb, skb->vlan_proto,
+					     vlan_tx_tag_get(skb));
+			if (unlikely(!skb))
+				return err;
+			vlan_set_tci(skb, 0);
+		}
+
+		/* As of v3.11 the kernel provides an mpls_features field in
+		 * struct net_device which allows devices to advertise which
+		 * features its supports for MPLS. This value defaults to
+		 * NETIF_F_SG and as of v3.11.
+		 *
+		 * This compatibility code is intended for kernels older
+		 * than v3.11 that do not support MPLS GSO and thus do not
+		 * provide mpls_features. Thus this code uses NETIF_F_SG
+		 * directly in place of mpls_features.
+		 */
+		if (mpls)
+			features &= NETIF_F_SG;
 
 		if (netif_needs_gso(skb, features)) {
 			struct sk_buff *nskb;
@@ -114,12 +159,14 @@ drop:
 	kfree_skb(skb);
 	return err;
 }
-#endif /* kernel version < 2.6.37 */
 
 static __be16 __skb_network_protocol(struct sk_buff *skb)
 {
 	__be16 type = skb->protocol;
 	int vlan_depth = ETH_HLEN;
+
+	if (eth_p_mpls(skb->protocol))
+		type = ovs_skb_get_inner_protocol(skb);
 
 	while (type == htons(ETH_P_8021Q) || type == htons(ETH_P_8021AD)) {
 		struct vlan_hdr *vh;
@@ -134,6 +181,7 @@ static __be16 __skb_network_protocol(struct sk_buff *skb)
 
 	return type;
 }
+#endif /* kernel version < 3.11.0 */
 
 static struct sk_buff *tnl_skb_gso_segment(struct sk_buff *skb,
 					   netdev_features_t features,
