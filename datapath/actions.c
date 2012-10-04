@@ -48,6 +48,111 @@ static int make_writable(struct sk_buff *skb, int write_len)
 	return pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
 }
 
+/* The end of the mac header.
+ *
+ * For non-MPLS skbs this will correspond to the network header.
+ * For MPLS skbs it will be berfore the network_header as the MPLS
+ * label stack lies between the end of the mac header and the network
+ * header. That is, for MPLS skbs the end of the mac header
+ * is the top of the MPLS label stack.
+ */
+static inline unsigned char *skb_mac_header_end(const struct sk_buff *skb)
+{
+	return skb_mac_header(skb) + skb->mac_len;
+}
+
+static __be16 *get_ethertype(struct sk_buff *skb)
+{
+	/* skb_mac_header hdr is not used to locate the ethertype to
+	 * set as it will be incorrect in the presence of VLAN tags
+	 */
+	struct ethhdr *hdr = (struct ethhdr *)(skb_mac_header_end(skb) -
+					       ETH_HLEN);
+	return &hdr->h_proto;
+}
+
+static void set_ethertype(struct sk_buff *skb, const __be16 ethertype)
+{
+	__be16 *skb_ethertype = get_ethertype(skb);
+	if (*skb_ethertype == ethertype)
+		return;
+	if (get_ip_summed(skb) == OVS_CSUM_COMPLETE) {
+		__be16 diff[] = { ~*skb_ethertype, ethertype };
+		skb->csum = ~csum_partial((char *)diff, sizeof(diff),
+					  ~skb->csum);
+	}
+	*skb_ethertype = ethertype;
+}
+
+static int push_mpls(struct sk_buff *skb,
+		     const struct ovs_action_push_mpls *mpls)
+{
+	__be32 *new_mpls_lse;
+	int err;
+
+	err = make_writable(skb, skb->mac_len + MPLS_HLEN);
+	if (unlikely(err))
+		return err;
+
+	skb_push(skb, MPLS_HLEN);
+	memmove(skb_mac_header(skb) - MPLS_HLEN, skb_mac_header(skb),
+		skb->mac_len);
+	skb_reset_mac_header(skb);
+
+	new_mpls_lse = (__be32 *)skb_mac_header_end(skb);
+	*new_mpls_lse = mpls->mpls_lse;
+
+	if (get_ip_summed(skb) == OVS_CSUM_COMPLETE)
+		skb->csum = csum_add(skb->csum, csum_partial(new_mpls_lse,
+							     MPLS_HLEN, 0));
+
+	set_ethertype(skb, mpls->mpls_ethertype);
+	return 0;
+}
+
+static int pop_mpls(struct sk_buff *skb, const __be16 *ethertype)
+{
+	int err;
+
+	err = make_writable(skb, skb->mac_len + MPLS_HLEN);
+	if (unlikely(err))
+		return err;
+
+	if (get_ip_summed(skb) == OVS_CSUM_COMPLETE)
+		skb->csum = csum_sub(skb->csum,
+				     csum_partial(skb_mac_header_end(skb),
+						  MPLS_HLEN, 0));
+
+	memmove(skb_mac_header(skb) + MPLS_HLEN, skb_mac_header(skb),
+		skb->mac_len);
+
+	skb_pull(skb, MPLS_HLEN);
+	skb_reset_mac_header(skb);
+
+	set_ethertype(skb, *ethertype);
+	return 0;
+}
+
+static int set_mpls(struct sk_buff *skb, const __be32 *mpls_lse)
+{
+	__be32 *stack = (__be32 *)skb_mac_header_end(skb);
+	int err;
+
+	err = make_writable(skb, skb->mac_len + MPLS_HLEN);
+	if (unlikely(err))
+		return err;
+
+	if (get_ip_summed(skb) == OVS_CSUM_COMPLETE) {
+		__be32 diff[] = { ~(*stack), *mpls_lse };
+		skb->csum = ~csum_partial((char *)diff, sizeof(diff),
+					  ~skb->csum);
+	}
+
+	*stack = *mpls_lse;
+
+	return 0;
+}
+
 /* remove VLAN header from packet and update csum accordingly. */
 static int __pop_vlan_tci(struct sk_buff *skb, __be16 *current_tci)
 {
@@ -114,6 +219,9 @@ static int push_vlan(struct sk_buff *skb, const struct ovs_action_push_vlan *vla
 
 		if (!__vlan_put_tag(skb, current_tag))
 			return -ENOMEM;
+
+		/* update mac_len for skb_mac_header_end() */
+		skb_reset_mac_len(skb);
 
 		if (get_ip_summed(skb) == OVS_CSUM_COMPLETE)
 			skb->csum = csum_add(skb->csum, csum_partial(skb->data
@@ -355,9 +463,19 @@ static int set_tcp(struct sk_buff *skb, const struct ovs_key_tcp *tcp_port_key)
 static int do_output(struct datapath *dp, struct sk_buff *skb, int out_port)
 {
 	struct vport *vport;
+	__be16 *ethertype = get_ethertype(skb);
 
 	if (unlikely(!skb))
 		return -ENOMEM;
+
+	/* Consider MPLS packets as encapsulated.
+	 *
+	 * This allows GSO segmentation to occur
+	 * by forcing hw_features to be used when determining
+	 * if checksum offload is available or not.
+	 */
+	if (eth_p_mpls(*ethertype))
+		skb_set_encapsulation_features(skb);
 
 	vport = ovs_vport_rcu(dp, out_port);
 	if (unlikely(!vport)) {
@@ -459,12 +577,21 @@ static int execute_set_action(struct sk_buff *skb,
 	case OVS_KEY_ATTR_UDP:
 		err = set_udp(skb, nla_data(nested_attr));
 		break;
+
+	case OVS_KEY_ATTR_MPLS:
+		err = set_mpls(skb, nla_data(nested_attr));
+		break;
 	}
 
 	return err;
 }
 
-/* Execute a list of actions against 'skb'. */
+/* Execute a list of actions against 'skb'.
+ *
+ * The stack depth is only tracked in the case of a non-MPLS packet
+ * that becomes MPLS via an MPLS push action. The stack depth
+ * is passed to do_output() in order to allow it to prepare the
+ * skb for possible GSO segmentation. */
 static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 			const struct nlattr *attr, int len, bool keep_skb)
 {
@@ -492,6 +619,14 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 
 		case OVS_ACTION_ATTR_USERSPACE:
 			output_userspace(dp, skb, a);
+			break;
+
+		case OVS_ACTION_ATTR_PUSH_MPLS:
+			err = push_mpls(skb, nla_data(a));
+			break;
+
+		case OVS_ACTION_ATTR_POP_MPLS:
+			err = pop_mpls(skb, nla_data(a));
 			break;
 
 		case OVS_ACTION_ATTR_PUSH_VLAN:

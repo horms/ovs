@@ -251,4 +251,14 @@ static inline void skb_reset_mac_len(struct sk_buff *skb)
 	skb->mac_len = skb->network_header - skb->mac_header;
 }
 #endif
+
+#ifdef HAVE_ENCAPSULATION_FEATURES
+static inline void skb_set_encapsulation_features(struct sk_buff *skb)
+{
+	skb->encapsulation_features = 1;
+}
+#else
+/* MPLS GSO is not supported */
+static inline void skb_set_encapsulation_features(struct sk_buff *skb) { }
+#endif
 #endif
