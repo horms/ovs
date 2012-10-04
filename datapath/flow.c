@@ -730,6 +730,17 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 			memcpy(key->ipv4.arp.tha, arp->ar_tha, ETH_ALEN);
 			key_len = SW_FLOW_KEY_OFFSET(ipv4.arp);
 		}
+	} else if (eth_p_mpls(key->eth.type)) {
+		error = check_header(skb, MPLS_HLEN);
+		if (unlikely(error))
+			goto out;
+
+		key_len = SW_FLOW_KEY_OFFSET(mpls.top_label);
+		memcpy(&key->mpls.top_label, skb_network_header(skb), MPLS_HLEN);
+
+		/* Update network header */
+		skb_set_network_header(skb, skb_network_header(skb) -
+				       skb->data + MPLS_HLEN);
 	} else if (key->eth.type == htons(ETH_P_IPV6)) {
 		int nh_len;             /* IPv6 Header + Extensions */
 
@@ -840,6 +851,7 @@ const int ovs_key_lens[OVS_KEY_ATTR_MAX + 1] = {
 	[OVS_KEY_ATTR_ETHERNET] = sizeof(struct ovs_key_ethernet),
 	[OVS_KEY_ATTR_VLAN] = sizeof(__be16),
 	[OVS_KEY_ATTR_ETHERTYPE] = sizeof(__be16),
+	[OVS_KEY_ATTR_MPLS] = sizeof(struct ovs_key_mpls),
 	[OVS_KEY_ATTR_IPV4] = sizeof(struct ovs_key_ipv4),
 	[OVS_KEY_ATTR_IPV6] = sizeof(struct ovs_key_ipv6),
 	[OVS_KEY_ATTR_TCP] = sizeof(struct ovs_key_tcp),
@@ -1185,6 +1197,16 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 		swkey->ip.proto = ntohs(arp_key->arp_op);
 		memcpy(swkey->ipv4.arp.sha, arp_key->arp_sha, ETH_ALEN);
 		memcpy(swkey->ipv4.arp.tha, arp_key->arp_tha, ETH_ALEN);
+	} else if (eth_p_mpls(swkey->eth.type)) {
+		const struct ovs_key_mpls *mpls_key;
+
+		if (!(attrs & (1ULL << OVS_KEY_ATTR_MPLS)))
+			return -EINVAL;
+		attrs &= ~(1ULL << OVS_KEY_ATTR_MPLS);
+
+		key_len = SW_FLOW_KEY_OFFSET(mpls.top_label);
+		mpls_key = nla_data(a[OVS_KEY_ATTR_MPLS]);
+		swkey->mpls.top_label = mpls_key->mpls_top_label;
 	}
 
 	if (attrs)
@@ -1384,6 +1406,15 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 		arp_key->arp_op = htons(swkey->ip.proto);
 		memcpy(arp_key->arp_sha, swkey->ipv4.arp.sha, ETH_ALEN);
 		memcpy(arp_key->arp_tha, swkey->ipv4.arp.tha, ETH_ALEN);
+	} else if (eth_p_mpls(swkey->eth.type)) {
+		struct ovs_key_mpls *mpls_key;
+
+		nla = nla_reserve(skb, OVS_KEY_ATTR_MPLS, sizeof(*mpls_key));
+		if (!nla)
+			goto nla_put_failure;
+		mpls_key = nla_data(nla);
+		memset(mpls_key, 0, sizeof(struct ovs_key_mpls));
+		mpls_key->mpls_top_label = swkey->mpls.top_label;
 	}
 
 	if ((swkey->eth.type == htons(ETH_P_IP) ||
