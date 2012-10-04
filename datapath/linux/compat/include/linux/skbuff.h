@@ -251,4 +251,16 @@ static inline void skb_reset_mac_len(struct sk_buff *skb)
 	skb->mac_len = skb->network_header - skb->mac_header;
 }
 #endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,7,0)
+static inline void skb_set_encapsulation(struct sk_buff *skb)
+{
+	skb->encapsulation = 1;
+}
+#else
+/* Encapsulation didn't exist before 3.7.0 but that is ok
+ * because neither did MPLS GSO the only reason the bit is set
+ * by Open vSwtich */
+static inline void skb_set_encapsulation(struct sk_buff *skb) { }
+#endif
 #endif
