@@ -95,6 +95,8 @@ struct datapath {
  * @pkt_key: The flow information extracted from the packet.  Must be nonnull.
  * @tun_key: Key for the tunnel that encapsulated this packet. NULL if the
  * packet is not being tunneled.
+ * @inner_protocol: Provides a substitute for the skb->inner_protocol field on
+ * kernels before 3.11.
  */
 struct ovs_skb_cb {
 	struct sw_flow		*flow;
