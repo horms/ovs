@@ -1,6 +1,7 @@
 #ifndef __LINUX_GSO_WRAPPER_H
 #define __LINUX_GSO_WRAPPER_H
 
+#include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <net/protocol.h>
 
@@ -69,4 +70,39 @@ static inline void skb_reset_inner_headers(struct sk_buff *skb)
 
 #define ip_local_out rpl_ip_local_out
 int ip_local_out(struct sk_buff *skb);
+
+#ifdef HAVE_INNER_PROTOCOL
+static inline void ovs_skb_set_inner_protocol(struct sk_buff *skb,
+					      __be16 ethertype)
+{
+	skb->inner_protocol = ethertype;
+}
+
+static inline __be16 ovs_skb_get_inner_protocol(struct sk_buff *skb)
+{
+	return skb->inner_protocol;
+}
+#else
+static inline void ovs_skb_set_inner_protocol(struct sk_buff *skb,
+					      __be16 ethertype) {
+	OVS_CB(skb)->inner_protocol = ethertype;
+}
+
+static inline __be16 ovs_skb_get_inner_protocol(struct sk_buff *skb)
+{
+	return OVS_CB(skb)->inner_protocol;
+}
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
+#define skb_gso_segment rpl_skb_gso_segment
+struct sk_buff *rpl_skb_gso_segment(struct sk_buff *skb,
+				    netdev_features_t features);
+
+#define __skb_gso_segment rpl___skb_gso_segment
+struct sk_buff *rpl___skb_gso_segment(struct sk_buff *skb,
+				      netdev_features_t features,
+				      bool tx_path);
+#endif /* before 3.11 */
+
 #endif
