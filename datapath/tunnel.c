@@ -33,6 +33,7 @@
 #include "checksum.h"
 #include "compat.h"
 #include "datapath.h"
+#include "gso.h"
 #include "tunnel.h"
 #include "vlan.h"
 #include "vport.h"

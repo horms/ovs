@@ -19,6 +19,7 @@
 #include <linux/module.h>
 #include <linux/if.h>
 #include <linux/if_tunnel.h>
+#include <linux/if_vlan.h>
 #include <linux/icmp.h>
 #include <linux/in.h>
 #include <linux/ip.h>
@@ -35,11 +36,19 @@
 #include <net/xfrm.h>
 
 #include "gso.h"
+#include "mpls.h"
+#include "vlan.h"
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,11,0)
 static __be16 skb_network_protocol(struct sk_buff *skb)
 {
 	__be16 type = skb->protocol;
+	__be16 inner_proto;
 	int vlan_depth = ETH_HLEN;
+
+	inner_proto = ovs_skb_get_inner_protocol(skb);
+	if (eth_p_mpls(skb->protocol) && !eth_p_mpls(inner_proto))
+		type = inner_proto;
 
 	while (type == htons(ETH_P_8021Q) || type == htons(ETH_P_8021AD)) {
 		struct vlan_hdr *vh;
@@ -54,6 +63,43 @@ static __be16 skb_network_protocol(struct sk_buff *skb)
 
 	return type;
 }
+
+struct sk_buff *rpl___skb_gso_segment(struct sk_buff *skb,
+				      netdev_features_t features,
+				      bool tx_path)
+{
+	struct sk_buff *skb_gso;
+	__be16 type = skb->protocol;
+
+	skb->protocol = skb_network_protocol(skb);
+
+	/* this hack needed to get regular skb_gso_segment() */
+#ifdef HAVE___SKB_GSO_SEGMENT
+#undef __skb_gso_segment
+	skb_gso = skb_gso_segment(skb, features, tx_path);
+#else
+#undef skb_gso_segment
+	skb_gso = skb_gso_segment(skb, features);
+#endif
+
+	if (!skb_gso || IS_ERR(skb_gso))
+	    return skb_gso;
+
+	skb = skb_gso;
+	while (skb) {
+		skb->protocol = type;
+		skb = skb->next;
+	}
+
+	return skb_gso;
+}
+
+struct sk_buff *rpl_skb_gso_segment(struct sk_buff *skb,
+				    netdev_features_t features)
+{
+	return rpl___skb_gso_segment(skb, features, true);
+}
+#endif /* kernel version < 3.11.0 */
 
 static struct sk_buff *tnl_skb_gso_segment(struct sk_buff *skb,
 					   netdev_features_t features,
