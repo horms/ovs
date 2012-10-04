@@ -71,6 +71,45 @@ static DECLARE_DELAYED_WORK(rehash_flow_wq, rehash_flow_table);
 
 int ovs_net_id __read_mostly;
 
+int (*ovs_dp_ioctl_hook)(struct net_device *dev, struct ifreq *rq, int cmd);
+EXPORT_SYMBOL(ovs_dp_ioctl_hook);
+
+void skb_cb_set_l2_size(struct sk_buff *skb)
+{
+	struct ethhdr *eth;
+	int nh_ofs;
+	__be16 dl_type = 0;
+
+	skb_reset_mac_header(skb);
+
+	eth = eth_hdr(skb);
+	nh_ofs = sizeof(struct ethhdr);
+	if (likely(eth->h_proto >= htons(ETH_TYPE_MIN))) {
+		dl_type = eth->h_proto;
+
+		while (dl_type == htons(ETH_P_8021Q) &&
+				skb->len >= nh_ofs + sizeof(struct vlan_hdr)) {
+			struct vlan_hdr *vh = (struct vlan_hdr*)(skb->data + nh_ofs);
+			dl_type = vh->h_vlan_encapsulated_proto;
+			nh_ofs += sizeof(struct vlan_hdr);
+		}
+
+		OVS_CB(skb)->l2_size = nh_ofs;
+	} else {
+		OVS_CB(skb)->l2_size = 0;
+	}
+}
+
+unsigned char *skb_cb_mpls_bos(const struct sk_buff *skb)
+{
+	return skb_mac_header(skb) + OVS_CB(skb)->l2_size;
+}
+
+ptrdiff_t skb_cb_l2_size(const struct sk_buff *skb)
+{
+	return OVS_CB(skb)->l2_size;
+}
+
 /**
  * DOC: Locking:
  *
@@ -667,6 +706,11 @@ static int validate_set(const struct nlattr *a,
 
 		return validate_tp_port(flow_key);
 
+	case OVS_KEY_ATTR_MPLS:
+		if (!eth_p_mpls(flow_key->eth.type))
+			return -EINVAL;
+		break;
+
 	default:
 		return -EINVAL;
 	}
@@ -725,6 +769,8 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 		static const u32 action_lens[OVS_ACTION_ATTR_MAX + 1] = {
 			[OVS_ACTION_ATTR_OUTPUT] = sizeof(u32),
 			[OVS_ACTION_ATTR_USERSPACE] = (u32)-1,
+			[OVS_ACTION_ATTR_PUSH_MPLS] = sizeof(struct ovs_action_push_mpls),
+			[OVS_ACTION_ATTR_POP_MPLS] = sizeof(__be16),
 			[OVS_ACTION_ATTR_PUSH_VLAN] = sizeof(struct ovs_action_push_vlan),
 			[OVS_ACTION_ATTR_POP_VLAN] = 0,
 			[OVS_ACTION_ATTR_SET] = (u32)-1,
@@ -755,6 +801,15 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 				return -EINVAL;
 			break;
 
+		case OVS_ACTION_ATTR_PUSH_MPLS: {
+			const struct ovs_action_push_mpls *mpls = nla_data(a);
+			if (!eth_p_mpls(mpls->mpls_ethertype))
+				return -EINVAL;
+			break;
+		}
+
+		case OVS_ACTION_ATTR_POP_MPLS:
+			break;
 
 		case OVS_ACTION_ATTR_POP_VLAN:
 			break;
@@ -869,6 +924,8 @@ static int ovs_packet_cmd_execute(struct sk_buff *skb, struct genl_info *info)
 	OVS_CB(packet)->flow = flow;
 	packet->priority = flow->key.phy.priority;
 	skb_set_mark(packet, flow->key.phy.skb_mark);
+
+	skb_cb_set_l2_size(packet);
 
 	rcu_read_lock();
 	dp = get_dp(sock_net(skb->sk), ovs_header->dp_ifindex);
