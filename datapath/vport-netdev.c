@@ -30,6 +30,8 @@
 
 #include "checksum.h"
 #include "datapath.h"
+#include "gso.h"
+#include "mpls.h"
 #include "vlan.h"
 #include "vport-internal_dev.h"
 #include "vport-netdev.h"
@@ -279,6 +281,8 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 	struct netdev_vport *netdev_vport = netdev_vport_priv(vport);
 	int mtu = netdev_vport->dev->mtu;
 	int len;
+	__be16 inner_protocol;
+	bool vlan, mpls;
 
 	if (unlikely(packet_length(skb) > mtu && !skb_is_gso(skb))) {
 		net_warn_ratelimited("%s: dropped over-mtu packet: %d > %d\n",
@@ -290,14 +294,34 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 	skb->dev = netdev_vport->dev;
 	forward_ip_summed(skb, true);
 
-	if (vlan_tx_tag_present(skb) && !dev_supports_vlan_tx(skb->dev)) {
-		int features;
+	vlan = mpls = false;
+
+	inner_protocol = ovs_skb_get_inner_protocol(skb);
+	if (eth_p_mpls(skb->protocol) && !eth_p_mpls(inner_protocol))
+		mpls = true;
+
+	if (vlan_tx_tag_present(skb) && !dev_supports_vlan_tx(skb->dev))
+		vlan = true;
+
+	if (vlan || mpls) {
+		netdev_features_t features;
 
 		features = netif_skb_features(skb);
 
 		if (!vlan_tso)
 			features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
 				      NETIF_F_UFO | NETIF_F_FSO);
+
+		/* As of v3.11 the kernel provides an mpls_features field in
+		 * struct net_device which allows devices to advertise which
+		 * features its supports for MPLS. This value defaults to
+		 * NETIF_F_SG and as of writing is not overridden anywhere.
+		 * This compatibility code is intended for older kernels which
+		 * do not support MPLS GSO and thus do not provide
+		 * mpls_features. Thus this code uses NETIF_F_SG directly in
+		 * place of mpls_features. */
+		if (mpls)
+			features &= NETIF_F_SG;
 
 		if (netif_needs_gso(skb, features)) {
 			struct sk_buff *nskb;
@@ -322,10 +346,12 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 				nskb = skb->next;
 				skb->next = NULL;
 
-				skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
+				if (vlan)
+					skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
 				if (likely(skb)) {
 					len += skb->len;
-					vlan_set_tci(skb, 0);
+					if (vlan)
+						vlan_set_tci(skb, 0);
 					dev_queue_xmit(skb);
 				}
 
@@ -336,10 +362,12 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 		}
 
 tag:
-		skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
-		if (unlikely(!skb))
-			return 0;
-		vlan_set_tci(skb, 0);
+		if (vlan) {
+			skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
+			if (unlikely(!skb))
+				return 0;
+			vlan_set_tci(skb, 0);
+		}
 	}
 
 	len = skb->len;
