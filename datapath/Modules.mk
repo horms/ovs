@@ -25,6 +25,7 @@ openvswitch_headers = \
 	compat.h \
 	datapath.h \
 	flow.h \
+	mpls.h \
 	vlan.h \
 	vport.h \
 	vport-internal_dev.h \
