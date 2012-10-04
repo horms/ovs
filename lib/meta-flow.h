@@ -78,6 +78,11 @@ enum mf_field_id {
     MFF_DL_VLAN_PCP,            /* u8 (OpenFlow 1.0 compatibility) */
     MFF_VLAN_PCP,               /* be16 (OpenFlow 1.2 compatibility) */
 
+    /* L2.5 */
+    MFF_MPLS_LABEL,             /* be32 */
+    MFF_MPLS_TC,                /* u8 */
+    MFF_MPLS_BOS,               /* u8 */
+
     /* L3. */
     MFF_IPV4_SRC,               /* be32 */
     MFF_IPV4_DST,               /* be32 */
@@ -164,6 +169,7 @@ enum mf_prereqs {
     /* L2 requirements. */
     MFP_ARP,
     MFP_VLAN_VID,
+    MFP_MPLS,
     MFP_IPV4,
     MFP_IPV6,
     MFP_IP_ANY,
@@ -220,6 +226,9 @@ struct mf_field {
      *     - "dl_vlan_pcp" is 1 byte but only 3 bits.
      *     - "is_frag" is 1 byte but only 2 bits.
      *     - "ipv6_label" is 4 bytes but only 20 bits.
+     *     - "mpls_label" is 4 bytes but only 20 bits.
+     *     - "mpls_tc"    is 1 byte but only 3 bits.
+     *     - "mpls_bos"   is 1 byte but only 1 bit.
      */
     unsigned int n_bytes;       /* Width of the field in bytes. */
     unsigned int n_bits;        /* Number of significant bits in field. */

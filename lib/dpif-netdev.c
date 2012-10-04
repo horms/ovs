@@ -1272,6 +1272,20 @@ dp_netdev_execute_actions(struct dp_netdev *dp,
             eth_pop_vlan(packet);
             break;
 
+        case OVS_ACTION_ATTR_PUSH_MPLS: {
+            const struct ovs_action_push_mpls *mpls = nl_attr_get(a);
+            push_mpls(packet, mpls->mpls_ethertype, mpls->mpls_label);
+            break;
+         }
+
+        case OVS_ACTION_ATTR_POP_MPLS:
+             pop_mpls(packet, nl_attr_get_be16(a));
+             break;
+
+        case OVS_ACTION_ATTR_SET_MPLS:
+             set_mpls_lse(packet, nl_attr_get_be32(a));
+             break;
+
         case OVS_ACTION_ATTR_SET:
             execute_set_action(packet, nl_attr_get(a));
             break;
@@ -1281,9 +1295,6 @@ dp_netdev_execute_actions(struct dp_netdev *dp,
             break;
 
         case OVS_ACTION_ATTR_UNSPEC:
-        case OVS_ACTION_ATTR_PUSH_MPLS:
-        case OVS_ACTION_ATTR_POP_MPLS:
-        case OVS_ACTION_ATTR_SET_MPLS:
         case __OVS_ACTION_ATTR_MAX:
             NOT_REACHED();
         }
