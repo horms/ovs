@@ -72,12 +72,17 @@ struct sw_flow_key {
 		__be16 tci;		/* 0 if no VLAN, VLAN_TAG_PRESENT set otherwise. */
 		__be16 type;		/* Ethernet frame type. */
 	} eth;
-	struct {
-		u8     proto;		/* IP protocol or lower 8 bits of ARP opcode. */
-		u8     tos;		/* IP ToS. */
-		u8     ttl;		/* IP TTL/hop limit. */
-		u8     frag;		/* One of OVS_FRAG_TYPE_*. */
-	} ip;
+	union {
+		struct {
+			__be32 top_lse;		/* top label stack entry */
+		} mpls;
+		struct {
+			u8     proto;		/* IP protocol or lower 8 bits of ARP opcode. */
+			u8     tos;		/* IP ToS. */
+			u8     ttl;		/* IP TTL/hop limit. */
+			u8     frag;		/* One of OVS_FRAG_TYPE_*. */
+		} ip;
+	};
 	union {
 		struct {
 			struct {
@@ -142,6 +147,10 @@ struct arp_eth_header {
 	unsigned char       ar_tha[ETH_ALEN];	/* target hardware address  */
 	unsigned char       ar_tip[4];		/* target IP address        */
 } __packed;
+
+#define ETH_TYPE_MIN 0x600
+
+#define MPLS_HLEN 4
 
 int ovs_flow_init(void);
 void ovs_flow_exit(void);
@@ -227,10 +236,16 @@ void ovs_flow_tbl_insert(struct flow_table *table, struct sw_flow *flow,
 void ovs_flow_tbl_remove(struct flow_table *table, struct sw_flow *flow);
 
 struct sw_flow *ovs_flow_tbl_next(struct flow_table *table, u32 *bucket, u32 *idx);
-extern const int ovs_key_lens[OVS_KEY_ATTR_MAX + 1];
+int ovs_flow_verify_key_len(u16 type, const struct nlattr *nla);
 int ipv4_tun_from_nlattr(const struct nlattr *attr,
 			 struct ovs_key_ipv4_tunnel *tun_key);
 int ipv4_tun_to_nlattr(struct sk_buff *skb,
 			const struct ovs_key_ipv4_tunnel *tun_key);
+
+static inline bool eth_p_mpls(__be16 eth_type)
+{
+	return eth_type == htons(ETH_P_MPLS_UC) ||
+		eth_type == htons(ETH_P_MPLS_MC);
+}
 
 #endif /* flow.h */

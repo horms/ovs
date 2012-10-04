@@ -547,12 +547,13 @@ static int validate_and_copy_sample(const struct nlattr *attr,
 	return 0;
 }
 
-static int validate_tp_port(const struct sw_flow_key *flow_key)
+static int validate_tp_port(const struct sw_flow_key *flow_key,
+			    __be16 current_eth_type)
 {
-	if (flow_key->eth.type == htons(ETH_P_IP)) {
+	if (current_eth_type == htons(ETH_P_IP)) {
 		if (flow_key->ipv4.tp.src || flow_key->ipv4.tp.dst)
 			return 0;
-	} else if (flow_key->eth.type == htons(ETH_P_IPV6)) {
+	} else if (current_eth_type == htons(ETH_P_IPV6)) {
 		if (flow_key->ipv6.tp.src || flow_key->ipv6.tp.dst)
 			return 0;
 	}
@@ -583,7 +584,7 @@ static int validate_and_copy_set_tun(const struct nlattr *attr,
 static int validate_set(const struct nlattr *a,
 			const struct sw_flow_key *flow_key,
 			struct sw_flow_actions **sfa,
-			bool *set_tun)
+			bool *set_tun, __be16 current_eth_type)
 {
 	const struct nlattr *ovs_key = nla_data(a);
 	int key_type = nla_type(ovs_key);
@@ -593,8 +594,7 @@ static int validate_set(const struct nlattr *a,
 		return -EINVAL;
 
 	if (key_type > OVS_KEY_ATTR_MAX ||
-	    (ovs_key_lens[key_type] != nla_len(ovs_key) &&
-	     ovs_key_lens[key_type] != -1))
+	    ovs_flow_verify_key_len(key_type, ovs_key))
 		return -EINVAL;
 
 	switch (key_type) {
@@ -621,7 +621,7 @@ static int validate_set(const struct nlattr *a,
 		break;
 
 	case OVS_KEY_ATTR_IPV4:
-		if (flow_key->eth.type != htons(ETH_P_IP))
+		if (current_eth_type != htons(ETH_P_IP))
 			return -EINVAL;
 
 		if (!flow_key->ip.proto)
@@ -637,7 +637,7 @@ static int validate_set(const struct nlattr *a,
 		break;
 
 	case OVS_KEY_ATTR_IPV6:
-		if (flow_key->eth.type != htons(ETH_P_IPV6))
+		if (current_eth_type != htons(ETH_P_IPV6))
 			return -EINVAL;
 
 		if (!flow_key->ip.proto)
@@ -659,13 +659,18 @@ static int validate_set(const struct nlattr *a,
 		if (flow_key->ip.proto != IPPROTO_TCP)
 			return -EINVAL;
 
-		return validate_tp_port(flow_key);
+		return validate_tp_port(flow_key, current_eth_type);
 
 	case OVS_KEY_ATTR_UDP:
 		if (flow_key->ip.proto != IPPROTO_UDP)
 			return -EINVAL;
 
-		return validate_tp_port(flow_key);
+		return validate_tp_port(flow_key, current_eth_type);
+
+	case OVS_KEY_ATTR_MPLS:
+		if (!eth_p_mpls(current_eth_type))
+			return -EINVAL;
+		break;
 
 	default:
 		return -EINVAL;
@@ -716,6 +721,7 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 {
 	const struct nlattr *a;
 	int rem, err;
+	__be16 current_eth_type = key->eth.type;
 
 	if (depth >= SAMPLE_ACTION_DEPTH)
 		return -EOVERFLOW;
@@ -725,6 +731,8 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 		static const u32 action_lens[OVS_ACTION_ATTR_MAX + 1] = {
 			[OVS_ACTION_ATTR_OUTPUT] = sizeof(u32),
 			[OVS_ACTION_ATTR_USERSPACE] = (u32)-1,
+			[OVS_ACTION_ATTR_PUSH_MPLS] = sizeof(struct ovs_action_push_mpls),
+			[OVS_ACTION_ATTR_POP_MPLS] = sizeof(__be16),
 			[OVS_ACTION_ATTR_PUSH_VLAN] = sizeof(struct ovs_action_push_vlan),
 			[OVS_ACTION_ATTR_POP_VLAN] = 0,
 			[OVS_ACTION_ATTR_SET] = (u32)-1,
@@ -755,6 +763,19 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 				return -EINVAL;
 			break;
 
+		case OVS_ACTION_ATTR_PUSH_MPLS: {
+			const struct ovs_action_push_mpls *mpls = nla_data(a);
+			if (!eth_p_mpls(mpls->mpls_ethertype))
+				return -EINVAL;
+			current_eth_type = mpls->mpls_ethertype;
+			break;
+		}
+
+		case OVS_ACTION_ATTR_POP_MPLS:
+			if (!eth_p_mpls(current_eth_type))
+				return -EINVAL;
+			current_eth_type = nla_get_u32(a);
+			break;
 
 		case OVS_ACTION_ATTR_POP_VLAN:
 			break;
@@ -768,7 +789,8 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 			break;
 
 		case OVS_ACTION_ATTR_SET:
-			err = validate_set(a, key, sfa, &skip_copy);
+			err = validate_set(a, key, sfa, &skip_copy,
+					   current_eth_type);
 			if (err)
 				return err;
 			break;
@@ -1189,8 +1211,10 @@ static int ovs_flow_cmd_new_or_set(struct sk_buff *skb, struct genl_info *info)
 	if (!a[OVS_FLOW_ATTR_KEY])
 		goto error;
 	error = ovs_flow_from_nlattrs(&key, &key_len, a[OVS_FLOW_ATTR_KEY]);
-	if (error)
+	if (error) {
+		printk("%s: ovs_flow_from_nlattrs failed\n", __func__);
 		goto error;
+	}
 
 	/* Validate actions. */
 	if (a[OVS_FLOW_ATTR_ACTIONS]) {
