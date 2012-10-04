@@ -77,6 +77,9 @@ odp_action_len(uint16_t type)
     case OVS_ACTION_ATTR_SAMPLE: return -2;
 
     case OVS_ACTION_ATTR_UNSPEC:
+    case OVS_ACTION_ATTR_PUSH_MPLS:
+    case OVS_ACTION_ATTR_POP_MPLS:
+    case OVS_ACTION_ATTR_SET_MPLS:
     case __OVS_ACTION_ATTR_MAX:
         return -1;
     }
@@ -109,6 +112,7 @@ ovs_key_attr_to_string(enum ovs_key_attr attr)
     case OVS_KEY_ATTR_ARP: return "arp";
     case OVS_KEY_ATTR_ND: return "nd";
 
+    case OVS_KEY_ATTR_MPLS:
     case __OVS_KEY_ATTR_MAX:
     default:
         snprintf(unknown_attr, sizeof unknown_attr, "key%u",
@@ -343,6 +347,9 @@ format_odp_action(struct ds *ds, const struct nlattr *a)
         format_odp_sample_action(ds, a);
         break;
     case OVS_ACTION_ATTR_UNSPEC:
+    case OVS_ACTION_ATTR_PUSH_MPLS:
+    case OVS_ACTION_ATTR_POP_MPLS:
+    case OVS_ACTION_ATTR_SET_MPLS:
     case __OVS_ACTION_ATTR_MAX:
     default:
         format_generic_odp_action(ds, a);
@@ -632,6 +639,7 @@ odp_flow_key_attr_len(uint16_t type)
     case OVS_KEY_ATTR_ND: return sizeof(struct ovs_key_nd);
 
     case OVS_KEY_ATTR_UNSPEC:
+    case OVS_KEY_ATTR_MPLS:
     case __OVS_KEY_ATTR_MAX:
         return -1;
     }
@@ -851,6 +859,7 @@ format_odp_key_attr(const struct nlattr *a, struct ds *ds)
     }
 
     case OVS_KEY_ATTR_UNSPEC:
+    case OVS_KEY_ATTR_MPLS:
     case __OVS_KEY_ATTR_MAX:
     default:
         format_generic_odp_key(a, ds);
