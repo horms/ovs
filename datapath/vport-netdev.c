@@ -298,6 +298,7 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 	struct netdev_vport *netdev_vport = netdev_vport_priv(vport);
 	int mtu = netdev_vport->dev->mtu;
 	int len;
+	bool vlan, mpls;
 
 	if (unlikely(packet_length(skb) > mtu && !skb_is_gso(skb))) {
 		net_warn_ratelimited("%s: dropped over-mtu packet: %d > %d\n",
@@ -309,14 +310,48 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 	skb->dev = netdev_vport->dev;
 	forward_ip_summed(skb, true);
 
+	vlan = mpls = false;
+
+	if (!kernel_supports_mpls_gso() && eth_p_mpls(skb->protocol) &&
+	    !eth_p_mpls(skb_get_inner_protocol(skb)))
+		mpls = true;
+
+	/* If we are segmenting a VLAN packet, then we don't need to handle
+	 * MPLS segmentation, because MPLS is part of the extended L2 header
+	 * and the kernel already knows how to handle this. */
 	if (vlan_tx_tag_present(skb) && !dev_supports_vlan_tx(skb->dev)) {
-		int features;
+		mpls = false;
+		vlan = true;
+	}
+
+	if (vlan || mpls) {
+		__be16 mpls_protocol;
+		netdev_features_t features;
+
+		/* Swap the protocol so we can reuse the existing
+		 * skb_gso_segment() function to handle L3 GSO. We will
+		 * restore this later. */
+		if (mpls) {
+			mpls_protocol = skb->protocol;
+			skb->protocol = skb_get_inner_protocol(skb);
+		}
 
 		features = netif_skb_features(skb);
 
 		if (!vlan_tso)
 			features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
 				      NETIF_F_UFO | NETIF_F_FSO);
+
+		/* As of v3.11 the kernel provides an mpls_features field in
+		 * struct net_device which allows devices to advertise which
+		 * features its supports for MPLS. This value defaults to
+		 * NETIF_F_SG and as of writing is not overridden anywhere.
+		 * This compatibility code is intended for older kernels which
+		 * do not support MPLS GSO and thus do not provide
+		 * mpls_features. Thus this code uses NETIF_F_SG directly in
+		 * place of mpls_features. */
+		if (mpls)
+			features &= NETIF_F_SG;
 
 		if (netif_needs_gso(skb, features)) {
 			struct sk_buff *nskb;
@@ -341,10 +376,14 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 				nskb = skb->next;
 				skb->next = NULL;
 
-				skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
+				if (vlan)
+					skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
 				if (likely(skb)) {
 					len += skb->len;
-					vlan_set_tci(skb, 0);
+					if (mpls)
+						skb->protocol = mpls_protocol;
+					if (vlan)
+						vlan_set_tci(skb, 0);
 					dev_queue_xmit(skb);
 				}
 
@@ -355,10 +394,14 @@ static int netdev_send(struct vport *vport, struct sk_buff *skb)
 		}
 
 tag:
-		skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
-		if (unlikely(!skb))
-			return 0;
-		vlan_set_tci(skb, 0);
+		if (mpls)
+			skb->protocol = mpls_protocol;
+		if (vlan) {
+			skb = __vlan_put_tag(skb, vlan_tx_tag_get(skb));
+			if (unlikely(!skb))
+				return 0;
+			vlan_set_tci(skb, 0);
+		}
 	}
 
 	len = skb->len;

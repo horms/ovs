@@ -150,6 +150,16 @@ static struct sk_buff *handle_offloads(struct sk_buff *skb)
 
 	if (skb_is_gso(skb)) {
 		struct sk_buff *nskb;
+		__be16 mpls_protocol = htons(0);
+
+		/* Swap the protocol so we can reuse the existing
+		 * skb_gso_segment() function to handle L3 GSO. We will
+		 * restore this later. */
+		if (!kernel_supports_mpls_gso() && eth_p_mpls(skb->protocol) &&
+		    !eth_p_mpls(skb_get_inner_protocol(skb))) {
+			mpls_protocol = skb->protocol;
+			skb->protocol = skb_get_inner_protocol(skb);
+		}
 
 		nskb = __skb_gso_segment(skb, 0, false);
 		if (IS_ERR(nskb)) {
@@ -159,6 +169,13 @@ static struct sk_buff *handle_offloads(struct sk_buff *skb)
 
 		consume_skb(skb);
 		skb = nskb;
+
+		if (mpls_protocol != htons(0)) {
+			do {
+				nskb->protocol = mpls_protocol;
+				nskb = nskb->next;
+			} while (nskb);
+		}
 	} else if (get_ip_summed(skb) == OVS_CSUM_PARTIAL) {
 		/* Pages aren't locked and could change at any time.
 		 * If this happens after we compute the checksum, the

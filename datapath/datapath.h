@@ -38,6 +38,10 @@
 
 #define SAMPLE_ACTION_DEPTH 3
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
+#define HAVE_INNER_PROTOCOL
+#endif
+
 /**
  * struct dp_stats_percpu - per-cpu packet processing statistics for a given
  * datapath.
@@ -101,6 +105,8 @@ struct datapath {
  * packet was not received on a tunnel.
  * @vlan_tci: Provides a substitute for the skb->vlan_tci field on kernels
  * before 2.6.27.
+ * @inner_protocol: Provides a substitute for the skb->inner_protocol field on
+ * kernels before 3.11.
  */
 struct ovs_skb_cb {
 	struct sw_flow		*flow;
@@ -112,8 +118,42 @@ struct ovs_skb_cb {
 #ifdef NEED_VLAN_FIELD
 	u16			vlan_tci;
 #endif
+#ifndef HAVE_INNER_PROTOCOL
+	__be16			inner_protocol;
+#endif
 };
 #define OVS_CB(skb) ((struct ovs_skb_cb *)(skb)->cb)
+
+#ifdef HAVE_INNER_PROTOCOL
+static inline void skb_set_inner_protocol(struct sk_buff *skb, __be16 ethertype)
+{
+	skb->inner_protocol = ethertype;
+}
+
+static inline __be16 skb_get_inner_protocol(struct sk_buff *skb)
+{
+	return skb->inner_protocol;
+}
+
+static inline bool kernel_supports_mpls_gso(void)
+{
+	return true;
+}
+#else
+static inline void skb_set_inner_protocol(struct sk_buff *skb, __be16 ethertype) {
+	OVS_CB(skb)->inner_protocol = ethertype;
+}
+
+static inline __be16 skb_get_inner_protocol(struct sk_buff *skb)
+{
+	return OVS_CB(skb)->inner_protocol;
+}
+
+static inline bool kernel_supports_mpls_gso(void)
+{
+	return false;
+}
+#endif
 
 /**
  * struct dp_upcall - metadata to include with a packet to send to userspace
