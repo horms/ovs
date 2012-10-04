@@ -256,6 +256,13 @@ AC_DEFUN([OVS_CHECK_LINUX_COMPAT], [
   OVS_GREP_IFELSE([$KSRC/include/linux/skbuff.h], [consume_skb])
   OVS_GREP_IFELSE([$KSRC/include/linux/skbuff.h], [skb_frag_page])
   OVS_GREP_IFELSE([$KSRC/include/linux/skbuff.h], [skb_reset_mac_len])
+  # If inner_protocol is merged upstream then a release number may
+  # be used to select compatibility code and the following check may be
+  # removed. This check is here for now to allow Open vSwtich to provide
+  # an example of how inner_protocol may be used to provide
+  # GSO of non-MPLS GSO skbs that are turned into MPLS GSO skbs
+  # using MPLS push actions
+  OVS_GREP_IFELSE([$KSRC/include/linux/skbuff.h], [inner_protocol])
 
   OVS_GREP_IFELSE([$KSRC/include/linux/string.h], [kmemdup], [],
                   [OVS_GREP_IFELSE([$KSRC/include/linux/slab.h], [kmemdup])])
