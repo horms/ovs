@@ -38,6 +38,7 @@
 #include "vport.h"
 
 static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
+			      unsigned *mpls_stack_depth,
 			      const struct nlattr *attr, int len, bool keep_skb);
 
 static int make_writable(struct sk_buff *skb, int write_len)
@@ -46,6 +47,89 @@ static int make_writable(struct sk_buff *skb, int write_len)
 		return 0;
 
 	return pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
+}
+
+static void set_ethertype(struct sk_buff *skb, const __be16 ethertype)
+{
+	struct ethhdr *hdr = (struct ethhdr *)skb_mac_header(skb);
+	if (hdr->h_proto == ethertype)
+		return;
+	hdr->h_proto = ethertype;
+	if (get_ip_summed(skb) == OVS_CSUM_COMPLETE) {
+		__be16 diff[] = { ~hdr->h_proto, ethertype };
+		skb->csum = ~csum_partial((char *)diff, sizeof(diff),
+					  ~skb->csum);
+	}
+}
+
+static int push_mpls(struct sk_buff *skb, const struct ovs_action_push_mpls *mpls)
+{
+	__be32 *new_mpls_lse;
+	int err;
+
+	err = make_writable(skb, skb->mac_len + MPLS_HLEN);
+	if (unlikely(err))
+		return err;
+
+	skb_push(skb, MPLS_HLEN);
+	memmove(skb_mac_header(skb) - MPLS_HLEN, skb_mac_header(skb),
+		skb->mac_len);
+	skb_reset_mac_header(skb);
+	skb_set_network_header(skb, skb->mac_len);
+
+	new_mpls_lse = (__be32 *)skb_network_header(skb);
+	*new_mpls_lse = mpls->mpls_lse;
+
+	if (get_ip_summed(skb) == OVS_CSUM_COMPLETE)
+		skb->csum = csum_add(skb->csum, csum_partial(new_mpls_lse,
+							     MPLS_HLEN, 0));
+
+	set_ethertype(skb, mpls->mpls_ethertype);
+	return 0;
+}
+
+static int pop_mpls(struct sk_buff *skb, const __be16 *ethertype)
+{
+	int err;
+
+	err = make_writable(skb, skb->mac_len + MPLS_HLEN);
+	if (unlikely(err))
+		return err;
+
+	if (get_ip_summed(skb) == OVS_CSUM_COMPLETE)
+		skb->csum = csum_sub(skb->csum,
+				     csum_partial(skb_network_header(skb),
+						  MPLS_HLEN, 0));
+
+	memmove(skb_mac_header(skb) + MPLS_HLEN, skb_mac_header(skb),
+		skb->mac_len);
+
+	skb_pull(skb, MPLS_HLEN);
+	skb_reset_mac_header(skb);
+	skb_set_network_header(skb, skb->mac_len);
+
+	set_ethertype(skb, *ethertype);
+	return 0;
+}
+
+static int set_mpls(struct sk_buff *skb, const __be32 *mpls_lse)
+{
+	__be32 *stack = (__be32 *)skb_network_header(skb);
+	int err;
+
+	err = make_writable(skb, skb->mac_len + MPLS_HLEN);
+	if (unlikely(err))
+		return err;
+
+	if (get_ip_summed(skb) == OVS_CSUM_COMPLETE) {
+		__be32 diff[] = { ~(*stack), *mpls_lse };
+		skb->csum = ~csum_partial((char *)diff, sizeof(diff),
+					  ~skb->csum);
+	}
+
+	*stack = *mpls_lse;
+
+	return 0;
 }
 
 /* remove VLAN header from packet and update csum accordingly. */
@@ -114,6 +198,9 @@ static int push_vlan(struct sk_buff *skb, const struct ovs_action_push_vlan *vla
 
 		if (!__vlan_put_tag(skb, current_tag))
 			return -ENOMEM;
+
+		/* update mac_len for MPLS functions */
+		skb_reset_mac_len(skb);
 
 		if (get_ip_summed(skb) == OVS_CSUM_COMPLETE)
 			skb->csum = csum_add(skb->csum, csum_partial(skb->data
@@ -352,12 +439,25 @@ static int set_tcp(struct sk_buff *skb, const struct ovs_key_tcp *tcp_port_key)
 	return 0;
 }
 
-static int do_output(struct datapath *dp, struct sk_buff *skb, int out_port)
+static int do_output(struct datapath *dp, struct sk_buff *skb, int out_port,
+		     unsigned mpls_stack_depth)
 {
 	struct vport *vport;
 
 	if (unlikely(!skb))
 		return -ENOMEM;
+
+	/* The mpls_stack_depth is only non zero if a non-MPLS packet is
+	 * turned into an MPLS packet via an MPLS push action. In this case
+	 * the skb may be GSO so update skb->mac_len and skb's
+	 * network_header to correspond to the bottom of the MPLS label
+	 * stack rather than the end of the original L2 data which is now
+	 * the top of the MPLS label stack.  */
+	if (mpls_stack_depth) {
+		skb->mac_len += MPLS_HLEN * mpls_stack_depth;
+		skb_set_network_header(skb, skb->mac_len);
+		skb_set_encapsulation_features(skb);
+	}
 
 	vport = ovs_vport_rcu(dp, out_port);
 	if (unlikely(!vport)) {
@@ -398,7 +498,7 @@ static int output_userspace(struct datapath *dp, struct sk_buff *skb,
 }
 
 static int sample(struct datapath *dp, struct sk_buff *skb,
-		  const struct nlattr *attr)
+		  unsigned *mpls_stack_depth, const struct nlattr *attr)
 {
 	const struct nlattr *acts_list = NULL;
 	const struct nlattr *a;
@@ -418,8 +518,9 @@ static int sample(struct datapath *dp, struct sk_buff *skb,
 		}
 	}
 
-	return do_execute_actions(dp, skb, nla_data(acts_list),
-				  nla_len(acts_list), true);
+	return do_execute_actions(dp, skb, mpls_stack_depth,
+				  nla_data(acts_list), nla_len(acts_list),
+				  true);
 }
 
 static int execute_set_action(struct sk_buff *skb,
@@ -459,13 +560,23 @@ static int execute_set_action(struct sk_buff *skb,
 	case OVS_KEY_ATTR_UDP:
 		err = set_udp(skb, nla_data(nested_attr));
 		break;
+
+	case OVS_KEY_ATTR_MPLS:
+		err = set_mpls(skb, nla_data(nested_attr));
+		break;
 	}
 
 	return err;
 }
 
-/* Execute a list of actions against 'skb'. */
+/* Execute a list of actions against 'skb'.
+ *
+ * The stack depth is only tracked in the case of a non-MPLS packet
+ * that becomes MPLS via an MPLS push action. The stack depth
+ * is passed to do_output() in order to allow it to prepare the
+ * skb for possible GSO segmentation. */
 static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
+			unsigned *mpls_stack_depth,
 			const struct nlattr *attr, int len, bool keep_skb)
 {
 	/* Every output action needs a separate clone of 'skb', but the common
@@ -481,7 +592,8 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		int err = 0;
 
 		if (prev_port != -1) {
-			do_output(dp, skb_clone(skb, GFP_ATOMIC), prev_port);
+			do_output(dp, skb_clone(skb, GFP_ATOMIC),
+				  prev_port, *mpls_stack_depth);
 			prev_port = -1;
 		}
 
@@ -492,6 +604,18 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 
 		case OVS_ACTION_ATTR_USERSPACE:
 			output_userspace(dp, skb, a);
+			break;
+
+		case OVS_ACTION_ATTR_PUSH_MPLS:
+			err = push_mpls(skb, nla_data(a));
+			if (!eth_p_mpls(skb->protocol))
+				(*mpls_stack_depth)++;
+			break;
+
+		case OVS_ACTION_ATTR_POP_MPLS:
+			err = pop_mpls(skb, nla_data(a));
+			if (!eth_p_mpls(skb->protocol))
+				(*mpls_stack_depth)--;
 			break;
 
 		case OVS_ACTION_ATTR_PUSH_VLAN:
@@ -509,7 +633,7 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 			break;
 
 		case OVS_ACTION_ATTR_SAMPLE:
-			err = sample(dp, skb, a);
+			err = sample(dp, skb, mpls_stack_depth, a);
 			break;
 		}
 
@@ -523,7 +647,7 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		if (keep_skb)
 			skb = skb_clone(skb, GFP_ATOMIC);
 
-		do_output(dp, skb, prev_port);
+		do_output(dp, skb, prev_port, *mpls_stack_depth);
 	} else if (!keep_skb)
 		consume_skb(skb);
 
@@ -556,6 +680,7 @@ int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb)
 	struct sw_flow_actions *acts = rcu_dereference(OVS_CB(skb)->flow->sf_acts);
 	struct loop_counter *loop;
 	int error;
+	unsigned mpls_stack_depth = 0;
 
 	/* Check whether we've looped too much. */
 	loop = &__get_cpu_var(loop_counters);
@@ -568,7 +693,7 @@ int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb)
 	}
 
 	OVS_CB(skb)->tun_key = NULL;
-	error = do_execute_actions(dp, skb, acts->actions,
+	error = do_execute_actions(dp, skb, &mpls_stack_depth, acts->actions,
 					 acts->actions_len, false);
 
 	/* Check whether sub-actions looped too much. */
