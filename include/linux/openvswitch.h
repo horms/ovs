@@ -309,15 +309,14 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_TCP_FLAGS,	/* be16 TCP flags. */
 	OVS_KEY_ATTR_DP_HASH,	/* u32 hash value */
 	OVS_KEY_ATTR_RECIRC_ID, /* u32 recirc id */
+	OVS_KEY_ATTR_MPLS,      /* array of struct ovs_key_mpls.
+				 * The implementation may restrict
+				 * the accepted length of the array. */
+
 #ifdef __KERNEL__
 	/* Only used within kernel data path. */
 	OVS_KEY_ATTR_IPV4_TUNNEL,  /* struct ovs_key_ipv4_tunnel */
 #endif
-	/* Experimental */
-
-	OVS_KEY_ATTR_MPLS = 62, /* array of struct ovs_key_mpls.
-				 * The implementation may restrict
-				 * the accepted length of the array. */
 	__OVS_KEY_ATTR_MAX
 };
 
