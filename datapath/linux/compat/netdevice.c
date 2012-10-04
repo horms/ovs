@@ -75,32 +75,4 @@ u32 rpl_netif_skb_features(struct sk_buff *skb)
 		return harmonize_features(skb, protocol, features);
 	}
 }
-
-struct sk_buff *rpl_skb_gso_segment(struct sk_buff *skb, u32 features)
-{
-	int vlan_depth = ETH_HLEN;
-	__be16 type = skb->protocol;
-	__be16 skb_proto;
-	struct sk_buff *skb_gso;
-
-	while (type == htons(ETH_P_8021Q)) {
-		struct vlan_hdr *vh;
-
-		if (unlikely(!pskb_may_pull(skb, vlan_depth + VLAN_HLEN)))
-			return ERR_PTR(-EINVAL);
-
-		vh = (struct vlan_hdr *)(skb->data + vlan_depth);
-		type = vh->h_vlan_encapsulated_proto;
-		vlan_depth += VLAN_HLEN;
-	}
-
-	/* this hack needed to get regular skb_gso_segment() */
-#undef skb_gso_segment
-	skb_proto = skb->protocol;
-	skb->protocol = type;
-
-	skb_gso = skb_gso_segment(skb, features);
-	skb->protocol = skb_proto;
-	return skb_gso;
-}
 #endif	/* kernel version < 2.6.38 */
