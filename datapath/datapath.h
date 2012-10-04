@@ -36,6 +36,10 @@
 
 #define SAMPLE_ACTION_DEPTH 3
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
+#define HAVE_INNER_PROTOCOL
+#endif
+
 /**
  * struct dp_stats_percpu - per-cpu packet processing statistics for a given
  * datapath.
@@ -93,11 +97,16 @@ struct datapath {
  * @pkt_key: The flow information extracted from the packet.  Must be nonnull.
  * @tun_key: Key for the tunnel that encapsulated this packet. NULL if the
  * packet is not being tunneled.
+ * @inner_protocol: Provides a substitute for the skb->inner_protocol field on
+ * kernels before 3.11.
  */
 struct ovs_skb_cb {
 	struct sw_flow		*flow;
 	struct sw_flow_key	*pkt_key;
 	struct ovs_key_ipv4_tunnel  *tun_key;
+#ifndef HAVE_INNER_PROTOCOL
+	__be16			inner_protocol;
+#endif
 };
 #define OVS_CB(skb) ((struct ovs_skb_cb *)(skb)->cb)
 

@@ -34,6 +34,7 @@
 #include <net/xfrm.h>
 
 #include "datapath.h"
+#include "gso.h"
 #include "vport.h"
 
 /*
