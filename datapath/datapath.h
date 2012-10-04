@@ -95,6 +95,10 @@ struct datapath {
  * @flow: The flow associated with this packet.  May be %NULL if no flow.
  * @tun_key: Key for the tunnel that encapsulated this packet. NULL if the
  * packet is not being tunneled.
+ * @l2_size: Length of the packet's Ethernet header, including any VLAN headers.
+ * This is the offset from the beginning of the ethernet frame where MPLS
+ * stack would be, if one is present. It is 0 when there is no L2 header.
+ * ethernet frame.  It is 0 if no MPLS stack is present.
  * @ip_summed: Consistently stores L4 checksumming status across different
  * kernel versions.
  * @csum_start: Stores the offset from which to start checksumming independent
@@ -106,6 +110,7 @@ struct datapath {
 struct ovs_skb_cb {
 	struct sw_flow		*flow;
 	struct ovs_key_ipv4_tunnel  *tun_key;
+	ptrdiff_t		l2_size;
 #ifdef NEED_CSUM_NORMALIZE
 	enum csum_type		ip_summed;
 	u16			csum_start;
@@ -189,4 +194,8 @@ struct sk_buff *ovs_vport_cmd_build_info(struct vport *, u32 portid, u32 seq,
 					 u8 cmd);
 
 int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb);
+
+void skb_cb_set_l2_size(struct sk_buff *skb);
+unsigned char *skb_cb_mpls_bos(const struct sk_buff *skb);
+ptrdiff_t skb_cb_l2_size(const struct sk_buff *skb);
 #endif /* datapath.h */

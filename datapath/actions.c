@@ -49,6 +49,64 @@ static int make_writable(struct sk_buff *skb, int write_len)
 	return pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
 }
 
+static __be16 get_ethertype(const struct sk_buff *skb)
+{
+	struct ethhdr *hdr = (struct ethhdr *)(skb_cb_mpls_bos(skb) - ETH_HLEN);
+	return hdr->h_proto;
+}
+
+static void set_ethertype(struct sk_buff *skb, const __be16 ethertype)
+{
+	struct ethhdr *hdr = (struct ethhdr *)(skb_cb_mpls_bos(skb) - ETH_HLEN);
+	hdr->h_proto = ethertype;
+}
+
+static int push_mpls(struct sk_buff *skb, const struct ovs_action_push_mpls *mpls)
+{
+	u32 l2_size;
+	__be32 *new_mpls_lse;
+
+	if (skb_cow_head(skb, MPLS_HLEN) < 0) {
+		kfree_skb(skb);
+		return -ENOMEM;
+	}
+
+	l2_size = skb_cb_l2_size(skb);
+	skb_push(skb, MPLS_HLEN);
+	memmove(skb_mac_header(skb) - MPLS_HLEN, skb_mac_header(skb), l2_size);
+	skb_reset_mac_header(skb);
+
+	new_mpls_lse = (__be32 *)(skb_mac_header(skb) + l2_size);
+	*new_mpls_lse = mpls->mpls_lse;
+
+	set_ethertype(skb, mpls->mpls_ethertype);
+	return 0;
+}
+
+static int pop_mpls(struct sk_buff *skb, const __be16 *ethertype)
+{
+	__be16 current_ethertype = get_ethertype(skb);
+	if (eth_p_mpls(current_ethertype)) {
+		u32 l2_size = skb_cb_l2_size(skb);
+
+		memmove(skb_mac_header(skb) + MPLS_HLEN, skb_mac_header(skb), l2_size);
+
+		skb_pull(skb, MPLS_HLEN);
+		skb_reset_mac_header(skb);
+
+		set_ethertype(skb, *ethertype);
+	}
+	return 0;
+}
+
+static int set_mpls(struct sk_buff *skb, const __be32 *mpls_lse)
+{
+	__be16 current_ethertype = get_ethertype(skb);
+	if (eth_p_mpls(current_ethertype))
+		memcpy(skb_cb_mpls_bos(skb), mpls_lse, sizeof(__be32));
+	return 0;
+}
+
 /* remove VLAN header from packet and update csum accordingly. */
 static int __pop_vlan_tci(struct sk_buff *skb, __be16 *current_tci)
 {
@@ -72,6 +130,9 @@ static int __pop_vlan_tci(struct sk_buff *skb, __be16 *current_tci)
 	vlan_set_encap_proto(skb, vhdr);
 	skb->mac_header += VLAN_HLEN;
 	skb_reset_mac_len(skb);
+
+	/* update pointer to MPLS label stack */
+	OVS_CB(skb)->l2_size -= VLAN_HLEN;
 
 	return 0;
 }
@@ -102,6 +163,7 @@ static int pop_vlan(struct sk_buff *skb)
 		return err;
 
 	__vlan_hwaccel_put_tag(skb, ntohs(tci));
+
 	return 0;
 }
 
@@ -115,6 +177,9 @@ static int push_vlan(struct sk_buff *skb, const struct ovs_action_push_vlan *vla
 
 		if (!__vlan_put_tag(skb, current_tag))
 			return -ENOMEM;
+
+		/* update pointer to MPLS label stack */
+		OVS_CB(skb)->l2_size += VLAN_HLEN;
 
 		if (get_ip_summed(skb) == OVS_CSUM_COMPLETE)
 			skb->csum = csum_add(skb->csum, csum_partial(skb->data
@@ -478,6 +543,10 @@ static int execute_set_action(struct sk_buff *skb,
 	case OVS_KEY_ATTR_UDP:
 		err = set_udp(skb, nla_data(nested_attr));
 		break;
+
+	case OVS_KEY_ATTR_MPLS:
+		err = set_mpls(skb, nla_data(nested_attr));
+		break;
 	}
 
 	return err;
@@ -512,6 +581,16 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 
 		case OVS_ACTION_ATTR_USERSPACE:
 			output_userspace(dp, skb, a);
+			break;
+
+		case OVS_ACTION_ATTR_PUSH_MPLS:
+			err = push_mpls(skb, nla_data(a));
+			if (unlikely(err)) /* skb already freed. */
+				return err;
+			break;
+
+		case OVS_ACTION_ATTR_POP_MPLS:
+			err = pop_mpls(skb, nla_data(a));
 			break;
 
 		case OVS_ACTION_ATTR_PUSH_VLAN:
