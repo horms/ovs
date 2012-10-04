@@ -663,6 +663,8 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 	key->eth.type = parse_ethertype(skb);
 	if (unlikely(key->eth.type == htons(0)))
 		return -ENOMEM;
+	else if (likely(key->eth.type != htons(ETH_P_802_2)))
+		OVS_CB(skb)->l2_size = skb->data - skb_mac_header(skb);
 
 	skb_reset_network_header(skb);
 	__skb_push(skb, skb->data - skb_mac_header(skb));
@@ -747,6 +749,13 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 			memcpy(key->ipv4.arp.tha, arp->ar_tha, ETH_ALEN);
 			key_len = SW_FLOW_KEY_OFFSET(ipv4.arp);
 		}
+	} else if (eth_p_mpls(key->eth.type)) {
+		error = check_header(skb, MPLS_HLEN);
+		if (unlikely(error))
+			goto out;
+
+		key_len = SW_FLOW_KEY_OFFSET(mpls.top_lse);
+		memcpy(&key->mpls.top_lse, skb_network_header(skb), MPLS_HLEN);
 	} else if (key->eth.type == htons(ETH_P_IPV6)) {
 		int nh_len;             /* IPv6 Header + Extensions */
 
@@ -849,7 +858,7 @@ void ovs_flow_tbl_remove(struct flow_table *table, struct sw_flow *flow)
 }
 
 /* The size of the argument for each %OVS_KEY_ATTR_* Netlink attribute.  */
-const int ovs_key_lens[OVS_KEY_ATTR_MAX + 1] = {
+static const int ovs_key_lens[OVS_KEY_ATTR_MAX + 1] = {
 	[OVS_KEY_ATTR_ENCAP] = -1,
 	[OVS_KEY_ATTR_PRIORITY] = sizeof(u32),
 	[OVS_KEY_ATTR_IN_PORT] = sizeof(u32),
@@ -868,8 +877,14 @@ const int ovs_key_lens[OVS_KEY_ATTR_MAX + 1] = {
 	[OVS_KEY_ATTR_TUNNEL] = -1,
 
 	/* Not upstream. */
+	[OVS_KEY_ATTR_MPLS] = sizeof(struct ovs_key_mpls),
 	[OVS_KEY_ATTR_TUN_ID] = sizeof(__be64),
 };
+
+/* Set the bit of a type in ovs_key_arrays if it is
+ * an array of one or more elements of size ovs_key_lens[type].
+ */
+static const u64 ovs_array_keys = (1ULL << OVS_KEY_ATTR_MPLS);
 
 static int ipv4_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_len,
 				  const struct nlattr *a[], u64 *attrs)
@@ -977,6 +992,27 @@ static int ipv6_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_len,
 	return 0;
 }
 
+int ovs_flow_verify_key_len(u16 type, const struct nlattr *nla)
+{
+	int expected_len = ovs_key_lens[type];
+	int len = nla_len(nla);
+
+	if (len == -1)
+		return 0;
+
+	if (ovs_array_keys & (1ULL << type)) {
+		/* The type is an array.
+		 * Check if len is a non-zero, non-negative multiple
+		 * of expected_len.
+		 */
+		if (len < expected_len || len % expected_len)
+			return -EINVAL;
+	} else if  (len != expected_len)
+		return -EINVAL;
+
+	return 0;
+}
+
 static int parse_flow_nlattrs(const struct nlattr *attr,
 			      const struct nlattr *a[], u64 *attrsp)
 {
@@ -987,14 +1023,12 @@ static int parse_flow_nlattrs(const struct nlattr *attr,
 	attrs = 0;
 	nla_for_each_nested(nla, attr, rem) {
 		u16 type = nla_type(nla);
-		int expected_len;
 
 		if (type > OVS_KEY_ATTR_MAX || attrs & (1ULL << type))
 			return -EINVAL;
 
-		expected_len = ovs_key_lens[type];
-		if (nla_len(nla) != expected_len && expected_len != -1)
-			return -EINVAL;
+		if (ovs_flow_verify_key_len(type, nla))
+		    return -EINVAL;
 
 		attrs |= 1ULL << type;
 		a[type] = nla;
@@ -1293,6 +1327,15 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 		swkey->ip.proto = ntohs(arp_key->arp_op);
 		memcpy(swkey->ipv4.arp.sha, arp_key->arp_sha, ETH_ALEN);
 		memcpy(swkey->ipv4.arp.tha, arp_key->arp_tha, ETH_ALEN);
+	} else if (eth_p_mpls(swkey->eth.type)) {
+		const struct ovs_key_mpls *mpls_key;
+		if (!(attrs & (1ULL << OVS_KEY_ATTR_MPLS)))
+			return -EINVAL;
+		attrs &= ~(1ULL << OVS_KEY_ATTR_MPLS);
+
+		key_len = SW_FLOW_KEY_OFFSET(mpls.top_lse);
+		mpls_key = nla_data(a[OVS_KEY_ATTR_MPLS]);
+		swkey->mpls.top_lse = mpls_key->mpls_top_lse;
 	}
 
 	if (attrs)
@@ -1333,7 +1376,7 @@ int ovs_flow_metadata_from_nlattrs(struct sw_flow *flow, int key_len, const stru
 		if (type <= OVS_KEY_ATTR_MAX && ovs_key_lens[type] > 0) {
 			int err;
 
-			if (nla_len(nla) != ovs_key_lens[type])
+			if (ovs_flow_verify_key_len(type, nla))
 				return -EINVAL;
 
 			switch (type) {
@@ -1492,6 +1535,14 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 		arp_key->arp_op = htons(swkey->ip.proto);
 		memcpy(arp_key->arp_sha, swkey->ipv4.arp.sha, ETH_ALEN);
 		memcpy(arp_key->arp_tha, swkey->ipv4.arp.tha, ETH_ALEN);
+	} else if (eth_p_mpls(swkey->eth.type)) {
+		struct ovs_key_mpls *mpls_key;
+
+		nla = nla_reserve(skb, OVS_KEY_ATTR_MPLS, sizeof(*mpls_key));
+		if (!nla)
+			goto nla_put_failure;
+		mpls_key = nla_data(nla);
+		mpls_key->mpls_top_lse = swkey->mpls.top_lse;
 	}
 
 	if ((swkey->eth.type == htons(ETH_P_IP) ||

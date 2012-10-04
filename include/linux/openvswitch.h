@@ -285,7 +285,7 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_IPV4_TUNNEL,  /* struct ovs_key_ipv4_tunnel */
 #endif
 
-	OVS_KEY_ATTR_MPLS = 62, /* struct ovs_key_mpls */
+	OVS_KEY_ATTR_MPLS = 62, /* Array of one or more struct ovs_key_mpls */
 	OVS_KEY_ATTR_TUN_ID = 63,  /* be64 tunnel ID */
 	__OVS_KEY_ATTR_MAX
 };
