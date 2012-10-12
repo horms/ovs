@@ -3124,6 +3124,17 @@ modify_flows__(struct ofproto *ofproto, struct ofconn *ofconn,
     return error;
 }
 
+static enum ofperr
+modify_flows_add(struct ofproto *ofproto, struct ofconn *ofconn,
+                 const struct ofputil_flow_mod *fm,
+                 const struct ofp_header *request)
+{
+    if (fm->cookie_mask != htonll(0) || fm->new_cookie == htonll(UINT64_MAX)) {
+        return 0;
+    }
+    return add_flow(ofproto, ofconn, fm, request);
+}
+
 /* Implements OFPFC_MODIFY.  Returns 0 on success or an OpenFlow error code on
  * failure.
  *
@@ -3143,7 +3154,7 @@ modify_flows_loose(struct ofproto *ofproto, struct ofconn *ofconn,
     if (error) {
         return error;
     } else if (list_is_empty(&rules)) {
-        return fm->cookie_mask ? 0 : add_flow(ofproto, ofconn, fm, request);
+        return modify_flows_add(ofproto, ofconn, fm, request);
     } else {
         return modify_flows__(ofproto, ofconn, fm, request, &rules);
     }
@@ -3169,7 +3180,7 @@ modify_flow_strict(struct ofproto *ofproto, struct ofconn *ofconn,
     if (error) {
         return error;
     } else if (list_is_empty(&rules)) {
-        return fm->cookie_mask ? 0 : add_flow(ofproto, ofconn, fm, request);
+        return modify_flows_add(ofproto, ofconn, fm, request);
     } else {
         return list_is_singleton(&rules) ? modify_flows__(ofproto, ofconn,
                                                           fm, request, &rules)
