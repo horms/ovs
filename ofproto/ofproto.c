@@ -3044,7 +3044,7 @@ add_flow(struct ofproto *ofproto, struct ofconn *ofconn,
             rule->evictable = was_evictable;
 
             if (!evict) {
-                error = OFPERR_OFPFMFC_ALL_TABLES_FULL;
+                error = OFPERR_OFPFMFC_TABLE_FULL;
                 goto exit;
             } else if (evict->pending) {
                 error = OFPROTO_POSTPONE;
@@ -3331,7 +3331,7 @@ handle_flow_mod(struct ofconn *ofconn, const struct ofp_header *oh)
         /* We do not support the emergency flow cache.  It will hopefully get
          * dropped from OpenFlow in the near future.  There is no good error
          * code, so just state that the flow table is full. */
-        error = OFPERR_OFPFMFC_ALL_TABLES_FULL;
+        error = OFPERR_OFPFMFC_TABLE_FULL;
     } else {
         error = handle_flow_mod__(ofconn_get_ofproto(ofconn), ofconn, &fm, oh);
     }
