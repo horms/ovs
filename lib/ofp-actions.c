@@ -168,14 +168,14 @@ note_from_openflow(const struct nx_action_note *nan, struct ofpbuf *out)
 }
 
 static enum ofperr
-dec_ttl_from_openflow(struct ofpbuf *out)
+dec_ttl_from_openflow(struct ofpbuf *out, enum ofputil_action_code compat)
 {
     uint16_t id = 0;
     struct ofpact_cnt_ids *ids;
     enum ofperr error = 0;
 
     ids = ofpact_put_DEC_TTL(out);
-    ids->ofpact.compat = OFPUTIL_NXAST_DEC_TTL;
+    ids->ofpact.compat = compat;
     ids->n_controllers = 1;
     ofpbuf_put(out, &id, sizeof id);
     ids = out->l2;
@@ -390,7 +390,7 @@ ofpact_from_nxast(const union ofp_action *a, enum ofputil_action_code code,
         break;
 
     case OFPUTIL_NXAST_DEC_TTL:
-        error = dec_ttl_from_openflow(out);
+        error = dec_ttl_from_openflow(out, code);
         break;
 
     case OFPUTIL_NXAST_DEC_TTL_CNT_IDS:
@@ -697,7 +697,7 @@ ofpact_from_openflow11(const union ofp_action *a, struct ofpbuf *out)
         break;
 
     case OFPUTIL_OFPAT11_DEC_NW_TTL:
-        ofpact_put_DEC_TTL(out);
+        dec_ttl_from_openflow(out, code);
         break;
 
     case OFPUTIL_OFPAT11_SET_DL_SRC:
@@ -896,7 +896,7 @@ ofpact_from_openflow12(const union ofp_action *a, struct ofpbuf *out)
 
 
     case OFPUTIL_OFPAT12_DEC_NW_TTL:
-        ofpact_put_DEC_TTL(out);
+        dec_ttl_from_openflow(out, code);
         break;
 
     case OFPUTIL_OFPAT12_PUSH_MPLS: {
@@ -1901,7 +1901,17 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
         ofputil_put_OFPAT11_COPY_TTL_IN(out);
         break;
 
-    /* TODO: more actions OFPAT_DEC_NW_TTL (and OFPAT_SET_NW_TTL) */
+    case OFPACT_DEC_TTL:
+        if (a->compat == OFPUTIL_OFPAT12_DEC_NW_TTL) {
+            ofputil_put_OFPAT12_DEC_NW_TTL(out);
+        } else if (a->compat == OFPUTIL_OFPAT11_DEC_NW_TTL) {
+            ofputil_put_OFPAT11_DEC_NW_TTL(out);
+        } else {
+            ofpact_to_nxast(a, out);
+        }
+        break;
+
+    /* TODO: more actions OFPAT_SET_NW_TTL */
 
     case OFPACT_END:
     case OFPACT_CONTROLLER:
@@ -1919,7 +1929,6 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_SET_L4_DST_PORT:
     case OFPACT_REG_MOVE:
     case OFPACT_REG_LOAD:
-    case OFPACT_DEC_TTL:
     case OFPACT_SET_MPLS_LABEL:
     case OFPACT_SET_MPLS_TC:
     case OFPACT_SET_TUNNEL:
@@ -1961,6 +1970,7 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_POP_MPLS:
     case OFPACT_COPY_TTL_OUT:
     case OFPACT_COPY_TTL_IN:
+    case OFPACT_DEC_TTL:
         return ofpact_to_openflow11_common(a, out);
 
     case OFPACT_SET_VLAN_VID:
@@ -2026,7 +2036,6 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_BUNDLE:
     case OFPACT_REG_MOVE:
     case OFPACT_REG_LOAD:
-    case OFPACT_DEC_TTL:
     case OFPACT_SET_MPLS_LABEL:
     case OFPACT_SET_MPLS_TC:
     case OFPACT_SET_TUNNEL:
@@ -2073,6 +2082,7 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_POP_MPLS:
     case OFPACT_COPY_TTL_OUT:
     case OFPACT_COPY_TTL_IN:
+    case OFPACT_DEC_TTL:
         return ofpact_to_openflow11_common(a, out);
 
     case OFPACT_CONTROLLER:
@@ -2080,7 +2090,6 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_BUNDLE:
     case OFPACT_REG_MOVE:
     case OFPACT_REG_LOAD:
-    case OFPACT_DEC_TTL:
     case OFPACT_SET_TUNNEL:
     case OFPACT_WRITE_METADATA:
     case OFPACT_SET_QUEUE:

@@ -168,7 +168,8 @@ ofpact_next(const struct ofpact *ofpact)
 /* OFPACT_END, OFPACT_STRIP_VLAN, OFPACT_POP_QUEUE,
  * OFPACT_EXIT.
  *
- * Used for OFPAT10_STRIP_VLAN, NXAST_DEC_TTL, NXAST_POP_QUEUE, NXAST_EXIT.
+ * Used for OFPAT10_STRIP_VLAN, NXAST_POP_QUEUE, NXAST_EXIT.
+ * OFPIT11_CLEAR_ACTIONS.
  *
  * Action structure for actions that do not have any extra data beyond the
  * action type. */
@@ -480,7 +481,7 @@ BUILD_ASSERT_DECL((sizeof(struct ofpact_inst_actions) % OFPACT_ALIGNTO) == 0);
 
 /* OFPACT_DEC_TTL.
  *
- * Used for NXAST_DEC_TTL and NXAST_DEC_TTL_CNT_IDS. */
+ * Used for OFPAT11_DEC_NW_TTL, NXAST_DEC_TTL and NXAST_DEC_TTL_CNT_IDS. */
 struct ofpact_cnt_ids {
     struct ofpact ofpact;
 
