@@ -5808,6 +5808,27 @@ compose_dec_ttl(struct action_xlate_ctx *ctx, struct ofpact_cnt_ids *ids)
     }
 }
 
+static bool
+compose_dec_mpls_ttl_action(struct action_xlate_ctx *ctx)
+{
+    uint8_t ttl = mpls_lse_to_ttl(ctx->flow.mpls_lse);
+
+    if (!eth_type_mpls(ctx->flow.dl_type)) {
+        return false;
+    }
+
+    if (ttl > 1) {
+        ttl--;
+        set_mpls_lse_ttl(&ctx->flow.mpls_lse, ttl);
+        return false;
+    } else {
+        execute_controller_action(ctx, UINT16_MAX, OFPR_INVALID_TTL, 0);
+
+        /* Stop processing for current table. */
+        return true;
+    }
+}
+
 static void
 xlate_output_action(struct action_xlate_ctx *ctx,
                     uint16_t port, uint16_t max_len, bool may_packet_in)
@@ -6176,6 +6197,12 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_POP_MPLS:
             compose_mpls_pop_action(ctx, ofpact_get_POP_MPLS(a)->ethertype);
+            break;
+
+        case OFPACT_DEC_MPLS_TTL:
+            if (compose_dec_mpls_ttl_action(ctx)) {
+                goto out;
+            }
             break;
 
         case OFPACT_DEC_TTL:
