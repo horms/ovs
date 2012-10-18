@@ -282,6 +282,24 @@ parse_controller(struct ofpbuf *b, char *arg)
 }
 
 static void
+parse_metadata(struct ofpbuf *b, char *arg)
+{
+    struct ofpact_metadata *om;
+    char *mask = strchr(arg, '/');
+
+    om = ofpact_put_WRITE_METADATA(b);
+
+    if (mask) {
+        *mask = '\0';
+        om->mask = htonll(str_to_u64(mask + 1));
+    } else {
+        om->mask = htonll(UINT64_MAX);
+    }
+
+    om->metadata = htonll(str_to_u64(arg));
+}
+
+static void
 parse_named_action(enum ofputil_action_code code, const struct flow *flow,
                    char *arg, struct ofpbuf *ofpacts)
 {
@@ -393,6 +411,10 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         tunnel = ofpact_put_SET_TUNNEL(ofpacts);
         tunnel->ofpact.compat = code;
         tunnel->tun_id = str_to_u64(arg);
+        break;
+
+    case OFPUTIL_NXAST_WRITE_METADATA:
+        parse_metadata(ofpacts, arg);
         break;
 
     case OFPUTIL_NXAST_SET_QUEUE:
@@ -517,8 +539,7 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         break;
 
     case OFPUTIL_OFPIT11_WRITE_METADATA:
-        /* TODO:XXX */
-        NOT_REACHED();
+        parse_metadata(ofpacts, arg);
         break;
 
     case OFPUTIL_OFPIT11_WRITE_ACTIONS:
@@ -547,6 +568,7 @@ static void
 str_to_ofpacts(const struct flow *flow, char *str, struct ofpbuf *ofpacts)
 {
     char *pos, *act, *arg;
+    enum ofperr error;
     int n_actions;
 
     pos = str;
@@ -574,7 +596,13 @@ str_to_ofpacts(const struct flow *flow, char *str, struct ofpbuf *ofpacts)
         }
         n_actions++;
     }
+
     ofpact_put_END(ofpacts);
+
+    error = ofpacts_verify(ofpacts->data);
+    if (error) {
+        ovs_fatal(0, "Incorrect action ordering");
+    }
 }
 
 struct protocol {

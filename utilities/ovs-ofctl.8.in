@@ -1084,6 +1084,14 @@ specified.
 These key-value pairs have the same meaning as in the usual
 \fBovs\-ofctl\fR flow syntax.
 .
+.IP \fBwrite_metadata\fB:\fIvalue\fR[/\fImask\fR]
+Updates the metadata field for the flow. If \fImask\fR is omitted, the
+metadata field is set exactly to \fIvalue\fR; if \fImask\fR is specified, then
+a 1-bit in \fImask\fR indicates that the corresponding bit in the metadata
+field will be replaced with the corresponding bit from \fIvalue\fR. Both
+\fIvalue\fR and \fImask\fR are 64-bit values that are decimal by default; use
+a \fB0x\fR prefix to specify them in hexadecimal.
+.
 .IP \fBfin_idle_timeout=\fIseconds\fR
 .IQ \fBfin_hard_timeout=\fIseconds\fR
 Adds a \fBfin_timeout\fR action with the specified arguments to the

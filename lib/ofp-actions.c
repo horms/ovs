@@ -137,6 +137,23 @@ controller_from_openflow(const struct nx_action_controller *nac,
     oc->reason = nac->reason;
 }
 
+static enum ofperr
+metadata_from_nxast(const struct nx_action_write_metadata *nawm,
+                    struct ofpbuf *out)
+{
+    struct ofpact_metadata *om;
+
+    if (!is_all_zeros(nawm->zeros, sizeof nawm->zeros)) {
+        return OFPERR_NXBRC_MUST_BE_ZERO;
+    }
+
+    om = ofpact_put_WRITE_METADATA(out);
+    om->metadata = nawm->metadata;
+    om->mask = nawm->mask;
+
+    return 0;
+}
+
 static void
 note_from_openflow(const struct nx_action_note *nan, struct ofpbuf *out)
 {
@@ -226,6 +243,7 @@ ofpact_from_nxast(const union ofp_action *a, enum ofputil_action_code code,
     const struct nx_action_set_queue *nasq;
     const struct nx_action_note *nan;
     const struct nx_action_set_tunnel64 *nast64;
+    const struct nx_action_write_metadata *nawm;
     const struct nx_action_push_vlan *napv;
     struct ofpact_tunnel *tunnel;
     enum ofperr error = 0;
@@ -248,6 +266,11 @@ ofpact_from_nxast(const union ofp_action *a, enum ofputil_action_code code,
         tunnel = ofpact_put_SET_TUNNEL(out);
         tunnel->ofpact.compat = code;
         tunnel->tun_id = ntohl(nast->tun_id);
+        break;
+
+    case OFPUTIL_NXAST_WRITE_METADATA:
+        nawm = (const struct nx_action_write_metadata *) a;
+        error = metadata_from_nxast(nawm, out);
         break;
 
     case OFPUTIL_NXAST_SET_QUEUE:
@@ -1065,6 +1088,12 @@ ofpacts_pull_openflow11_actions(uint8_t ofp_version, struct ofpbuf *openflow,
 exit:
     if (error) {
         ofpbuf_clear(ofpacts);
+        return error;
+    }
+
+    error = ofpacts_verify(ofpacts->data);
+    if (error) {
+        ofpbuf_clear(ofpacts);
     }
     return error;
 }
@@ -1125,7 +1154,17 @@ ofpacts_pull_openflow11_instructions(uint8_t ofp_version,
             goto exit;
         }
     }
-    /* TODO:XXX insts[OVSINST_OFPIT11_WRITE_METADATA] */
+    if (insts[OVSINST_OFPIT11_WRITE_METADATA]) {
+        const struct ofp11_instruction_write_metadata *oiwm;
+        struct ofpact_metadata *om;
+
+        oiwm = (const struct ofp11_instruction_write_metadata *)
+            insts[OVSINST_OFPIT11_WRITE_METADATA];
+
+        om = ofpact_put_WRITE_METADATA(ofpacts);
+        om->metadata = oiwm->metadata;
+        om->mask = oiwm->metadata_mask;
+    }
     if (insts[OVSINST_OFPIT11_GOTO_TABLE]) {
         struct ofp11_instruction_goto_table *oigt =
             (struct ofp11_instruction_goto_table *)
@@ -1138,11 +1177,7 @@ ofpacts_pull_openflow11_instructions(uint8_t ofp_version,
 
     ofpact_put_END(ofpacts);
 
-    if (insts[OVSINST_OFPIT11_WRITE_METADATA]) {
-        error = OFPERR_OFPBIC_UNSUP_INST;
-        goto exit;
-    }
-
+    error = ofpacts_verify(ofpacts->data);
 exit:
     if (error) {
         ofpbuf_clear(ofpacts);
@@ -1302,6 +1337,12 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports,
         inst_actions = ofpact_get_WRITE_ACTIONS(a);
         return ofpacts_check__(inst_actions->ofpacts, flow, max_ports, false);
 
+    case OFPACT_WRITE_METADATA:
+        if (!allow_inst) {
+            NOT_REACHED();
+        }
+        return 0;
+
     case OFPACT_CLEAR_ACTIONS:
         return 0;
 
@@ -1380,6 +1421,17 @@ ofpact_set_tunnel_to_nxast(const struct ofpact_tunnel *tunnel,
 }
 
 static void
+ofpact_write_metadata_to_nxast(const struct ofpact_metadata *om,
+                               struct ofpbuf *out)
+{
+    struct nx_action_write_metadata *nawm;
+
+    nawm = ofputil_put_NXAST_WRITE_METADATA(out);
+    nawm->metadata = om->metadata;
+    nawm->mask = om->mask;
+}
+
+static void
 ofpact_note_to_nxast(const struct ofpact_note *note, struct ofpbuf *out)
 {
     size_t start_ofs = out->size;
@@ -1448,6 +1500,10 @@ ofpact_to_nxast(const struct ofpact *a, struct ofpbuf *out)
 
     case OFPACT_DEC_TTL:
         ofputil_put_NXAST_DEC_TTL(out);
+        break;
+
+    case OFPACT_WRITE_METADATA:
+        ofpact_write_metadata_to_nxast(ofpact_get_WRITE_METADATA(a), out);
         break;
 
     case OFPACT_SET_TUNNEL:
@@ -1522,6 +1578,35 @@ ofpact_to_nxast(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_COPY_TTL_IN:
         NOT_REACHED();
     }
+}
+
+/* Verifies that the 'ofpacts_len' bytes of actions in 'ofpacts' are
+ * in the appropriate order as defined by the OpenFlow spec. */
+enum ofperr
+ofpacts_verify(const struct ofpact ofpacts[])
+{
+    const struct ofpact *a;
+    const struct ofpact_metadata *om = NULL;
+
+    OFPACT_FOR_EACH (a, ofpacts) {
+        if (om) {
+            if (a->type == OFPACT_WRITE_METADATA) {
+                VLOG_WARN("duplicate write_metadata instruction specified");
+                /* should be OFPERR_OFPET_BAD_ACTION? */
+                return OFPERR_OFPBAC_UNSUPPORTED_ORDER;
+            } else {
+                VLOG_WARN("write_metadata instruction must be specified after "
+                          "other instructions/actions");
+                return OFPERR_OFPBAC_UNSUPPORTED_ORDER;
+            }
+        }
+
+        if (a->type == OFPACT_WRITE_METADATA) {
+            om = (const struct ofpact_metadata *) a;
+        }
+    }
+
+    return 0;
 }
 
 /* Converting ofpacts to OpenFlow 1.0. */
@@ -1622,6 +1707,7 @@ ofpact_to_openflow10(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_REG_LOAD:
     case OFPACT_DEC_TTL:
     case OFPACT_SET_TUNNEL:
+    case OFPACT_WRITE_METADATA:
     case OFPACT_SET_QUEUE:
     case OFPACT_POP_QUEUE:
     case OFPACT_FIN_TIMEOUT:
@@ -1746,6 +1832,7 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_SET_MPLS_LABEL:
     case OFPACT_SET_MPLS_TC:
     case OFPACT_SET_TUNNEL:
+    case OFPACT_WRITE_METADATA:
     case OFPACT_SET_QUEUE:
     case OFPACT_POP_QUEUE:
     case OFPACT_FIN_TIMEOUT:
@@ -1797,6 +1884,10 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
 
     case OFPACT_STRIP_VLAN:
         /* XXX */
+        break;
+
+    case OFPACT_WRITE_METADATA:
+        /* OpenFlow 1.1 uses OFPIT_WRITE_METADATA to express this action. */
         break;
 
     case OFPACT_SET_QUEUE:
@@ -1900,6 +1991,7 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_REG_LOAD:
     case OFPACT_DEC_TTL:
     case OFPACT_SET_TUNNEL:
+    case OFPACT_WRITE_METADATA:
     case OFPACT_SET_QUEUE:
     case OFPACT_POP_QUEUE:
     case OFPACT_FIN_TIMEOUT:
@@ -1943,7 +2035,7 @@ ofpacts_put_openflow11_actions(uint8_t ofp_version,
     return openflow->size - start_size;
 }
 
-static void
+static const struct ofpact *
 ofpacts_to_inst_actions(const struct ofpact ofpacts[],
                         struct ofpbuf *openflow,
                         enum ofp11_instruction_type type,
@@ -1953,6 +2045,7 @@ ofpacts_to_inst_actions(const struct ofpact ofpacts[],
     size_t start_len;
     struct ofp11_instruction_actions *oia;
     const struct ofpact *a;
+    const struct ofpact *processed = ofpacts;
 
     start_len = openflow->size;
     oia = ofpbuf_put_uninit(openflow, sizeof *oia);
@@ -1960,18 +2053,22 @@ ofpacts_to_inst_actions(const struct ofpact ofpacts[],
     memset(oia->pad, 0, sizeof oia->pad);
 
     OFPACT_FOR_EACH (a, ofpacts) {
-        assert(!ofpact_is_instruction(a));
+        if (ofpact_is_instruction(a)) {
+            break;
+        }
         ofpact_to_openflow(a, openflow);
+        processed = a;
     }
 
     oia = ofpbuf_at_assert(openflow, start_len, sizeof *oia);
     oia->len = htons(openflow->size - start_len);
+    return processed;
 }
 
 /* Converts the ofpacts in 'ofpacts' (terminated by OFPACT_END) into OpenFlow
  * 1.1 actions in 'openflow', appending the actions to any existing data in
  * 'openflow'. */
-static void
+static const struct ofpact *
 ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
                               struct ofpbuf *openflow,
                               void (*ofpact_to_openflow)(
@@ -1979,6 +2076,7 @@ ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
 {
     size_t start_len = openflow->size;
     struct ofp11_instruction_actions *oia;
+    const struct ofpact *processed = ofpacts;
 
     switch (ofpacts[0].type) {
     case OFPACT_END:
@@ -2012,8 +2110,22 @@ ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
             inst_actions = ofpact_get_APPLY_ACTIONS(ofpacts);
             type = OFPIT11_APPLY_ACTIONS;
         }
-        ofpacts_to_inst_actions(inst_actions->ofpacts, openflow, type,
-                                ofpact_to_openflow);
+        processed = ofpacts_to_inst_actions(inst_actions->ofpacts, openflow,
+                                            type, ofpact_to_openflow);
+        break;
+    }
+
+    case OFPACT_WRITE_METADATA: {
+        const struct ofpact_metadata *om;
+        struct ofp11_instruction_write_metadata *oiwm;
+
+        om = ofpact_get_WRITE_METADATA(ofpacts);
+        oiwm = ofpbuf_put_uninit(openflow, sizeof *oiwm);
+        oiwm->type = htons(OFPIT11_WRITE_METADATA);
+        oiwm->len = htons(sizeof *oiwm);
+        memset(oiwm->pad, 0, sizeof oiwm->pad);
+        oiwm->metadata = om->metadata;
+        oiwm->metadata_mask = om->mask;
         break;
     }
 
@@ -2066,6 +2178,8 @@ ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
     default:
         NOT_REACHED();
     }
+
+    return processed;
 }
 
 void
@@ -2085,14 +2199,14 @@ ofpacts_insts_to_openflow11(uint8_t ofp_version,
     }
 
     if (!ofpact_is_instruction(ofpacts)) {
-        ofpacts_to_inst_actions(ofpacts, openflow, OFPIT11_APPLY_ACTIONS,
-                                ofpact_to_openflow);
-        return;
+        a = ofpacts_to_inst_actions(ofpacts, openflow, OFPIT11_APPLY_ACTIONS,
+                                    ofpact_to_openflow);
+        ofpacts = (a->type == OFPACT_END) ? ofpacts : ofpact_next(a);
     }
 
     OFPACT_FOR_EACH(a, ofpacts) {
         assert(ofpact_is_instruction(a) || a->type == OFPACT_END);
-        ofpacts_insts_to_openflow11__(a, openflow, ofpact_to_openflow);
+        a = ofpacts_insts_to_openflow11__(a, openflow, ofpact_to_openflow);
     }
 }
 
@@ -2125,6 +2239,7 @@ ofpact_outputs_to_port(const struct ofpact *ofpact, uint16_t port)
     case OFPACT_REG_LOAD:
     case OFPACT_DEC_TTL:
     case OFPACT_SET_TUNNEL:
+    case OFPACT_WRITE_METADATA:
     case OFPACT_SET_QUEUE:
     case OFPACT_POP_QUEUE:
     case OFPACT_FIN_TIMEOUT:
@@ -2216,6 +2331,7 @@ ofpact_format(const struct ofpact *a, struct ds *s)
     const struct ofpact_resubmit *resubmit;
     const struct ofpact_autopath *autopath;
     const struct ofpact_controller *controller;
+    const struct ofpact_metadata *metadata;
     const struct ofpact_tunnel *tunnel;
     const struct ofpact_inst_actions *inst_actions;
     uint16_t port;
@@ -2452,6 +2568,15 @@ ofpact_format(const struct ofpact *a, struct ds *s)
         ds_put_cstr(s, ")");
         break;
 
+    case OFPACT_WRITE_METADATA:
+        metadata = ofpact_get_WRITE_METADATA(a);
+        ds_put_format(s, "write_metadata:%#"PRIx64,
+                      ntohll(metadata->metadata));
+        if (metadata->mask != htonll(UINT64_MAX)) {
+            ds_put_format(s, "/%#"PRIx64, ntohll(metadata->mask));
+        }
+        break;
+
     case OFPACT_CLEAR_ACTIONS:
         ds_put_cstr(s, "clear_actions");
         break;
@@ -2470,6 +2595,7 @@ ofpact_is_instruction(const struct ofpact *a)
 {
     return
         a->type == OFPACT_APPLY_ACTIONS ||
+        a->type == OFPACT_WRITE_METADATA ||
         a->type == OFPACT_CLEAR_ACTIONS ||
         a->type == OFPACT_WRITE_ACTIONS ||
         (a->type == OFPACT_RESUBMIT &&

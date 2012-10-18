@@ -94,6 +94,7 @@ NXAST_ACTION(NXAST_EXIT,           nx_action_header,       0, "exit")
 NXAST_ACTION(NXAST_DEC_TTL,        nx_action_header,       0, "dec_ttl")
 NXAST_ACTION(NXAST_FIN_TIMEOUT,    nx_action_fin_timeout,  0, "fin_timeout")
 NXAST_ACTION(NXAST_CONTROLLER,     nx_action_controller,   0, "controller")
+NXAST_ACTION(NXAST_WRITE_METADATA,  nx_action_write_metadata, 0, "write_metadata")
 NXAST_ACTION(NXAST_PUSH_VLAN,      nx_action_push_vlan,    0, "push_vlan")
 
 #undef OFPAT10_ACTION

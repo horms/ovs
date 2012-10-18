@@ -105,6 +105,7 @@
                                                                     \
     /* Instruction */                                               \
     DEFINE_OFPACT(APPLY_ACTIONS,   ofpact_inst_actions,  ofpacts)   \
+    DEFINE_OFPACT(WRITE_METADATA,  ofpact_metadata,      ofpact)    \
     DEFINE_OFPACT(CLEAR_ACTIONS,   ofpact_inst_actions,  ofpact)    \
     DEFINE_OFPACT(WRITE_ACTIONS,   ofpact_inst_actions,  ofpacts)
 
@@ -324,6 +325,15 @@ struct ofpact_fin_timeout {
     uint16_t fin_hard_timeout;
 };
 
+/* OFPACT_WRITE_METADATA.
+ *
+ * Used for NXAST_WRITE_METADATA. */
+struct ofpact_metadata {
+    struct ofpact ofpact;
+    ovs_be64 metadata;
+    ovs_be64 mask;
+};
+
 /* OFPACT_RESUBMIT.
  *
  * Used for NXAST_RESUBMIT, NXAST_RESUBMIT_TABLE. */
@@ -482,6 +492,7 @@ enum ofperr ofpacts_pull_openflow11_instructions(uint8_t ofp_version,
                                                  struct ofpbuf *ofpacts);
 enum ofperr ofpacts_check(const struct ofpact[],
                           const struct flow *, int max_ports);
+enum ofperr ofpacts_verify(const struct ofpact ofpacts[]);
 
 /* Converting ofpacts to OpenFlow. */
 void ofpacts_to_openflow10(const struct ofpact[], struct ofpbuf *openflow);

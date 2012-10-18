@@ -346,6 +346,7 @@ enum nx_action_subtype {
     NXAST_DEC_TTL,              /* struct nx_action_header */
     NXAST_FIN_TIMEOUT,          /* struct nx_action_fin_timeout */
     NXAST_CONTROLLER,           /* struct nx_action_controller */
+    NXAST_WRITE_METADATA,       /* struct nx_action_write_metadata */
     NXAST_PUSH_VLAN,            /* struct nx_action_push_vlan */
 };
 
@@ -2045,5 +2046,19 @@ struct nx_action_push_vlan {
     uint8_t  pad[4];
 };
 OFP_ASSERT(sizeof(struct nx_action_push_vlan) == 16);
+
+/* Action structure for NXAST_WRITE_METADATA.
+ *
+ * Modifies the 'mask' bits of the metadata value. */
+struct nx_action_write_metadata {
+    ovs_be16 type;                  /* OFPAT_VENDOR. */
+    ovs_be16 len;                   /* Length is 32. */
+    ovs_be32 vendor;                /* NX_VENDOR_ID. */
+    ovs_be16 subtype;               /* NXAST_WRITE_METADATA. */
+    uint8_t zeros[6];               /* Must be zero. */
+    ovs_be64 metadata;              /* Metadata register. */
+    ovs_be64 mask;                  /* Metadata mask. */
+};
+OFP_ASSERT(sizeof(struct nx_action_write_metadata) == 32);
 
 #endif /* openflow/nicira-ext.h */

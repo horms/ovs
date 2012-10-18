@@ -5507,6 +5507,7 @@ static bool
 do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
 {
     struct ofpact_controller *controller;
+    const struct ofpact_metadata *metadata;
     struct ofpact_reg_load *load;
     ovs_be32 mpls_label;
     uint32_t mpls_tc;
@@ -5752,6 +5753,12 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
 
     case OFPACT_APPLY_ACTIONS:
         do_xlate_actions__(ofpact_get_APPLY_ACTIONS(a)->ofpacts, ctx);
+        break;
+
+    case OFPACT_WRITE_METADATA:
+        metadata = ofpact_get_WRITE_METADATA(a);
+        ctx->flow.metadata &= ~metadata->mask;
+        ctx->flow.metadata |= metadata->metadata & metadata->mask;
         break;
 
     case OFPACT_CLEAR_ACTIONS:
