@@ -263,7 +263,7 @@ get_ethertype(struct ofpbuf *packet)
 }
 
 /* Set MPLS tag time-to-live. */
-static void
+void
 set_mpls_lse_ttl(ovs_be32 *tag, uint8_t ttl)
 {
     *tag &= ~htonl(MPLS_TTL_MASK);
