@@ -5831,7 +5831,7 @@ compose_output_action__(struct action_xlate_ctx *ctx, uint16_t ofp_port,
 
     /* If 'struct flow' gets additional metadata, we'll need to zero it out
      * before traversing a patch port. */
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 19);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 20);
 
     if (!ofport) {
         xlate_report(ctx, "Nonexistent output port");
@@ -6170,6 +6170,25 @@ compose_dec_ttl(struct action_xlate_ctx *ctx, struct ofpact_cnt_ids *ids)
 
         /* Stop processing for current table. */
         return true;
+    }
+}
+
+static void
+execute_copy_ttl_out_action(struct action_xlate_ctx *ctx)
+{
+    if (ctx->flow.dl_type != htons(ETH_TYPE_MPLS) &&
+        ctx->flow.dl_type != htons(ETH_TYPE_MPLS_MCAST)) {
+        /* Copying TTL to IP is not supported */
+        return;
+    }
+
+    if (ctx->flow.mpls_depth > 1) {
+        /* MPLS -> MPLS */
+        set_mpls_lse_ttl(&ctx->flow.mpls_lse,
+                         mpls_lse_to_ttl(ctx->flow.inner_mpls_lse));
+    } else {
+        /* IP -> MPLS */
+        set_mpls_lse_ttl(&ctx->flow.mpls_lse, ctx->flow.nw_ttl);
     }
 }
 
@@ -6550,6 +6569,10 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_POP_MPLS:
             execute_mpls_pop_action(ctx, ofpact_get_POP_MPLS(a)->ethertype);
+            break;
+
+        case OFPACT_COPY_TTL_OUT:
+            execute_copy_ttl_out_action(ctx);
             break;
 
         case OFPACT_SET_MPLS_TTL:
