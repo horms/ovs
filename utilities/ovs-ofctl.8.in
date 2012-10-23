@@ -1023,6 +1023,13 @@ set of actions then stops.  However, if the current set of actions was
 reached through ``resubmit'' then remaining actions in outer levels resume
 processing.
 .
+.IP \fBcopy_ttl_out\fR
+Copy the TTL from the next-to-outermost to the outermost header with TTL.
+The implementation supports copying to an outer MPLS header from either the
+next-to-outermost MPLS header, or if the MPLS stack only has a depth of one
+the TTL of the outer-most IP header - the TTL of an IPv4 header or hop limit
+of an IPv6 header.
+.
 .IP \fBnote:\fR[\fIhh\fR]...
 Does nothing at all.  Any number of bytes represented as hex digits
 \fIhh\fR may be included.  Pairs of hex digits may be separated by

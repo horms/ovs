@@ -73,6 +73,7 @@
     DEFINE_OFPACT(DEC_TTL,         ofpact_cnt_ids,       cnt_ids)   \
     DEFINE_OFPACT(SET_MPLS_TTL,    ofpact_mpls_ttl,      ofpact)    \
     DEFINE_OFPACT(DEC_MPLS_TTL,    ofpact_null,          ofpact)    \
+    DEFINE_OFPACT(COPY_TTL_OUT,    ofpact_null,          ofpact)    \
     DEFINE_OFPACT(PUSH_MPLS,       ofpact_push,          ofpact)    \
     DEFINE_OFPACT(POP_MPLS,        ofpact_pop_mpls,      ofpact)    \
                                                                     \
