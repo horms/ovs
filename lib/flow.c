@@ -100,7 +100,9 @@ parse_remaining_mpls(struct ofpbuf *b, struct flow *flow)
     struct mpls_hdr *mh;
     while ((mh = ofpbuf_try_pull(b, sizeof *mh)) &&
            !(mh->mpls_lse & htonl(MPLS_BOS_MASK))) {
-        flow->mpls_depth++;
+        if (flow->mpls_depth++ == 1) {
+            flow->inner_mpls_lse = mh->mpls_lse;
+        }
     }
 }
 
@@ -522,7 +524,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 19);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 20);
 
     fmd->tun_id = flow->tunnel.tun_id;
     fmd->metadata = flow->metadata;
