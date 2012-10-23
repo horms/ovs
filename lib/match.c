@@ -993,7 +993,7 @@ match_format(const struct match *match, struct ds *s, unsigned int priority)
         if (f->dl_type == htons(ETH_TYPE_ARP) ||
             f->dl_type == htons(ETH_TYPE_RARP)) {
             ds_put_format(s, "arp_op=%"PRIu8",", f->nw_proto);
-        } else {
+        } else if (!eth_type_mpls(f->dl_type)) {
             ds_put_format(s, "nw_proto=%"PRIu8",", f->nw_proto);
         }
     }
