@@ -1031,6 +1031,11 @@ Processing the current set of actions then stops.  However, if the current
 set of actions was reached through ``resubmit'' then remaining actions in
 outer levels resume processing.
 .
+.IP \fBcopy_ttl_in\fR
+Copy the TTL from the outermost header to next-to-outermost with TTL.
+The implementation supports copying to a next-to-outermost IP header
+from an outermost MPLS header.
+.
 .IP \fBcopy_ttl_out\fR
 Copy the TTL from the next-to-outermost to the outermost header with TTL.
 The implementation supports copying to an outer MPLS header from either the
