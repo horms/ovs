@@ -99,9 +99,12 @@ parse_mpls(struct ofpbuf *b, struct flow *flow)
     struct mpls_hdr *mh;
 
     while ((mh = ofpbuf_try_pull(b, sizeof *mh))) {
-        if (flow->mpls_depth++ == 0) {
+        if (flow->mpls_depth == 0) {
             flow->mpls_lse = mh->mpls_lse;
+        } else if (flow->mpls_depth == 1) {
+            flow->inner_mpls_lse = mh->mpls_lse;
         }
+        flow->mpls_depth++;
         if (mh->mpls_lse & htonl(MPLS_BOS_MASK)) {
             break;
         }
@@ -511,7 +514,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 19);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 20);
 
     fmd->tun_id = flow->tunnel.tun_id;
     fmd->metadata = flow->metadata;
@@ -841,14 +844,6 @@ void
 flow_set_mpls_label(struct flow *flow, ovs_be32 label)
 {
     set_mpls_lse_label(&flow->mpls_lse, label);
-}
-
-/* Sets the MPLS TTL that 'flow' matches to 'ttl', which should be in the
- * range 0...255. */
-void
-flow_set_mpls_ttl(struct flow *flow, uint8_t ttl)
-{
-    set_mpls_lse_ttl(&flow->mpls_lse, ttl);
 }
 
 /* Sets the MPLS TC that 'flow' matches to 'tc', which should be in the
