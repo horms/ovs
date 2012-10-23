@@ -5824,10 +5824,26 @@ compose_dec_ttl(struct action_xlate_ctx *ctx, struct ofpact_cnt_ids *ids)
 }
 
 static void
+compose_copy_ttl_in_action(struct action_xlate_ctx *ctx)
+{
+    if (!eth_type_mpls(ctx->flow.dl_type)) {
+        /* Copying TTL from IP is not supported */
+        return;
+    }
+
+    if (ctx->flow.mpls_depth > 1) {
+        /* Copying TTL from MPLS to MPLS is not supported */
+        return;
+    } else {
+        /* MPLS -> IP */
+        ctx->flow.nw_ttl = mpls_lse_to_ttl(ctx->flow.mpls_lse);
+    }
+}
+
+static void
 compose_copy_ttl_out_action(struct action_xlate_ctx *ctx)
 {
-    if (ctx->flow.dl_type != htons(ETH_TYPE_MPLS) &&
-        ctx->flow.dl_type != htons(ETH_TYPE_MPLS_MCAST)) {
+    if (!eth_type_mpls(ctx->flow.dl_type)) {
         /* Copying TTL to IP is not supported */
         return;
     }
@@ -6239,6 +6255,10 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_POP_MPLS:
             compose_mpls_pop_action(ctx, ofpact_get_POP_MPLS(a)->ethertype);
+            break;
+
+        case OFPACT_COPY_TTL_IN:
+            compose_copy_ttl_in_action(ctx);
             break;
 
         case OFPACT_COPY_TTL_OUT:
