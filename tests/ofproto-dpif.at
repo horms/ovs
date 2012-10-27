@@ -243,13 +243,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via no_match) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via no_match) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via no_match) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
 ])
 
 dnl Singleton controller action.
@@ -262,13 +262,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 ])
 
 dnl Modified controller action.
@@ -300,13 +300,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 metadata=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 metadata=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 metadata=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 ])
 
 dnl Modified vlan qinq controller action.
@@ -319,13 +319,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 metadata=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 metadata=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 metadata=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 ])
 
 dnl metadata instruction.
@@ -338,19 +338,19 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=1 total_len=60 in_port=1 metadata=0x64 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=1 total_len=60 in_port=1 metadata=0x64 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=1 total_len=60 in_port=1 metadata=0x64 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 ])
 
 dnl goto table instruction.
@@ -363,13 +363,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=89 total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:63 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=89 total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:63 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=89 total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:63 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 ])
 
 dnl Modified mpls controller action.
@@ -382,13 +382,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 metadata=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 metadata=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 metadata=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 ])
 
 dnl Modified mpls ttl action.
@@ -401,13 +401,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 ])
 
 dnl Modified mpls ipv6 controller action.
@@ -439,13 +439,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=56 in_port=1 metadata=0x0 (via action) data_len=56 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=56 in_port=1 metadata=0x0 (via action) data_len=56 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=56 in_port=1 metadata=0x0 (via action) data_len=56 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 ])
 
 dnl Checksum TCP.
@@ -458,7 +458,7 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
-priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) tcp_csum:0
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:64 ip(192.168.0.1->192.168.0.2) port(8->11) tcp_csum:0
 dnl
 OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=1 total_len=64 in_port=1 metadata=0x0 (via action) data_len=64 (unbuffered)
 priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
