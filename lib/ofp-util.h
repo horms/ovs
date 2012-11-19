@@ -137,6 +137,7 @@ int ofputil_netmask_to_wcbits(ovs_be32 netmask);
  * to implement set union and intersection.
  */
 enum ofputil_protocol {
+#define OFPUTIL_P_NONE 0
     /* OpenFlow 1.0-based protocols. */
     OFPUTIL_P_OF10     = 1 << 0, /* OpenFlow 1.0 flow format. */
     OFPUTIL_P_OF10_TID = 1 << 1, /* OF1.0 + flow_mod_table_id extension. */
