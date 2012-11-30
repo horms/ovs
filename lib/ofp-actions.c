@@ -1592,7 +1592,6 @@ ofpacts_verify(const struct ofpact ofpacts[])
         if (om) {
             if (a->type == OFPACT_WRITE_METADATA) {
                 VLOG_WARN("duplicate write_metadata instruction specified");
-                /* should be OFPERR_OFPET_BAD_ACTION? */
                 return OFPERR_OFPBAC_UNSUPPORTED_ORDER;
             } else {
                 VLOG_WARN("write_metadata instruction must be specified after "
