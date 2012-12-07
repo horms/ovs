@@ -725,8 +725,10 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 
 	if (vlan_tx_tag_present(skb)) {
 		key->eth.tci = htons(vlan_get_tci(skb));
-		key->vlan.type = skb->protocol;
+		key->vlan.type = vlan_get_tpid(skb);
 		if (vlan_tx_qinq_tag_present(skb)) {
+			if (key->vlan.type == htons(0))
+				key->vlan.type = htons(ETH_P_8021AD);
 			key->vlan.qinq_tci = htons(vlan_get_qinq_tci(skb));
 			key_len = SW_FLOW_KEY_OFFSET(vlan.qinq_tci);
 		} else {
@@ -736,8 +738,11 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 			if (proto == htons(ETH_P_8021Q)) {
 				if (unlikely(parse_vlan_qinq(skb, key)))
 					return -ENOMEM;
+				vlan_set_tpid(skb, htons(ETH_P_8021Q));
 				key_len = SW_FLOW_KEY_OFFSET(vlan.qinq_tci);
 			}
+			if (key->vlan.type == htons(0))
+				key->vlan.type = htons(ETH_P_8021Q);
 		}
 	} else if (eth->h_proto == htons(ETH_P_8021Q) ||
 			   eth->h_proto == htons(ETH_P_8021AD)) {
