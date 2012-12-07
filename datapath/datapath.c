@@ -682,6 +682,10 @@ static int validate_set(const struct nlattr *a,
 		break;
 
 	case OVS_KEY_ATTR_IPV4:
+		/* Gratuitous exception for MPLS to allow copy_ttl_in */
+		if (eth_p_mpls(flow_key->eth.type))
+			break;
+
 		if (flow_key->eth.type != htons(ETH_P_IP))
 			return -EINVAL;
 
@@ -698,6 +702,10 @@ static int validate_set(const struct nlattr *a,
 		break;
 
 	case OVS_KEY_ATTR_IPV6:
+		/* Gratuitous exception for MPLS to allow copy_ttl_in */
+		if (eth_p_mpls(flow_key->eth.type))
+			break;
+
 		if (flow_key->eth.type != htons(ETH_P_IPV6))
 			return -EINVAL;
 
