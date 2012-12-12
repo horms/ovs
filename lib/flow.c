@@ -535,7 +535,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
     const flow_wildcards_t wc = wildcards->wildcards;
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         flow->regs[i] &= wildcards->reg_masks[i];
@@ -606,7 +606,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     fmd->tun_id = flow->tun_id;
     fmd->tun_id_mask = htonll(UINT64_MAX);
@@ -715,7 +715,7 @@ flow_print(FILE *stream, const struct flow *flow)
 void
 flow_wildcards_init_catchall(struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     wc->wildcards = FWW_ALL;
     wc->tun_id_mask = htonll(0);
@@ -742,7 +742,7 @@ flow_wildcards_init_catchall(struct flow_wildcards *wc)
 void
 flow_wildcards_init_exact(struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     wc->wildcards = 0;
     wc->tun_id_mask = htonll(UINT64_MAX);
@@ -771,7 +771,7 @@ flow_wildcards_is_exact(const struct flow_wildcards *wc)
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     if (wc->wildcards
         || wc->tun_id_mask != htonll(UINT64_MAX)
@@ -808,7 +808,7 @@ flow_wildcards_is_catchall(const struct flow_wildcards *wc)
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     if (wc->wildcards != FWW_ALL
         || wc->tun_id_mask != htonll(0)
@@ -848,7 +848,7 @@ flow_wildcards_combine(struct flow_wildcards *dst,
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     dst->wildcards = src1->wildcards | src2->wildcards;
     dst->tun_id_mask = src1->tun_id_mask & src2->tun_id_mask;
@@ -892,7 +892,7 @@ flow_wildcards_equal(const struct flow_wildcards *a,
 {
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     if (a->wildcards != b->wildcards
         || a->tun_id_mask != b->tun_id_mask
@@ -931,7 +931,7 @@ flow_wildcards_has_extra(const struct flow_wildcards *a,
     uint8_t eth_masked[ETH_ADDR_LEN];
     struct in6_addr ipv6_masked;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 14);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 15);
 
     for (i = 0; i < FLOW_N_REGS; i++) {
         if ((a->reg_masks[i] & b->reg_masks[i]) != b->reg_masks[i]) {
@@ -1191,7 +1191,13 @@ flow_set_mpls_stack(struct flow *flow, uint8_t stack)
 void
 flow_compose(struct ofpbuf *b, const struct flow *flow)
 {
-    eth_compose(b, flow->dl_dst, flow->dl_src, ntohs(flow->dl_type), 0);
+    ovs_be16 inner_dl_type;
+
+    inner_dl_type = (flow->encap_dl_type == htons(0)
+                     ? flow->dl_type
+                     : flow->encap_dl_type);
+
+    eth_compose(b, flow->dl_dst, flow->dl_src, ntohs(inner_dl_type), 0);
     if (flow->dl_type == htons(FLOW_DL_TYPE_NONE)) {
         struct eth_header *eth = b->l2;
         eth->eth_type = htons(b->size);
@@ -1206,11 +1212,7 @@ flow_compose(struct ofpbuf *b, const struct flow *flow)
         eth_push_vlan(b, flow->vlan_qinq_tci, htons(ETH_TYPE_VLAN));
     }
 
-    if (flow->dl_type == htons(ETH_TYPE_MPLS) ||
-        flow->dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
-        push_mpls(b, flow->dl_type);
-        set_mpls_lse(b, flow->mpls_lse);
-    } else if (flow->dl_type == htons(ETH_TYPE_IP)) {
+    if (inner_dl_type == htons(ETH_TYPE_IP)) {
         struct ip_header *ip;
 
         b->l3 = ip = ofpbuf_put_zeros(b, sizeof *ip);
@@ -1252,9 +1254,9 @@ flow_compose(struct ofpbuf *b, const struct flow *flow)
 
         ip->ip_tot_len = htons((uint8_t *) b->data + b->size
                                - (uint8_t *) b->l3);
-    } else if (flow->dl_type == htons(ETH_TYPE_IPV6)) {
+    } else if (inner_dl_type == htons(ETH_TYPE_IPV6)) {
         /* XXX */
-    } else if (flow->dl_type == htons(ETH_TYPE_ARP)) {
+    } else if (inner_dl_type == htons(ETH_TYPE_ARP)) {
         struct arp_eth_header *arp;
 
         b->l3 = arp = ofpbuf_put_zeros(b, sizeof *arp);
@@ -1271,5 +1273,11 @@ flow_compose(struct ofpbuf *b, const struct flow *flow)
             memcpy(arp->ar_sha, flow->arp_sha, ETH_ADDR_LEN);
             memcpy(arp->ar_tha, flow->arp_tha, ETH_ADDR_LEN);
         }
+    }
+
+    if (flow->dl_type == htons(ETH_TYPE_MPLS) ||
+        flow->dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
+        push_mpls(b, flow->dl_type);
+        set_mpls_lse(b, flow->mpls_lse);
     }
 }

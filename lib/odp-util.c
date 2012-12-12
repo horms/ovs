@@ -1747,6 +1747,12 @@ parse_ethertype(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
     return true;
 }
 
+static enum odp_key_fitness
+parse_l3_onward(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
+                uint64_t present_attrs, int out_of_range_attr,
+                uint64_t expected_attrs, struct flow *flow,
+                const struct nlattr *key, size_t key_len);
+
 /* Parse MPLS header attributes. */
 static enum odp_key_fitness
 parse_mpls_onward(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
@@ -1754,8 +1760,9 @@ parse_mpls_onward(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
                    uint64_t expected_attrs, struct flow *flow,
                    const struct nlattr *key, size_t key_len)
 {
-    enum odp_key_fitness fitness;
+    enum odp_key_fitness fitness, encap_fitness;
     ovs_be32 mpls_lse;
+    ovs_be16 dl_type;
 
     /* Calulate fitness of outer attributes. */
     expected_attrs |= (UINT64_C(1) << OVS_KEY_ATTR_MPLS);
@@ -1789,8 +1796,30 @@ parse_mpls_onward(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
         flow->inner_mpls_lse = mpls_lse;
     }
 
-    return check_expectations(present_attrs, out_of_range_attr, expected_attrs,
-                              key, key_len);
+    fitness = check_expectations(present_attrs, out_of_range_attr,
+                                 expected_attrs, key, key_len);
+
+    /* Try to guess what the encapsulated ethernet type was
+     * in order to try and fill out the flow more fully */
+    dl_type = flow->dl_type;
+    if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV4)) {
+        flow->dl_type = htons(ETH_TYPE_IP);
+    } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV6)) {
+        flow->dl_type = htons(ETH_TYPE_IPV6);
+    } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_ARP)) {
+        flow->dl_type = htons(ETH_TYPE_ARP);
+    } else {
+        /* Nothing to work with, abandon hope of further processing */
+        return fitness;
+    }
+    encap_fitness = parse_l3_onward(attrs, present_attrs,
+                                    out_of_range_attr, expected_attrs,
+                                    flow, key, key_len);
+    flow->encap_dl_type = flow->dl_type;
+    flow->dl_type = dl_type;
+
+    /* The overall fitness is the worse of the outer and inner attributes. */
+    return MAX(encap_fitness, fitness);
 }
 
 static enum odp_key_fitness
@@ -2317,11 +2346,13 @@ commit_mpls_push_action(struct flow *flow, struct flow *base,
         }
         mpls_stack = htonl(0x1 << MPLS_STACK_SHIFT);
         flow->mpls_lse = mpls_label | mpls_tc | mpls_ttl | mpls_stack;
+        flow->encap_dl_type = flow->dl_type;
     }
 
     nl_msg_put_be16(odp_actions, OVS_ACTION_ATTR_PUSH_MPLS, eth_type);
     /* Update dl_type and mpls_lse fields. */
     base->dl_type = flow->dl_type = eth_type;
+    base->encap_dl_type = flow->encap_dl_type;
     base->mpls_lse = flow->mpls_lse;
 }
 
@@ -2338,6 +2369,7 @@ commit_mpls_pop_action(struct flow *flow, struct flow *base,
     /* Update dl_type and mpls_lse fields. */
     if (flow->dl_type & htonl(MPLS_STACK_MASK)) {
         base->dl_type = flow->dl_type = eth_type;
+        base->encap_dl_type = flow->encap_dl_type = htons(0);
     }
     base->mpls_lse = flow->mpls_lse;
 }
