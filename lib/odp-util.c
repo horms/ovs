@@ -2391,14 +2391,20 @@ static void
 commit_set_nw_action(const struct flow *flow, struct flow *base,
                      struct ofpbuf *odp_actions)
 {
+    ovs_be16 inner_dl_type;
+
+    inner_dl_type = (base->encap_dl_type == htons(0)
+                     ? base->dl_type
+                     : base->encap_dl_type);
+
     /* Check if flow really have an IP header. */
     if (!flow->nw_proto) {
         return;
     }
 
-    if (base->dl_type == htons(ETH_TYPE_IP)) {
+    if (inner_dl_type == htons(ETH_TYPE_IP)) {
         commit_set_ipv4_action(flow, base, odp_actions);
-    } else if (base->dl_type == htons(ETH_TYPE_IPV6)) {
+    } else if (inner_dl_type == htons(ETH_TYPE_IPV6)) {
         commit_set_ipv6_action(flow, base, odp_actions);
     }
 }
