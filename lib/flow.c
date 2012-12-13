@@ -396,6 +396,7 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
 {
     struct ofpbuf b = *packet;
     struct eth_header *eth;
+    ovs_be16 dl_type;
 
     COVERAGE_INC(flow_extract);
 
@@ -434,7 +435,7 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
         }
     }
 
-    flow->dl_type = parse_ethertype(&b);
+    dl_type = flow->dl_type = parse_ethertype(&b);
 
     /* Parse mpls, copy l3 ttl. */
     if (flow->dl_type == htons(ETH_TYPE_MPLS) ||
@@ -451,17 +452,17 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
         ih6 = b.data;
         if (packet->size >= IP_HEADER_LEN &&
             IP_VER(ih->ip_ihl_ver) == IP_VERSION) {
-                flow->nw_ttl = ih->ip_ttl;
+                dl_type = htons(ETH_TYPE_IP);
         if (packet->size >= sizeof *ih6 &&
             IP6_VER(ih6->ip6_vfc) == IP6_VERSION) {
-                flow->nw_ttl = ih6->ip6_hlim;
+                dl_type = htons(ETH_TYPE_IPV6);
             }
         }
     }
 
     /* Network layer. */
     packet->l3 = b.data;
-    if (flow->dl_type == htons(ETH_TYPE_IP)) {
+    if (dl_type == htons(ETH_TYPE_IP)) {
         const struct ip_header *nh = pull_ip(&b);
         if (nh) {
             packet->l4 = b.data;
@@ -494,7 +495,7 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
                 }
             }
         }
-    } else if (flow->dl_type == htons(ETH_TYPE_IPV6)) {
+    } else if (dl_type == htons(ETH_TYPE_IPV6)) {
         if (parse_ipv6(&b, flow)) {
             return;
         }
@@ -509,7 +510,7 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
                 packet->l7 = b.data;
             }
         }
-    } else if (flow->dl_type == htons(ETH_TYPE_ARP)) {
+    } else if (dl_type == htons(ETH_TYPE_ARP)) {
         const struct arp_eth_header *arp = pull_arp(&b);
         if (arp && arp->ar_hrd == htons(1)
             && arp->ar_pro == htons(ETH_TYPE_IP)
