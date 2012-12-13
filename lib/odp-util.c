@@ -2367,7 +2367,7 @@ commit_mpls_pop_action(struct flow *flow, struct flow *base,
            eth_type != htons(ETH_TYPE_MPLS_MCAST));
     nl_msg_put_be16(odp_actions, OVS_ACTION_ATTR_POP_MPLS, eth_type);
     /* Update dl_type and mpls_lse fields. */
-    if (flow->dl_type & htonl(MPLS_STACK_MASK)) {
+    if (flow->mpls_lse & htonl(MPLS_STACK_MASK)) {
         base->dl_type = flow->dl_type = eth_type;
         base->encap_dl_type = flow->encap_dl_type = htons(0);
     }
