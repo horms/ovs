@@ -439,17 +439,21 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, ovs_be64 tun_id,
     /* Parse mpls, copy l3 ttl. */
     if (flow->dl_type == htons(ETH_TYPE_MPLS) ||
         flow->dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
-        struct ip_header *ih = b.data;
-        struct ip6_hdr   *ih6 = b.data;
+        struct ip_header *ih;
+        struct ip6_hdr   *ih6;
         packet->l2_5 = b.data;
         parse_mpls(&b, flow);
         if (!(flow->mpls_lse & htonl(MPLS_STACK_MASK))) {
             parse_remaining_mpls(&b, flow);
         }
-        if (ih) {
-            if (IP_VER(ih->ip_ihl_ver) == IP_VERSION) {
+
+        ih = b.data;
+        ih6 = b.data;
+        if (packet->size >= IP_HEADER_LEN &&
+            IP_VER(ih->ip_ihl_ver) == IP_VERSION) {
                 flow->nw_ttl = ih->ip_ttl;
-            } else if (IP6_VER(ih6->ip6_vfc) == IP6_VERSION) {
+        if (packet->size >= sizeof *ih6 &&
+            IP6_VER(ih6->ip6_vfc) == IP6_VERSION) {
                 flow->nw_ttl = ih6->ip6_hlim;
             }
         }
