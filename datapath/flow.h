@@ -59,6 +59,8 @@ struct sw_flow_key {
 	struct {
 		__be32 mpls_lse;	/* 0 if no MPLS, otherwise MPLS label Stack entry. */
 		__be32 inner_mpls_lse;	/* 0 if no inner MPLS, otherwise MPLS label Stack entry. */
+		__be16 type;		/* Encapsulated ethernet frame type.
+					 * (Guess!!!) */
 	} mpls;
 	struct {
 		u8     proto;		/* IP protocol or lower 8 bits of ARP opcode. */
