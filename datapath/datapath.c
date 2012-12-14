@@ -576,7 +576,7 @@ static int validate_tp_port(const struct sw_flow_key *flow_key)
 }
 
 static int validate_set(const struct nlattr *a,
-			const struct sw_flow_key *flow_key, __be16 eth_type)
+			const struct sw_flow_key *flow_key)
 {
 	const struct nlattr *ovs_key = nla_data(a);
 	int key_type = nla_type(ovs_key);
@@ -598,13 +598,8 @@ static int validate_set(const struct nlattr *a,
 		break;
 
 	case OVS_KEY_ATTR_IPV4:
-		if (eth_type != htons(ETH_P_IP))
+		if (flow_key->eth.type != htons(ETH_P_IP))
 			return -EINVAL;
-
-		/* Gratuitous exception for MPLS to allow ttl modifications */
-		if (flow_key->eth.type == htons(ETH_P_MPLS_UC) ||
-		    flow_key->eth.type == htons(ETH_P_MPLS_MC))
-			break;
 
 		if (!flow_key->ipv4.addr.src || !flow_key->ipv4.addr.dst)
 			return -EINVAL;
@@ -663,7 +658,6 @@ static int validate_actions(const struct nlattr *attr,
 {
 	const struct nlattr *a;
 	int rem, err;
-	__u16 eth_type = key->eth.type;
 
 	if (depth >= SAMPLE_ACTION_DEPTH)
 		return -EOVERFLOW;
@@ -685,6 +679,8 @@ static int validate_actions(const struct nlattr *attr,
 			[OVS_ACTION_ATTR_SAMPLE] = (u32)-1
 		};
 		const struct ovs_action_push_vlan *vlan;
+		__be16 push_ethertype;
+		__be16 pop_ethertype;
 		__be32 mpls_lse;
 		u8	new_ttl;
 		int type = nla_type(a);
@@ -723,16 +719,16 @@ static int validate_actions(const struct nlattr *attr,
 			break;
 
 		case OVS_ACTION_ATTR_PUSH_MPLS:
-			eth_type = nla_get_be16(a);
-			if (eth_type != htons(ETH_P_MPLS_UC) &&
-			    eth_type != htons(ETH_P_MPLS_MC))
+			push_ethertype = nla_get_be16(a);
+			if (push_ethertype != htons(ETH_P_MPLS_UC) &&
+				push_ethertype != htons(ETH_P_MPLS_MC))
 				return -EINVAL;
 			break;
 
 		case OVS_ACTION_ATTR_POP_MPLS:
-			eth_type = nla_get_be16(a);
-			if (eth_type == htons(ETH_P_MPLS_UC) ||
-			    eth_type == htons(ETH_P_MPLS_MC))
+			pop_ethertype = nla_get_be16(a);
+			if (pop_ethertype == htons(ETH_P_MPLS_UC) ||
+				pop_ethertype == htons(ETH_P_MPLS_MC))
 				return -EINVAL;
 			break;
 
@@ -753,7 +749,7 @@ static int validate_actions(const struct nlattr *attr,
 			break;
 
 		case OVS_ACTION_ATTR_SET:
-			err = validate_set(a, key, eth_type);
+			err = validate_set(a, key);
 			if (err)
 				return err;
 			break;
