@@ -805,6 +805,11 @@ ofpact_from_openflow12(const union ofp_action *a, struct ofpbuf *out)
         break;
     }
 
+    case OFPUTIL_OFPAT12_SET_QUEUE:
+        ofpact_put_SET_QUEUE(out)->queue_id =
+            ntohl(((const struct ofp11_action_set_queue *)a)->queue_id);
+        break;
+
     case OFPUTIL_OFPAT12_PUSH_MPLS: {
         struct ofp11_action_push *oap = (struct ofp11_action_push *)a;
         ofpact_put_PUSH_MPLS(out)->ethertype = oap->ethertype;

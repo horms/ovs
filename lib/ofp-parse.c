@@ -330,6 +330,7 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         break;
 
     case OFPUTIL_OFPAT11_SET_QUEUE:
+    case OFPUTIL_OFPAT12_SET_QUEUE:
         ofpact_put_SET_QUEUE(ofpacts)->queue_id = str_to_u32(arg);
         break;
 
