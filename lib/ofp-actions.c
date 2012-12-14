@@ -616,6 +616,10 @@ ofpact_from_openflow11(const union ofp_action *a, struct ofpbuf *out)
             ntohl(((const struct ofp11_action_set_queue *)a)->queue_id);
         break;
 
+    case OFPUTIL_OFPAT11_DEC_NW_TTL:
+        ofpact_put_DEC_TTL(out);
+        break;
+
     case OFPUTIL_OFPAT11_SET_DL_SRC:
         memcpy(ofpact_put_SET_ETH_SRC(out)->mac,
                ((const struct ofp_action_dl_addr *) a)->dl_addr, ETH_ADDR_LEN);
@@ -808,6 +812,11 @@ ofpact_from_openflow12(const union ofp_action *a, struct ofpbuf *out)
     case OFPUTIL_OFPAT12_SET_QUEUE:
         ofpact_put_SET_QUEUE(out)->queue_id =
             ntohl(((const struct ofp11_action_set_queue *)a)->queue_id);
+        break;
+
+
+    case OFPUTIL_OFPAT12_DEC_NW_TTL:
+        ofpact_put_DEC_TTL(out);
         break;
 
     case OFPUTIL_OFPAT12_PUSH_MPLS: {

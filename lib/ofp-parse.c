@@ -444,6 +444,8 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
         break;
 
     case OFPUTIL_NXAST_DEC_TTL:
+    case OFPUTIL_OFPAT11_DEC_NW_TTL:
+    case OFPUTIL_OFPAT12_DEC_NW_TTL:
         ofpact_put_DEC_TTL(ofpacts);
         break;
 
