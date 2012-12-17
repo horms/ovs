@@ -588,7 +588,8 @@ out:
 }
 
 /**
- * ovs_flow_extract - extracts a flow key from an Ethernet frame.
+ * ovs_flow_extract_l3_onwards - extracts l3 and l4 portion of a flow key
+ * from an Ethernet frame.
  * @skb: sk_buff that contains the frame, with skb->data pointing to the
  * Ethernet header
  * @in_port: port number on which @skb was received.
@@ -596,62 +597,27 @@ out:
  * @key_lenp: length of output flow key
  *
  * The caller must ensure that skb->len >= ETH_HLEN.
+ * The caller must ensure that the rest of the flow is initialised.
+ * This, ovs_flow_extract_l3_onwards() should be called by or after
+ * vs_flow_extract().
  *
  * Returns 0 if successful, otherwise a negative errno value.
  *
  * Initializes @skb header pointers as follows:
  *
- *    - skb->mac_header: the Ethernet header.
- *
- *    - skb->network_header: just past the Ethernet header, or just past the
- *      VLAN header, to the first byte of the Ethernet payload.
- *
- *    - skb->transport_header: If key->dl_type is ETH_P_IP or ETH_P_IPV6
+ *    - skb->transport_header: If eth_type is ETH_P_IP or ETH_P_IPV6
  *      on output, then just past the IP header, if one is present and
  *      of a correct length, otherwise the same as skb->network_header.
  *      For other key->dl_type values it is left untouched.
  */
-int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
-		 int *key_lenp)
+int ovs_flow_extract_l3_onwards(struct sk_buff *skb, struct sw_flow_key *key,
+				int *key_lenp, __be16 eth_type)
 {
 	int error = 0;
-	int key_len = SW_FLOW_KEY_OFFSET(eth);
-	struct ethhdr *eth;
-
-	memset(key, 0, sizeof(*key));
-
-	key->phy.priority = skb->priority;
-	if (OVS_CB(skb)->tun_key)
-		memcpy(&key->tun_key, OVS_CB(skb)->tun_key, sizeof(key->tun_key));
-	key->phy.in_port = in_port;
-	key->phy.skb_mark = skb_get_mark(skb);
-
-	skb_reset_mac_header(skb);
-
-	/* Link layer.  We are guaranteed to have at least the 14 byte Ethernet
-	 * header in the linear data area.
-	 */
-	eth = eth_hdr(skb);
-	memcpy(key->eth.src, eth->h_source, ETH_ALEN);
-	memcpy(key->eth.dst, eth->h_dest, ETH_ALEN);
-
-	__skb_pull(skb, 2 * ETH_ALEN);
-
-	if (vlan_tx_tag_present(skb))
-		key->eth.tci = htons(vlan_get_tci(skb));
-	else if (eth->h_proto == htons(ETH_P_8021Q))
-		if (unlikely(parse_vlan(skb, key)))
-			return -ENOMEM;
-
-	key->eth.type = parse_ethertype(skb);
-	if (unlikely(key->eth.type == htons(0)))
-		return -ENOMEM;
-
-	skb_reset_network_header(skb);
-	__skb_push(skb, skb->data - skb_mac_header(skb));
+	int key_len = *key_lenp;
 
 	/* Network layer. */
-	if (key->eth.type == htons(ETH_P_IP)) {
+	if (eth_type == htons(ETH_P_IP)) {
 		struct iphdr *nh;
 		__be16 offset;
 
@@ -710,8 +676,8 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 			}
 		}
 
-	} else if ((key->eth.type == htons(ETH_P_ARP) ||
-		   key->eth.type == htons(ETH_P_RARP)) && arphdr_ok(skb)) {
+	} else if ((eth_type == htons(ETH_P_ARP) ||
+		    eth_type == htons(ETH_P_RARP)) && arphdr_ok(skb)) {
 		struct arp_eth_header *arp;
 
 		arp = (struct arp_eth_header *)skb_network_header(skb);
@@ -730,18 +696,7 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 			memcpy(key->ipv4.arp.tha, arp->ar_tha, ETH_ALEN);
 			key_len = SW_FLOW_KEY_OFFSET(ipv4.arp);
 		}
-	} else if (eth_p_mpls(key->eth.type)) {
-		error = check_header(skb, MPLS_HLEN);
-		if (unlikely(error))
-			goto out;
-
-		key_len = SW_FLOW_KEY_OFFSET(mpls.top_label);
-		memcpy(&key->mpls.top_label, skb_network_header(skb), MPLS_HLEN);
-
-		/* Update network header */
-		skb_set_network_header(skb, skb_network_header(skb) -
-				       skb->data + MPLS_HLEN);
-	} else if (key->eth.type == htons(ETH_P_IPV6)) {
+	} else if (eth_type == htons(ETH_P_IPV6)) {
 		int nh_len;             /* IPv6 Header + Extensions */
 
 		nh_len = parse_ipv6hdr(skb, key, &key_len);
@@ -785,6 +740,91 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 
 out:
 	*key_lenp = key_len;
+	return error;
+}
+
+/**
+ * ovs_flow_extract - extracts a flow key from an Ethernet frame.
+ * @skb: sk_buff that contains the frame, with skb->data pointing to the
+ * Ethernet header
+ * @in_port: port number on which @skb was received.
+ * @key: output flow key
+ * @key_lenp: length of output flow key
+ *
+ * The caller must ensure that skb->len >= ETH_HLEN.
+ *
+ * Returns 0 if successful, otherwise a negative errno value.
+ *
+ * Initializes @skb header pointers as follows:
+ *
+ *    - skb->mac_header: the Ethernet header.
+ *
+ *    - skb->network_header: just past the Ethernet header, or just past the
+ *      VLAN header, to the first byte of the Ethernet payload.
+ *
+ *    - skb->transport_header: If key->dl_type is ETH_P_IP or ETH_P_IPV6
+ *      on output, then just past the IP header, if one is present and
+ *      of a correct length, otherwise the same as skb->network_header.
+ *      For other key->dl_type values it is left untouched.
+ */
+int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
+		     int *key_lenp)
+{
+	int error = 0;
+	int key_len = SW_FLOW_KEY_OFFSET(eth);
+	struct ethhdr *eth;
+
+	memset(key, 0, sizeof(*key));
+
+	key->phy.priority = skb->priority;
+	if (OVS_CB(skb)->tun_key)
+		memcpy(&key->tun_key, OVS_CB(skb)->tun_key, sizeof(key->tun_key));
+	key->phy.in_port = in_port;
+	key->phy.skb_mark = skb_get_mark(skb);
+
+	skb_reset_mac_header(skb);
+
+	/* Link layer.  We are guaranteed to have at least the 14 byte Ethernet
+	 * header in the linear data area.
+	 */
+	eth = eth_hdr(skb);
+	memcpy(key->eth.src, eth->h_source, ETH_ALEN);
+	memcpy(key->eth.dst, eth->h_dest, ETH_ALEN);
+
+	__skb_pull(skb, 2 * ETH_ALEN);
+
+	if (vlan_tx_tag_present(skb))
+		key->eth.tci = htons(vlan_get_tci(skb));
+	else if (eth->h_proto == htons(ETH_P_8021Q))
+		if (unlikely(parse_vlan(skb, key)))
+			return -ENOMEM;
+
+	key->eth.type = parse_ethertype(skb);
+	if (unlikely(key->eth.type == htons(0)))
+		return -ENOMEM;
+
+	skb_reset_network_header(skb);
+	__skb_push(skb, skb->data - skb_mac_header(skb));
+
+	/* MPLS */
+	if (eth_p_mpls(key->eth.type)) {
+		error = check_header(skb, MPLS_HLEN);
+		if (unlikely(error))
+			goto err;
+
+		key_len = SW_FLOW_KEY_OFFSET(mpls.top_label);
+		memcpy(&key->mpls.top_label, skb_network_header(skb), MPLS_HLEN);
+
+		/* Update transport header */
+		skb_set_network_header(skb, skb_network_header(skb) -
+				       skb->data + MPLS_HLEN);
+	}
+
+	*key_lenp = key_len;
+	return ovs_flow_extract_l3_onwards(skb, key, key_lenp,
+					   key->eth.type);
+
+err:
 	return error;
 }
 
