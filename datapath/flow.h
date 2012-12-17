@@ -160,6 +160,8 @@ void ovs_flow_free(struct sw_flow *);
 struct sw_flow_actions *ovs_flow_actions_alloc(int actions_len);
 void ovs_flow_deferred_free_acts(struct sw_flow_actions *);
 
+int ovs_flow_extract_l3_onwards(struct sk_buff *, struct sw_flow_key *,
+				int *key_lenp, __be16 eth_type);
 int ovs_flow_extract(struct sk_buff *, u16 in_port, struct sw_flow_key *,
 		     int *key_lenp);
 void ovs_flow_used(struct sw_flow *, struct sk_buff *);
