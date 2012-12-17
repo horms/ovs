@@ -629,6 +629,20 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 	return 0;
 }
 
+__be16 ovs_actions_allow_l3_extraction(struct sw_flow *flow)
+{
+	struct sw_flow_actions *acts = rcu_dereference(flow->sf_acts);
+	const struct nlattr *a;
+	int rem;
+
+	for (a = acts->actions, rem = acts->actions_len; rem > 0;
+	     a = nla_next(a, &rem))
+		if (nla_type(a) == OVS_ACTION_ATTR_POP_MPLS)
+			return *(__be16 *)nla_data(a);
+
+	return 0;
+}
+
 /* We limit the number of times that we pass into execute_actions()
  * to avoid blowing out the stack in the event that we have a loop. */
 #define MAX_LOOPS 5
