@@ -224,7 +224,9 @@ struct sw_flow *ovs_flow_alloc(void)
 		return ERR_PTR(-ENOMEM);
 
 	spin_lock_init(&flow->lock);
+	INIT_LIST_HEAD(&flow->inner_flows);
 	flow->sf_acts = NULL;
+	flow->flags = 0;
 
 	return flow;
 }
@@ -341,7 +343,7 @@ struct sw_flow *ovs_flow_tbl_next(struct flow_table *table, u32 *bucket, u32 *la
 		i = 0;
 		head = flex_array_get(table->buckets, *bucket);
 		hlist_for_each_entry_rcu(flow, n, head, hash_node[ver]) {
-			if (i < *last) {
+			if (i < *last || flow->flags & SW_FLOW_F_NO_DUMP) {
 				i++;
 				continue;
 			}
@@ -413,7 +415,8 @@ void ovs_flow_free(struct sw_flow *flow)
 	if (unlikely(!flow))
 		return;
 
-	kfree((struct sf_flow_acts __force *)flow->sf_acts);
+	if (!(flow->flags | SW_FLOW_F_NO_FREE_SF_ACTS))
+		kfree((struct sf_flow_acts __force *)flow->sf_acts);
 	kmem_cache_free(flow_cache, flow);
 }
 
@@ -873,11 +876,23 @@ void ovs_flow_tbl_insert(struct flow_table *table, struct sw_flow *flow,
 	__flow_tbl_insert(table, flow);
 }
 
-void ovs_flow_tbl_remove(struct flow_table *table, struct sw_flow *flow)
+static void __flow_tbl_remove(struct flow_table *table, struct sw_flow *flow)
 {
 	hlist_del_rcu(&flow->hash_node[table->node_ver]);
 	table->count--;
 	BUG_ON(table->count < 0);
+}
+
+void ovs_flow_tbl_remove(struct flow_table *table, struct sw_flow *flow)
+{
+	struct sw_flow *inner_flow;
+
+	__flow_tbl_remove(table, flow);
+
+	list_for_each_entry_rcu(inner_flow, &flow->inner_flows, inner_flows) {
+		__flow_tbl_remove(table, inner_flow);
+		ovs_flow_deferred_free(inner_flow);
+	}
 }
 
 /* The size of the argument for each %OVS_KEY_ATTR_* Netlink attribute.  */
@@ -1145,7 +1160,7 @@ int ipv4_tun_to_nlattr(struct sk_buff *skb,
  * @attr: Netlink attribute holding nested %OVS_KEY_ATTR_* Netlink attribute
  * sequence.
  */
-int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
+int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int key_lenp[2],
 		      const struct nlattr *attr)
 {
 	const struct nlattr *a[OVS_KEY_ATTR_MAX + 1];
@@ -1153,6 +1168,7 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 	int key_len;
 	u64 attrs;
 	int err;
+	__be16 eth_type;
 
 	memset(swkey, 0, sizeof(struct sw_flow_key));
 	key_len = SW_FLOW_KEY_OFFSET(eth);
@@ -1260,7 +1276,29 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 		swkey->eth.type = htons(ETH_P_802_2);
 	}
 
-	if (swkey->eth.type == htons(ETH_P_IP)) {
+	eth_type = swkey->eth.type;
+	if (eth_p_mpls(eth_type)) {
+		const struct ovs_key_mpls *mpls_key;
+
+		if (!(attrs & (1ULL << OVS_KEY_ATTR_MPLS)))
+			return -EINVAL;
+		attrs &= ~(1ULL << OVS_KEY_ATTR_MPLS);
+
+		key_len = SW_FLOW_KEY_OFFSET(mpls.top_lse);
+		mpls_key = nla_data(a[OVS_KEY_ATTR_MPLS]);
+		swkey->mpls.top_lse = mpls_key->mpls_top_lse;
+
+		if (attrs & (1 << OVS_KEY_ATTR_IPV4))
+			eth_type = htons(ETH_P_IP);
+		if (attrs & (1 << OVS_KEY_ATTR_IPV6))
+			eth_type = htons(ETH_P_IPV6);
+		if (attrs & (1 << OVS_KEY_ATTR_ARP))
+			eth_type = htons(ETH_P_ARP);
+	}
+
+	key_lenp[0] = key_len;
+
+	if (eth_type == htons(ETH_P_IP)) {
 		const struct ovs_key_ipv4 *ipv4_key;
 
 		if (!(attrs & (1 << OVS_KEY_ATTR_IPV4)))
@@ -1283,7 +1321,7 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 			if (err)
 				return err;
 		}
-	} else if (swkey->eth.type == htons(ETH_P_IPV6)) {
+	} else if (eth_type == htons(ETH_P_IPV6)) {
 		const struct ovs_key_ipv6 *ipv6_key;
 
 		if (!(attrs & (1 << OVS_KEY_ATTR_IPV6)))
@@ -1309,8 +1347,8 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 			if (err)
 				return err;
 		}
-	} else if (swkey->eth.type == htons(ETH_P_ARP) ||
-		   swkey->eth.type == htons(ETH_P_RARP)) {
+	} else if (eth_type == htons(ETH_P_ARP) ||
+		   eth_type == htons(ETH_P_RARP)) {
 		const struct ovs_key_arp *arp_key;
 
 		if (!(attrs & (1 << OVS_KEY_ATTR_ARP)))
@@ -1326,21 +1364,17 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 		swkey->ip.proto = ntohs(arp_key->arp_op);
 		memcpy(swkey->ipv4.arp.sha, arp_key->arp_sha, ETH_ALEN);
 		memcpy(swkey->ipv4.arp.tha, arp_key->arp_tha, ETH_ALEN);
-	} else if (eth_p_mpls(swkey->eth.type)) {
-		const struct ovs_key_mpls *mpls_key;
-
-		if (!(attrs & (1ULL << OVS_KEY_ATTR_MPLS)))
-			return -EINVAL;
-		attrs &= ~(1ULL << OVS_KEY_ATTR_MPLS);
-
-		key_len = SW_FLOW_KEY_OFFSET(mpls.top_lse);
-		mpls_key = nla_data(a[OVS_KEY_ATTR_MPLS]);
-		swkey->mpls.top_lse = mpls_key->mpls_top_lse;
 	}
 
 	if (attrs)
 		return -EINVAL;
-	*key_lenp = key_len;
+
+	if (eth_type == swkey->eth.type) {
+		key_lenp[0] = key_len;
+		key_lenp[1] = 0;
+	} else {
+		key_lenp[1] = key_len;
+	}
 
 	return 0;
 }
