@@ -117,6 +117,29 @@ struct sw_flow_key {
 	};
 };
 
+#define SW_FLOW_F_NO_DUMP         0x01
+#define SW_FLOW_F_NO_FREE_SF_ACTS 0x02
+
+/* Flows are divided into three types:
+ * Singleton Flow: The match and actions of this flow are self-contained
+ *     and actions are applied to packets which match.
+ * Outer Flow: The actions of the flow include information that
+ *     may be used to create a more fine-grained match. This match
+ *     is constructed and a second lookup is made for the inner flow that
+ *     matches a packet.
+ * Inner Flow: This has a more fine-grained match constructed using
+ *     information contained in the actions of the inner flow.
+ *
+ * The actions of the inner and outer flow are identical but as a match on
+ * an outer flow will always result in the lookup of an inner flow the
+ * matches of an outer flow are never applied.
+ *
+ * An outer_flow is denoted by encap_eth_type being set to a non-zero
+ * value. This element is used as an optimisation to avoid scanning the
+ * actions of the outer flow each time it matches a packet.
+ *
+ * On deletion, outer_flow will delete all its inner flows, which
+ * are found by iterating the inner_flows element. */
 struct sw_flow {
 	struct rcu_head rcu;
 	struct hlist_node hash_node[2];
@@ -126,10 +149,27 @@ struct sw_flow {
 	struct sw_flow_actions __rcu *sf_acts;
 
 	spinlock_t lock;	/* Lock for values below. */
+
+	struct list_head inner_flows;	/* Inner flows.
+					 * For an inner flow this is its
+					 * entry in the hlist of its outer
+					 * flow.
+					 * For an outer flow this is the
+					 * list of inner flows
+					 * For a singleton flow this is
+					 * unused */
+	__be16 encap_eth_type;		/* Set to the ethernet type supplied
+					 * by action for outer flows,
+					 * zero otherwise. */
+
 	unsigned long used;	/* Last used time (in jiffies). */
 	u64 packet_count;	/* Number of packets matched. */
 	u64 byte_count;		/* Number of bytes matched. */
 	u8 tcp_flags;		/* Union of seen TCP flags. */
+	/* End values that need loc*/
+
+	u8 flags;		/* SW_FLOW_F_* */
+
 };
 
 struct arp_eth_header {
@@ -161,7 +201,7 @@ struct sw_flow_actions *ovs_flow_actions_alloc(int actions_len);
 void ovs_flow_deferred_free_acts(struct sw_flow_actions *);
 
 int ovs_flow_extract_l3_onwards(struct sk_buff *, struct sw_flow_key *,
-				int *key_lenp, __be16 eth_type);
+				int key_lenp[2], __be16 eth_type);
 int ovs_flow_extract(struct sk_buff *, u16 in_port, struct sw_flow_key *,
 		     int *key_lenp);
 void ovs_flow_used(struct sw_flow *, struct sk_buff *);

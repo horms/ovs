@@ -239,7 +239,7 @@ void ovs_dp_detach_port(struct vport *p)
 void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 {
 	struct datapath *dp = p->dp;
-	struct sw_flow *flow;
+	struct sw_flow *flow, *outer_flow = NULL;
 	struct dp_stats_percpu *stats;
 	u64 *stats_counter;
 	int error;
@@ -249,6 +249,7 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 	if (!OVS_CB(skb)->flow) {
 		struct sw_flow_key key;
 		int key_len;
+		struct flow_table *table = rcu_dereference(dp->table);
 
 		/* Extract flow from 'skb' into 'key'. */
 		error = ovs_flow_extract(skb, p->port_no, &key, &key_len);
@@ -258,8 +259,27 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 		}
 
 		/* Look up flow. */
-		flow = ovs_flow_tbl_lookup(rcu_dereference(dp->table),
-					   &key, key_len);
+		flow = ovs_flow_tbl_lookup(table, &key, key_len);
+
+		/* We have a flow? Superb.
+		 * See if the actions in the flow supply information to
+		 * allow more information to be included in the flow's match
+		 */
+		if (likely(flow)) {
+			__be16 encap_eth_type;
+			encap_eth_type = flow->encap_eth_type;
+			if (unlikely(encap_eth_type)) {
+				error = ovs_flow_extract_l3_onwards(skb, &key, &key_len,
+								    encap_eth_type);
+				if (unlikely(error)) {
+					kfree_skb(skb);
+					return;
+				}
+				outer_flow = flow;
+				flow = ovs_flow_tbl_lookup(table, &key, key_len);
+			}
+		}
+
 		if (unlikely(!flow)) {
 			struct dp_upcall_info upcall;
 
@@ -277,6 +297,8 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 	}
 
 	stats_counter = &stats->n_hit;
+	if (unlikely(outer_flow))
+		ovs_flow_used(outer_flow, skb);
 	ovs_flow_used(OVS_CB(skb)->flow, skb);
 	ovs_execute_actions(dp, skb);
 
@@ -1228,24 +1250,145 @@ static struct sk_buff *ovs_flow_cmd_build_info(struct sw_flow *flow,
 	return skb;
 }
 
+enum flow_type {
+	flow_inner,
+	flow_outer,
+	flow_singleton,
+};
+
+static int ovs_flow_cmd_new_or_set__(struct sk_buff *skb,
+				     struct genl_info *info,
+				     struct sw_flow_actions *acts,
+				     struct nlattr **a, struct datapath *dp,
+				     struct sw_flow_key key, int key_len,
+				     enum flow_type flow_type,
+				     struct sw_flow **flowp)
+{
+	struct sk_buff *reply = NULL;
+	struct flow_table *table = genl_dereference(dp->table);
+	struct sw_flow *flow = ovs_flow_tbl_lookup(table, &key, key_len);
+
+	if (!flow) {
+		/* Bail out if we're not allowed to create a new flow. */
+		if (info->genlhdr->cmd == OVS_FLOW_CMD_SET)
+			return -ENOENT;
+
+		/* Expand table, if necessary, to make room. */
+		if (ovs_flow_tbl_need_to_expand(table)) {
+			struct flow_table *new_table;
+
+			new_table = ovs_flow_tbl_expand(table);
+			if (!IS_ERR(new_table)) {
+				rcu_assign_pointer(dp->table, new_table);
+				ovs_flow_tbl_deferred_destroy(table);
+				table = genl_dereference(dp->table);
+			}
+		}
+
+		/* Allocate flow. */
+		flow = ovs_flow_alloc();
+		if (IS_ERR(flow))
+			return PTR_ERR(flow);
+		clear_stats(flow);
+
+		rcu_assign_pointer(flow->sf_acts, acts);
+
+		/* Add inner flow without locking */
+		if (flow_type == flow_outer) {
+			flow->encap_eth_type = ovs_actions_allow_l3_extraction(flow);
+			list_add_rcu(&(*flowp)->inner_flows,
+				     &flow->inner_flows);
+			flow->flags = SW_FLOW_F_NO_FREE_SF_ACTS;
+		} else if (flow_type == flow_inner) {
+
+			flow->flags = SW_FLOW_F_NO_DUMP;
+			*flowp = flow;
+		}
+
+		/* Put flow in bucket. */
+		ovs_flow_tbl_insert(table, flow, &key, key_len);
+
+		if (flow_type == flow_inner)
+			reply = ovs_flow_cmd_build_info(flow, dp,
+							info->snd_portid,
+							info->snd_seq,
+							OVS_FLOW_CMD_NEW);
+	} else {
+		/* We found a matching flow. */
+		struct sw_flow_actions *old_acts;
+		bool may_clear_stats = true;
+
+		/* Bail out if we're not allowed to modify an existing flow.
+		 * We accept NLM_F_CREATE in place of the intended NLM_F_EXCL
+		 * because Generic Netlink treats the latter as a dump
+		 * request.  We also accept NLM_F_EXCL in case that bug ever
+		 * gets fixed.
+		 */
+		if (info->genlhdr->cmd == OVS_FLOW_CMD_NEW &&
+		    info->nlhdr->nlmsg_flags & (NLM_F_CREATE | NLM_F_EXCL)) {
+			/* If this is an outer_flow then it may duplicate
+			 * the outer_flow of another flow's inner_flow.
+			 * Just accept this and more on.
+			 */
+			if (flow_type != flow_outer)
+				return -EEXIST;
+			may_clear_stats = false;
+		} else {
+			/* Update actions. */
+			old_acts = rcu_dereference_protected(flow->sf_acts,
+							     lockdep_genl_is_held());
+			rcu_assign_pointer(flow->sf_acts, acts);
+			if (!(flow->flags | SW_FLOW_F_NO_FREE_SF_ACTS))
+				ovs_flow_deferred_free_acts(old_acts);
+
+			reply = ovs_flow_cmd_build_info(flow, dp,
+							info->snd_portid,
+							info->snd_seq,
+							OVS_FLOW_CMD_NEW);
+		}
+
+		if (a[OVS_FLOW_ATTR_CLEAR] || flow_type == flow_outer) {
+			spin_lock_bh(&flow->lock);
+			/* Clear stats. */
+			if (a[OVS_FLOW_ATTR_CLEAR] && may_clear_stats)
+				clear_stats(flow);
+			/* Add inner flow */
+			if (flow_type == flow_outer)
+				list_add_rcu(&(*flowp)->inner_flows,
+					     &flow->inner_flows);
+			spin_unlock_bh(&flow->lock);
+		}
+	}
+
+	if (!reply)
+		return 0;
+
+	if (!IS_ERR(reply))
+		genl_notify(reply, genl_info_net(info), info->snd_portid,
+			   ovs_dp_flow_multicast_group.id, info->nlhdr,
+			   GFP_KERNEL);
+	else
+		netlink_set_err(GENL_SOCK(sock_net(skb->sk)), 0,
+				ovs_dp_flow_multicast_group.id,	PTR_ERR(reply));
+	return 0;
+}
+
 static int ovs_flow_cmd_new_or_set(struct sk_buff *skb, struct genl_info *info)
 {
 	struct nlattr **a = info->attrs;
 	struct ovs_header *ovs_header = info->userhdr;
 	struct sw_flow_key key;
-	struct sw_flow *flow;
-	struct sk_buff *reply;
+	struct sw_flow *inner_flow = NULL;
 	struct datapath *dp;
-	struct flow_table *table;
 	struct sw_flow_actions *acts = NULL;
 	int error;
-	int key_len;
+	int key_len[2];
 
 	/* Extract key. */
 	error = -EINVAL;
 	if (!a[OVS_FLOW_ATTR_KEY])
 		goto error;
-	error = ovs_flow_from_nlattrs(&key, &key_len, a[OVS_FLOW_ATTR_KEY]);
+	error = ovs_flow_from_nlattrs(&key, key_len, a[OVS_FLOW_ATTR_KEY]);
 	if (error)
 		goto error;
 
@@ -1269,81 +1412,26 @@ static int ovs_flow_cmd_new_or_set(struct sk_buff *skb, struct genl_info *info)
 	if (!dp)
 		goto err_kfree;
 
-	table = genl_dereference(dp->table);
-	flow = ovs_flow_tbl_lookup(table, &key, key_len);
-	if (!flow) {
-		/* Bail out if we're not allowed to create a new flow. */
-		error = -ENOENT;
-		if (info->genlhdr->cmd == OVS_FLOW_CMD_SET)
+	if (key_len[1]) {
+		error = ovs_flow_cmd_new_or_set__(skb, info, acts, a, dp,
+						  key, key_len[1], flow_inner,
+						  &inner_flow);
+		if (error)
 			goto err_kfree;
-
-		/* Expand table, if necessary, to make room. */
-		if (ovs_flow_tbl_need_to_expand(table)) {
-			struct flow_table *new_table;
-
-			new_table = ovs_flow_tbl_expand(table);
-			if (!IS_ERR(new_table)) {
-				rcu_assign_pointer(dp->table, new_table);
-				ovs_flow_tbl_deferred_destroy(table);
-				table = genl_dereference(dp->table);
-			}
-		}
-
-		/* Allocate flow. */
-		flow = ovs_flow_alloc();
-		if (IS_ERR(flow)) {
-			error = PTR_ERR(flow);
-			goto err_kfree;
-		}
-		clear_stats(flow);
-
-		rcu_assign_pointer(flow->sf_acts, acts);
-
-		/* Put flow in bucket. */
-		ovs_flow_tbl_insert(table, flow, &key, key_len);
-
-		reply = ovs_flow_cmd_build_info(flow, dp, info->snd_portid,
-						info->snd_seq,
-						OVS_FLOW_CMD_NEW);
-	} else {
-		/* We found a matching flow. */
-		struct sw_flow_actions *old_acts;
-
-		/* Bail out if we're not allowed to modify an existing flow.
-		 * We accept NLM_F_CREATE in place of the intended NLM_F_EXCL
-		 * because Generic Netlink treats the latter as a dump
-		 * request.  We also accept NLM_F_EXCL in case that bug ever
-		 * gets fixed.
-		 */
-		error = -EEXIST;
-		if (info->genlhdr->cmd == OVS_FLOW_CMD_NEW &&
-		    info->nlhdr->nlmsg_flags & (NLM_F_CREATE | NLM_F_EXCL))
-			goto err_kfree;
-
-		/* Update actions. */
-		old_acts = rcu_dereference_protected(flow->sf_acts,
-						     lockdep_genl_is_held());
-		rcu_assign_pointer(flow->sf_acts, acts);
-		ovs_flow_deferred_free_acts(old_acts);
-
-		reply = ovs_flow_cmd_build_info(flow, dp, info->snd_portid,
-					       info->snd_seq, OVS_FLOW_CMD_NEW);
-
-		/* Clear stats. */
-		if (a[OVS_FLOW_ATTR_CLEAR]) {
-			spin_lock_bh(&flow->lock);
-			clear_stats(flow);
-			spin_unlock_bh(&flow->lock);
-		}
 	}
 
-	if (!IS_ERR(reply))
-		genl_notify(reply, genl_info_net(info), info->snd_portid,
-			   ovs_dp_flow_multicast_group.id, info->nlhdr,
-			   GFP_KERNEL);
-	else
-		netlink_set_err(GENL_SOCK(sock_net(skb->sk)), 0,
-				ovs_dp_flow_multicast_group.id,	PTR_ERR(reply));
+	error = ovs_flow_cmd_new_or_set__(skb, info, acts, a, dp, key,
+					  key_len[0], key_len[1] ? flow_outer :
+					  flow_singleton, &inner_flow);
+	if (error) {
+		if (key_len[1]) {
+			struct flow_table *table = genl_dereference(dp->table);
+			ovs_flow_tbl_remove(table, inner_flow);
+			ovs_flow_deferred_free(inner_flow);
+		}
+		goto err_kfree;
+	}
+
 	return 0;
 
 err_kfree:
@@ -1362,11 +1450,11 @@ static int ovs_flow_cmd_get(struct sk_buff *skb, struct genl_info *info)
 	struct datapath *dp;
 	struct flow_table *table;
 	int err;
-	int key_len;
+	int key_len[2];
 
 	if (!a[OVS_FLOW_ATTR_KEY])
 		return -EINVAL;
-	err = ovs_flow_from_nlattrs(&key, &key_len, a[OVS_FLOW_ATTR_KEY]);
+	err = ovs_flow_from_nlattrs(&key, key_len, a[OVS_FLOW_ATTR_KEY]);
 	if (err)
 		return err;
 
@@ -1375,7 +1463,8 @@ static int ovs_flow_cmd_get(struct sk_buff *skb, struct genl_info *info)
 		return -ENODEV;
 
 	table = genl_dereference(dp->table);
-	flow = ovs_flow_tbl_lookup(table, &key, key_len);
+	flow = ovs_flow_tbl_lookup(table, &key,
+				   key_len[1] ? key_len[1] : key_len[0]);
 	if (!flow)
 		return -ENOENT;
 
@@ -1393,11 +1482,11 @@ static int ovs_flow_cmd_del(struct sk_buff *skb, struct genl_info *info)
 	struct ovs_header *ovs_header = info->userhdr;
 	struct sw_flow_key key;
 	struct sk_buff *reply;
-	struct sw_flow *flow;
+	struct sw_flow *notify_flow, *outer_flow, *inner_flow;
 	struct datapath *dp;
 	struct flow_table *table;
 	int err;
-	int key_len;
+	int key_len[2];
 
 	dp = get_dp(sock_net(skb->sk), ovs_header->dp_ifindex);
 	if (!dp)
@@ -1406,26 +1495,39 @@ static int ovs_flow_cmd_del(struct sk_buff *skb, struct genl_info *info)
 	if (!a[OVS_FLOW_ATTR_KEY])
 		return flush_flows(dp);
 
-	err = ovs_flow_from_nlattrs(&key, &key_len, a[OVS_FLOW_ATTR_KEY]);
+	err = ovs_flow_from_nlattrs(&key, key_len, a[OVS_FLOW_ATTR_KEY]);
 	if (err)
 		return err;
 
 	table = genl_dereference(dp->table);
-	flow = ovs_flow_tbl_lookup(table, &key, key_len);
-	if (!flow)
+	notify_flow = outer_flow = ovs_flow_tbl_lookup(table, &key, key_len[0]);
+	if (!outer_flow)
 		return -ENOENT;
 
-	reply = ovs_flow_cmd_alloc_info(flow);
+	if (key_len[1]) {
+		notify_flow = inner_flow = ovs_flow_tbl_lookup(table, &key,
+							       key_len[1]);
+		if (!inner_flow)
+			return -ENOENT;
+	} else {
+		inner_flow = NULL;
+	}
+
+	reply = ovs_flow_cmd_alloc_info(notify_flow);
 	if (!reply)
 		return -ENOMEM;
 
-	ovs_flow_tbl_remove(table, flow);
+	ovs_flow_tbl_remove(table, outer_flow);
+	if (inner_flow)
+		ovs_flow_tbl_remove(table, inner_flow);
 
-	err = ovs_flow_cmd_fill_info(flow, dp, reply, info->snd_portid,
+	err = ovs_flow_cmd_fill_info(notify_flow, dp, reply, info->snd_portid,
 				     info->snd_seq, 0, OVS_FLOW_CMD_DEL);
 	BUG_ON(err < 0);
 
-	ovs_flow_deferred_free(flow);
+	ovs_flow_deferred_free(outer_flow);
+	if (inner_flow)
+		ovs_flow_deferred_free(inner_flow);
 
 	genl_notify(reply, genl_info_net(info), info->snd_portid,
 		    ovs_dp_flow_multicast_group.id, info->nlhdr, GFP_KERNEL);

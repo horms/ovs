@@ -194,6 +194,7 @@ struct sk_buff *ovs_vport_cmd_build_info(struct vport *, u32 portid, u32 seq,
 					 u8 cmd);
 
 int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb);
+__be16 ovs_actions_allow_l3_extraction(struct sw_flow *flow);
 
 void skb_cb_set_l2_size(struct sk_buff *skb);
 unsigned char *skb_cb_mpls_bos(const struct sk_buff *skb);
