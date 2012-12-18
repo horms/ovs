@@ -3236,6 +3236,22 @@ flow_miss_should_make_facet(struct ofproto_dpif *ofproto,
                                         list_size(&miss->packets));
 }
 
+static ovs_be16
+actions_allow_l3_extraction(const struct ofpact *ofpacts, size_t ofpacts_len)
+{
+    const struct ofpact *a;
+
+    OFPACT_FOR_EACH (a, ofpacts, ofpacts_len) {
+        if (a->type == OFPACT_EXIT)
+            break;
+        if (a->type == OFPACT_POP_MPLS)
+            return ofpact_get_POP_MPLS(a)->ethertype;
+    }
+
+    return htons(0);
+}
+
+
 /* Handles 'miss', which matches 'rule', without creating a facet or subfacet
  * or creating any datapath flow.  May add an "execute" operation to 'ops' and
  * increment '*n_ops'. */
@@ -4103,7 +4119,8 @@ execute_odp_actions(struct ofproto_dpif *ofproto, const struct flow *flow,
 
     ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
     odp_flow_key_from_flow(&key, flow,
-                           ofp_port_to_odp_port(ofproto, flow->in_port));
+                           ofp_port_to_odp_port(ofproto, flow->in_port),
+                           flow->encap_dl_type);
 
     error = dpif_execute(ofproto->backer->dpif, key.data, key.size,
                          odp_actions, actions_len, packet);
@@ -4429,6 +4446,14 @@ facet_check_consistency(struct facet *facet)
         if (want_path == SF_SLOW_PATH && subfacet->path == SF_SLOW_PATH) {
             /* The actions for slow-path flows may legitimately vary from one
              * packet to the next.  We're done. */
+            continue;
+        }
+
+        if (actions_allow_l3_extraction(rule->up.ofpacts,
+                                        rule->up.ofpacts_len)) {
+            /* The actions for flows that depend on actions for evaluation
+             * may legitimately vary from one packet to the next.
+             * We're done. */
             continue;
         }
 
@@ -4820,7 +4845,8 @@ subfacet_get_key(struct subfacet *subfacet, struct odputil_keybuf *keybuf,
         struct flow *flow = &subfacet->facet->flow;
 
         ofpbuf_use_stack(key, keybuf, sizeof *keybuf);
-        odp_flow_key_from_flow(key, flow, subfacet->odp_in_port);
+        odp_flow_key_from_flow(key, flow, subfacet->odp_in_port,
+                               htons(0));
     } else {
         ofpbuf_use_const(key, subfacet->key, subfacet->key_len);
     }
@@ -5220,7 +5246,8 @@ send_packet(const struct ofport_dpif *ofport, struct ofpbuf *packet)
 
     ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
     odp_flow_key_from_flow(&key, &flow,
-                           ofp_port_to_odp_port(ofproto, flow.in_port));
+                           ofp_port_to_odp_port(ofproto, flow.in_port),
+                           htons(0));
 
     ofpbuf_init(&odp_actions, 32);
     compose_sflow_action(ofproto, &odp_actions, &flow, odp_port);
@@ -7014,7 +7041,8 @@ packet_out(struct ofproto *ofproto_, struct ofpbuf *packet,
 
     ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
     odp_flow_key_from_flow(&key, flow,
-                           ofp_port_to_odp_port(ofproto, flow->in_port));
+                           ofp_port_to_odp_port(ofproto, flow->in_port),
+                           flow->encap_dl_type);
 
     dpif_flow_stats_extract(flow, packet, time_msec(), &stats);
 
