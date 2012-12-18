@@ -1503,10 +1503,11 @@ ovs_to_odp_frag(uint8_t nw_frag)
  * capable of being expanded to allow for that much space. */
 void
 odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
-                       uint32_t odp_in_port)
+                       uint32_t odp_in_port, ovs_be16 encap_dl_type)
 {
     struct ovs_key_ethernet *eth_key;
     size_t encap;
+    ovs_be16 dl_type;
 
     if (flow->skb_priority) {
         nl_msg_put_u32(buf, OVS_KEY_ATTR_PRIORITY, flow->skb_priority);
@@ -1548,7 +1549,18 @@ odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
 
     nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, flow->dl_type);
 
-    if (flow->dl_type == htons(ETH_TYPE_IP)) {
+    dl_type = flow->dl_type;
+
+    if (flow->mpls_depth) {
+        struct ovs_key_mpls *mpls_key;
+
+        mpls_key = nl_msg_put_unspec_uninit(buf, OVS_KEY_ATTR_MPLS,
+                                            sizeof *mpls_key);
+        mpls_key->mpls_top_lse = flow->mpls_lse;
+        dl_type = encap_dl_type;
+    }
+
+    if (dl_type == htons(ETH_TYPE_IP)) {
         struct ovs_key_ipv4 *ipv4_key;
 
         ipv4_key = nl_msg_put_unspec_uninit(buf, OVS_KEY_ATTR_IPV4,
@@ -1559,7 +1571,7 @@ odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
         ipv4_key->ipv4_tos = flow->nw_tos;
         ipv4_key->ipv4_ttl = flow->nw_ttl;
         ipv4_key->ipv4_frag = ovs_to_odp_frag(flow->nw_frag);
-    } else if (flow->dl_type == htons(ETH_TYPE_IPV6)) {
+    } else if (dl_type == htons(ETH_TYPE_IPV6)) {
         struct ovs_key_ipv6 *ipv6_key;
 
         ipv6_key = nl_msg_put_unspec_uninit(buf, OVS_KEY_ATTR_IPV6,
@@ -1571,8 +1583,8 @@ odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
         ipv6_key->ipv6_tclass = flow->nw_tos;
         ipv6_key->ipv6_hlimit = flow->nw_ttl;
         ipv6_key->ipv6_frag = ovs_to_odp_frag(flow->nw_frag);
-    } else if (flow->dl_type == htons(ETH_TYPE_ARP) ||
-               flow->dl_type == htons(ETH_TYPE_RARP)) {
+    } else if (dl_type == htons(ETH_TYPE_ARP) ||
+               dl_type == htons(ETH_TYPE_RARP)) {
         struct ovs_key_arp *arp_key;
 
         arp_key = nl_msg_put_unspec_uninit(buf, OVS_KEY_ATTR_ARP,
@@ -1585,16 +1597,7 @@ odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
         memcpy(arp_key->arp_tha, flow->arp_tha, ETH_ADDR_LEN);
     }
 
-    if (flow->mpls_depth) {
-        struct ovs_key_mpls *mpls_key;
-
-        mpls_key = nl_msg_put_unspec_uninit(buf, OVS_KEY_ATTR_MPLS,
-                                            sizeof *mpls_key);
-        mpls_key->mpls_top_lse = flow->mpls_lse;
-    }
-
-    if ((flow->dl_type == htons(ETH_TYPE_IP)
-         || flow->dl_type == htons(ETH_TYPE_IPV6))
+    if ((dl_type == htons(ETH_TYPE_IP) || dl_type == htons(ETH_TYPE_IPV6))
         && !(flow->nw_frag & FLOW_NW_FRAG_LATER)) {
 
         if (flow->nw_proto == IPPROTO_TCP) {
@@ -1611,7 +1614,7 @@ odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
                                                sizeof *udp_key);
             udp_key->udp_src = flow->tp_src;
             udp_key->udp_dst = flow->tp_dst;
-        } else if (flow->dl_type == htons(ETH_TYPE_IP)
+        } else if (dl_type == htons(ETH_TYPE_IP)
                 && flow->nw_proto == IPPROTO_ICMP) {
             struct ovs_key_icmp *icmp_key;
 
@@ -1619,7 +1622,7 @@ odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
                                                 sizeof *icmp_key);
             icmp_key->icmp_type = ntohs(flow->tp_src);
             icmp_key->icmp_code = ntohs(flow->tp_dst);
-        } else if (flow->dl_type == htons(ETH_TYPE_IPV6)
+        } else if (dl_type == htons(ETH_TYPE_IPV6)
                 && flow->nw_proto == IPPROTO_ICMPV6) {
             struct ovs_key_icmpv6 *icmpv6_key;
 

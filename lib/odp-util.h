@@ -92,7 +92,7 @@ int odp_flow_key_from_string(const char *s, const struct simap *port_names,
                              struct ofpbuf *);
 
 void odp_flow_key_from_flow(struct ofpbuf *, const struct flow *,
-                            uint32_t odp_in_port);
+                            uint32_t odp_in_port, ovs_be16 encap_dl_type);
 
 uint32_t odp_flow_key_hash(const struct nlattr *, size_t);
 
