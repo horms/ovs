@@ -397,7 +397,8 @@ static void subfacet_update_stats(struct subfacet *,
                                   const struct dpif_flow_stats *);
 static void subfacet_make_actions(struct subfacet *,
                                   const struct ofpbuf *packet,
-                                  struct ofpbuf *odp_actions);
+                                  struct ofpbuf *odp_actions,
+                                  const struct flow *flow);
 static int subfacet_install(struct subfacet *,
                             const struct nlattr *actions, size_t actions_len,
                             struct dpif_flow_stats *, enum slow_path_reason);
@@ -3082,12 +3083,14 @@ struct flow_miss {
     struct list packets;
     enum dpif_upcall_type upcall_type;
     uint32_t odp_in_port;
+    bool singleton;
 };
 
 struct flow_miss_op {
     struct dpif_op dpif_op;
     struct subfacet *subfacet;  /* Subfacet  */
     void *garbage;              /* Pointer to pass to free(), NULL if none. */
+    void *garbage2;              /* Pointer to pass to free(), NULL if none. */
     uint64_t stub[1024 / 8];    /* Temporary buffer. */
 };
 
@@ -3143,6 +3146,19 @@ process_special(struct ofproto_dpif *ofproto, const struct flow *flow,
         return SLOW_STP;
     }
     return 0;
+}
+
+static bool flow_miss_is_singleton(const struct flow *flow)
+{
+    /* The decoding of the L3 and L4 components of an MPLS frame
+     * may only occur if there is a pop_mpls action present in
+     * which case the ethernet type of the internel frame becomes
+     * known. For this reason the decoding of the L3 and L4
+     * components of an MPLS frame is delayed and the match is
+     * at this point incomplete. Treat it as a singleton to
+     * avoid a single miss covering multiple flows
+     */
+    return eth_type_mpls(flow->dl_type);
 }
 
 static struct flow_miss *
@@ -3251,6 +3267,39 @@ actions_allow_l3_extraction(const struct ofpact *ofpacts, size_t ofpacts_len)
     return htons(0);
 }
 
+static ovs_be16
+handle_flow_miss_l3_extraction(struct flow_miss *miss,
+                               struct rule_dpif *rule,
+                               struct ofpbuf *packet,
+                               struct flow **flowp,
+                               struct ofpbuf *inner_key)
+{
+    struct ofproto_dpif *ofproto = ofproto_dpif_cast(rule->up.ofproto);
+    ovs_be16 encap_dl_type;
+    struct flow *inner_flow;
+
+    encap_dl_type = actions_allow_l3_extraction(rule->up.ofpacts,
+                                                rule->up.ofpacts_len);
+    if (!encap_dl_type) {
+        return encap_dl_type;
+    }
+
+    ovs_assert(miss->singleton);
+
+    inner_flow = xmemdup(*flowp, sizeof **flowp);
+    inner_flow->encap_dl_type = encap_dl_type;
+    flow_extract_l3_onwards(packet, inner_flow, encap_dl_type);
+
+    ofpbuf_reinit(inner_key, 128);
+    odp_flow_key_from_flow(inner_key, inner_flow,
+                           ofp_port_to_odp_port(ofproto, inner_flow->in_port),
+                           encap_dl_type);
+    miss->key = inner_key->data;
+    miss->key_len = inner_key->size;
+
+    *flowp = inner_flow;
+    return encap_dl_type;
+}
 
 /* Handles 'miss', which matches 'rule', without creating a facet or subfacet
  * or creating any datapath flow.  May add an "execute" operation to 'ops' and
@@ -3269,19 +3318,31 @@ handle_flow_miss_without_facet(struct flow_miss *miss,
         struct flow_miss_op *op = &ops[*n_ops];
         struct dpif_flow_stats stats;
         struct ofpbuf odp_actions;
+        struct flow *flow = &miss->flow;
+        struct ofpbuf inner_key;
+        __be16 encap_dl_type;
 
         COVERAGE_INC(facet_suppress);
 
         ofpbuf_use_stub(&odp_actions, op->stub, sizeof op->stub);
+        ofpbuf_init(&inner_key, 0);
 
         dpif_flow_stats_extract(&miss->flow, packet, now, &stats);
         rule_credit_stats(rule, &stats);
 
-        action_xlate_ctx_init(&ctx, ofproto, &miss->flow, miss->initial_tci,
+        encap_dl_type = handle_flow_miss_l3_extraction(miss, rule,
+                                                       packet, &flow,
+                                                       &inner_key);
+
+        action_xlate_ctx_init(&ctx, ofproto, flow, miss->initial_tci,
                               rule, 0, packet);
         ctx.resubmit_stats = &stats;
         xlate_actions(&ctx, rule->up.ofpacts, rule->up.ofpacts_len,
                       &odp_actions);
+
+        if (encap_dl_type) {
+            free(flow);
+        }
 
         if (odp_actions.size) {
             struct dpif_execute *execute = &op->dpif_op.u.execute;
@@ -3290,10 +3351,12 @@ handle_flow_miss_without_facet(struct flow_miss *miss,
             execute->actions = odp_actions.data;
             execute->actions_len = odp_actions.size;
             op->garbage = ofpbuf_get_uninit_pointer(&odp_actions);
+            op->garbage2 = ofpbuf_get_uninit_pointer(&inner_key);
 
             (*n_ops)++;
         } else {
             ofpbuf_uninit(&odp_actions);
+            ofpbuf_uninit(&inner_key);
         }
     }
 }
@@ -3316,8 +3379,13 @@ handle_flow_miss_with_facet(struct flow_miss *miss, struct facet *facet,
     enum subfacet_path want_path;
     struct subfacet *subfacet;
     struct ofpbuf *packet;
+    struct ofpbuf inner_key;
+    ovs_be16 encap_dl_type = htons(0);
+    struct flow *flow = &facet->flow;
+    size_t base_op = *n_ops;
 
     subfacet = subfacet_create(facet, miss, now);
+    ofpbuf_init(&inner_key, 0);
 
     LIST_FOR_EACH (packet, list_node, &miss->packets) {
         struct flow_miss_op *op = &ops[*n_ops];
@@ -3326,13 +3394,29 @@ handle_flow_miss_with_facet(struct flow_miss *miss, struct facet *facet,
 
         handle_flow_miss_common(facet->rule, packet, &miss->flow);
 
-        ofpbuf_use_stub(&odp_actions, op->stub, sizeof op->stub);
-        if (!subfacet->actions || subfacet->slow) {
-            subfacet_make_actions(subfacet, packet, &odp_actions);
+        encap_dl_type = handle_flow_miss_l3_extraction(miss, facet->rule,
+                                                       packet, &flow,
+                                                       &inner_key);
+        if (encap_dl_type) {
+            struct facet *inner_facet;
+            uint32_t inner_hash;
+
+            inner_hash = flow_hash(flow, 0);
+            inner_facet = facet_create(facet->rule, flow, inner_hash);
+            facet = inner_facet;
         }
 
-        dpif_flow_stats_extract(&facet->flow, packet, now, &stats);
+        ofpbuf_use_stub(&odp_actions, op->stub, sizeof op->stub);
+        if (!subfacet->actions || subfacet->slow) {
+            subfacet_make_actions(subfacet, packet, &odp_actions, flow);
+        }
+
+        dpif_flow_stats_extract(flow, packet, now, &stats);
         subfacet_update_stats(subfacet, &stats);
+
+        if (encap_dl_type) {
+            free(flow);
+        }
 
         if (subfacet->actions_len) {
             struct dpif_execute *execute = &op->dpif_op.u.execute;
@@ -3348,6 +3432,7 @@ handle_flow_miss_with_facet(struct flow_miss *miss, struct facet *facet,
                 execute->actions_len = odp_actions.size;
                 op->garbage = ofpbuf_get_uninit_pointer(&odp_actions);
             }
+            op->garbage2 = NULL;
 
             (*n_ops)++;
         } else {
@@ -3361,7 +3446,7 @@ handle_flow_miss_with_facet(struct flow_miss *miss, struct facet *facet,
         struct dpif_flow_put *put = &op->dpif_op.u.flow_put;
 
         op->subfacet = subfacet;
-        op->garbage = NULL;
+        op->garbage = op->garbage2 = NULL;
         op->dpif_op.type = DPIF_OP_FLOW_PUT;
         put->flags = DPIF_FP_CREATE | DPIF_FP_MODIFY;
         put->key = miss->key;
@@ -3376,6 +3461,14 @@ handle_flow_miss_with_facet(struct flow_miss *miss, struct facet *facet,
         }
         put->stats = NULL;
     }
+
+    if (base_op != *n_ops) {
+        struct flow_miss_op *op = &ops[(*n_ops) - 1];
+        op->garbage2 = ofpbuf_get_uninit_pointer(&inner_key);
+    } else {
+        ofpbuf_uninit(&inner_key);
+    }
+
 }
 
 /* Handles flow miss 'miss'.  May add any required datapath operations
@@ -3565,6 +3658,7 @@ handle_miss_upcalls(struct dpif_backer *backer, struct dpif_upcall *upcalls,
             miss->key_len = upcall->key_len;
             miss->upcall_type = upcall->type;
             miss->odp_in_port = odp_in_port;
+            miss->singleton = flow_miss_is_singleton(&miss->flow);
             list_init(&miss->packets);
 
             n_misses++;
@@ -3607,6 +3701,7 @@ handle_miss_upcalls(struct dpif_backer *backer, struct dpif_upcall *upcalls,
         }
 
         free(op->garbage);
+        free(op->garbage2);
     }
     hmap_destroy(&todo);
 }
@@ -4857,7 +4952,7 @@ subfacet_get_key(struct subfacet *subfacet, struct odputil_keybuf *keybuf,
  * initialized and is responsible for uninitializing. */
 static void
 subfacet_make_actions(struct subfacet *subfacet, const struct ofpbuf *packet,
-                      struct ofpbuf *odp_actions)
+                      struct ofpbuf *odp_actions, const struct flow *flow)
 {
     struct facet *facet = subfacet->facet;
     struct rule_dpif *rule = facet->rule;
@@ -4865,7 +4960,7 @@ subfacet_make_actions(struct subfacet *subfacet, const struct ofpbuf *packet,
 
     struct action_xlate_ctx ctx;
 
-    action_xlate_ctx_init(&ctx, ofproto, &facet->flow, subfacet->initial_tci,
+    action_xlate_ctx_init(&ctx, ofproto, flow, subfacet->initial_tci,
                           rule, 0, packet);
     xlate_actions(&ctx, rule->up.ofpacts, rule->up.ofpacts_len, odp_actions);
     facet->tags = ctx.tags;
