@@ -1383,10 +1383,12 @@ int ovs_flow_metadata_from_nlattrs(struct sw_flow *flow, int key_len, const stru
 	return 0;
 }
 
-int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
+int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb,
+			__be16 encap_eth_type)
 {
 	struct ovs_key_ethernet *eth_key;
 	struct nlattr *nla, *encap;
+	__be16 eth_type;
 
 	if (swkey->phy.priority &&
 	    nla_put_u32(skb, OVS_KEY_ATTR_PRIORITY, swkey->phy.priority))
@@ -1436,7 +1438,20 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 	if (nla_put_be16(skb, OVS_KEY_ATTR_ETHERTYPE, swkey->eth.type))
 		goto nla_put_failure;
 
-	if (swkey->eth.type == htons(ETH_P_IP)) {
+	eth_type = swkey->eth.type;
+	if (eth_p_mpls(eth_type)) {
+		struct ovs_key_mpls *mpls_key;
+
+		nla = nla_reserve(skb, OVS_KEY_ATTR_MPLS, sizeof(*mpls_key));
+		if (!nla)
+			goto nla_put_failure;
+		mpls_key = nla_data(nla);
+		memset(mpls_key, 0, sizeof(struct ovs_key_mpls));
+		mpls_key->mpls_top_label = swkey->mpls.top_label;
+		eth_type = encap_eth_type;
+	}
+
+	if (eth_type == htons(ETH_P_IP)) {
 		struct ovs_key_ipv4 *ipv4_key;
 
 		nla = nla_reserve(skb, OVS_KEY_ATTR_IPV4, sizeof(*ipv4_key));
@@ -1449,7 +1464,7 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 		ipv4_key->ipv4_tos = swkey->ip.tos;
 		ipv4_key->ipv4_ttl = swkey->ip.ttl;
 		ipv4_key->ipv4_frag = swkey->ip.frag;
-	} else if (swkey->eth.type == htons(ETH_P_IPV6)) {
+	} else if (eth_type == htons(ETH_P_IPV6)) {
 		struct ovs_key_ipv6 *ipv6_key;
 
 		nla = nla_reserve(skb, OVS_KEY_ATTR_IPV6, sizeof(*ipv6_key));
@@ -1465,8 +1480,8 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 		ipv6_key->ipv6_tclass = swkey->ip.tos;
 		ipv6_key->ipv6_hlimit = swkey->ip.ttl;
 		ipv6_key->ipv6_frag = swkey->ip.frag;
-	} else if (swkey->eth.type == htons(ETH_P_ARP) ||
-		   swkey->eth.type == htons(ETH_P_RARP)) {
+	} else if (eth_type == htons(ETH_P_ARP) ||
+		   eth_type == htons(ETH_P_RARP)) {
 		struct ovs_key_arp *arp_key;
 
 		nla = nla_reserve(skb, OVS_KEY_ATTR_ARP, sizeof(*arp_key));
@@ -1479,19 +1494,9 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 		arp_key->arp_op = htons(swkey->ip.proto);
 		memcpy(arp_key->arp_sha, swkey->ipv4.arp.sha, ETH_ALEN);
 		memcpy(arp_key->arp_tha, swkey->ipv4.arp.tha, ETH_ALEN);
-	} else if (eth_p_mpls(swkey->eth.type)) {
-		struct ovs_key_mpls *mpls_key;
-
-		nla = nla_reserve(skb, OVS_KEY_ATTR_MPLS, sizeof(*mpls_key));
-		if (!nla)
-			goto nla_put_failure;
-		mpls_key = nla_data(nla);
-		memset(mpls_key, 0, sizeof(struct ovs_key_mpls));
-		mpls_key->mpls_top_label = swkey->mpls.top_label;
 	}
 
-	if ((swkey->eth.type == htons(ETH_P_IP) ||
-	     swkey->eth.type == htons(ETH_P_IPV6)) &&
+	if ((eth_type == htons(ETH_P_IP) || eth_type == htons(ETH_P_IPV6)) &&
 	     swkey->ip.frag != OVS_FRAG_TYPE_LATER) {
 
 		if (swkey->ip.proto == IPPROTO_TCP) {
@@ -1501,10 +1506,10 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 			if (!nla)
 				goto nla_put_failure;
 			tcp_key = nla_data(nla);
-			if (swkey->eth.type == htons(ETH_P_IP)) {
+			if (eth_type == htons(ETH_P_IP)) {
 				tcp_key->tcp_src = swkey->ipv4.tp.src;
 				tcp_key->tcp_dst = swkey->ipv4.tp.dst;
-			} else if (swkey->eth.type == htons(ETH_P_IPV6)) {
+			} else if (eth_type == htons(ETH_P_IPV6)) {
 				tcp_key->tcp_src = swkey->ipv6.tp.src;
 				tcp_key->tcp_dst = swkey->ipv6.tp.dst;
 			}
@@ -1515,14 +1520,14 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 			if (!nla)
 				goto nla_put_failure;
 			udp_key = nla_data(nla);
-			if (swkey->eth.type == htons(ETH_P_IP)) {
+			if (eth_type == htons(ETH_P_IP)) {
 				udp_key->udp_src = swkey->ipv4.tp.src;
 				udp_key->udp_dst = swkey->ipv4.tp.dst;
-			} else if (swkey->eth.type == htons(ETH_P_IPV6)) {
+			} else if (eth_type == htons(ETH_P_IPV6)) {
 				udp_key->udp_src = swkey->ipv6.tp.src;
 				udp_key->udp_dst = swkey->ipv6.tp.dst;
 			}
-		} else if (swkey->eth.type == htons(ETH_P_IP) &&
+		} else if (eth_type == htons(ETH_P_IP) &&
 			   swkey->ip.proto == IPPROTO_ICMP) {
 			struct ovs_key_icmp *icmp_key;
 
@@ -1532,7 +1537,7 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 			icmp_key = nla_data(nla);
 			icmp_key->icmp_type = ntohs(swkey->ipv4.tp.src);
 			icmp_key->icmp_code = ntohs(swkey->ipv4.tp.dst);
-		} else if (swkey->eth.type == htons(ETH_P_IPV6) &&
+		} else if (eth_type == htons(ETH_P_IPV6) &&
 			   swkey->ip.proto == IPPROTO_ICMPV6) {
 			struct ovs_key_icmpv6 *icmpv6_key;
 

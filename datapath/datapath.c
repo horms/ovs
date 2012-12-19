@@ -449,7 +449,7 @@ static int queue_userspace_packet(struct net *net, int dp_ifindex,
 	upcall->dp_ifindex = dp_ifindex;
 
 	nla = nla_nest_start(user_skb, OVS_PACKET_ATTR_KEY);
-	ovs_flow_to_nlattrs(upcall_info->key, user_skb);
+	ovs_flow_to_nlattrs(upcall_info->key, user_skb, htons(0));
 	nla_nest_end(user_skb, nla);
 
 	if (upcall_info->userdata)
@@ -916,7 +916,7 @@ static int ovs_flow_cmd_fill_info(struct sw_flow *flow, struct datapath *dp,
 	nla = nla_nest_start(skb, OVS_FLOW_ATTR_KEY);
 	if (!nla)
 		goto nla_put_failure;
-	err = ovs_flow_to_nlattrs(&flow->key, skb);
+	err = ovs_flow_to_nlattrs(&flow->key, skb, htons(0));
 	if (err)
 		goto error;
 	nla_nest_end(skb, nla);
