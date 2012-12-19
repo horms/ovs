@@ -237,7 +237,8 @@ u64 ovs_flow_used_time(unsigned long flow_jiffies);
  */
 #define FLOW_BUFSIZE 220
 
-int ovs_flow_to_nlattrs(const struct sw_flow_key *, struct sk_buff *);
+int ovs_flow_to_nlattrs(const struct sw_flow_key *, struct sk_buff *,
+			__be16 encap_eth_type);
 int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 		      const struct nlattr *);
 int ovs_flow_metadata_from_nlattrs(struct sw_flow *flow, int key_len,
