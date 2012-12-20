@@ -242,6 +242,7 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 	struct sw_flow *flow, *outer_flow = NULL;
 	struct dp_stats_percpu *stats;
 	u64 *stats_counter;
+	__be16 encap_eth_type = 0;
 	int error;
 
 	stats = this_cpu_ptr(dp->stats_percpu);
@@ -266,7 +267,6 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 		 * allow more information to be included in the flow's match
 		 */
 		if (likely(flow)) {
-			__be16 encap_eth_type;
 			encap_eth_type = flow->encap_eth_type;
 			if (unlikely(encap_eth_type)) {
 				error = ovs_flow_extract_l3_onwards(skb, &key, &key_len,
@@ -298,8 +298,8 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 
 	stats_counter = &stats->n_hit;
 	if (unlikely(outer_flow))
-		ovs_flow_used(outer_flow, skb);
-	ovs_flow_used(OVS_CB(skb)->flow, skb);
+		ovs_flow_used(outer_flow, htons(0), skb);
+	ovs_flow_used(OVS_CB(skb)->flow, encap_eth_type, skb);
 	ovs_execute_actions(dp, skb);
 
 out:
