@@ -184,7 +184,7 @@ int ovs_flow_extract_l3_onwards(struct sk_buff *, struct sw_flow_key *,
 				int key_lenp[2], __be16 eth_type);
 int ovs_flow_extract(struct sk_buff *, u16 in_port, struct sw_flow_key *,
 		     int *key_lenp);
-void ovs_flow_used(struct sw_flow *, struct sk_buff *);
+void ovs_flow_used(struct sw_flow *, __be16 encap_eth_type, struct sk_buff *);
 u64 ovs_flow_used_time(unsigned long flow_jiffies);
 
 /* Upper bound on the length of a nlattr-formatted flow key.  The longest
