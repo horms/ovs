@@ -180,12 +180,14 @@ static bool icmp6hdr_ok(struct sk_buff *skb)
 #define TCP_FLAGS_OFFSET 13
 #define TCP_FLAG_MASK 0x3f
 
-void ovs_flow_used(struct sw_flow *flow, struct sk_buff *skb)
+void ovs_flow_used(struct sw_flow *flow, __be16 encap_eth_type,
+		   struct sk_buff *skb)
 {
 	u8 tcp_flags = 0;
+	__be16 eth_type;
 
-	if ((flow->key.eth.type == htons(ETH_P_IP) ||
-	     flow->key.eth.type == htons(ETH_P_IPV6)) &&
+	eth_type = encap_eth_type ? encap_eth_type : flow->key.eth.type;
+	if ((eth_type == htons(ETH_P_IP) || eth_type == htons(ETH_P_IPV6)) &&
 	    flow->key.ip.proto == IPPROTO_TCP &&
 	    likely(skb->len >= skb_transport_offset(skb) + sizeof(struct tcphdr))) {
 		u8 *tcp = (u8 *)tcp_hdr(skb);
