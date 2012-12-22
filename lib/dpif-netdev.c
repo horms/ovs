@@ -108,16 +108,51 @@ struct dp_netdev_port {
     char *type;                 /* Port type as requested by user. */
 };
 
-/* A flow in dp_netdev's 'flow_table'. */
+#define DP_NETDEV_FLOW_F_NO_DUMP 0x01
+
+/* A flow in dp_netdev's 'flow_table'.
+ *
+ * Flows are divided into three types:
+ * Singleton Flow: The match and actions of this flow are self-contained
+ *     and actions are applied to packets which match.
+ * Outer Flow: The actions of the flow include information that
+ *     may be used to create a more fine-grained match. This match
+ *     is constructed and a second lookup is made for the inner flow that
+ *     matches a packet.
+ * Inner Flow: This has a more fine-grained match constructed using
+ *     information contained in the actions of the inner flow.
+ *
+ * The actions of the inner and outer flow are identical but as a match on
+ * an outer flow will always result in the lookup of an inner flow the
+ * matches of an outer flow are never applied.
+ *
+ * An outer_flow is denoted by encap_eth_type being set to a non-zero
+ * value. This element is used as an optimisation to avoid scanning the
+ * actions of the outer flow each time it matches a packet.
+ *
+ * On deletion, outer_flow will delete all its inner flows, which
+ * are found by iterating the inner_flows element. */
 struct dp_netdev_flow {
     struct hmap_node node;      /* Element in dp_netdev's 'flow_table'. */
     struct flow key;
+
+    struct list inner_flows;    /* Inner flows.
+                                 * For an inner flow this is its entry
+                                 * in the hlist of its outer flow.
+                                 * For an outer flow this is the
+                                 * list of inner flows.
+                                 * For a singleton flow this is unused */
+	ovs_be16 encap_dl_type;     /* Set to the ethernet type supplied
+                                 * by action for outer flows, zero otherwise. */
 
     /* Statistics. */
     long long int used;         /* Last used time, in monotonic msecs. */
     long long int packet_count; /* Number of packets matched. */
     long long int byte_count;   /* Number of bytes matched. */
     uint8_t tcp_flags;          /* Bitwise-OR of seen tcp_flags values. */
+
+    /* Flags */
+    uint8_t flags;              /* One of DP_NETDEV_FLOW_F_* */
 
     /* Actions. */
     struct nlattr *actions;
@@ -553,11 +588,22 @@ dpif_netdev_get_max_ports(const struct dpif *dpif OVS_UNUSED)
 }
 
 static void
-dp_netdev_free_flow(struct dp_netdev *dp, struct dp_netdev_flow *flow)
+dp_netdev_free_flow__(struct dp_netdev *dp, struct dp_netdev_flow *flow)
 {
     hmap_remove(&dp->flow_table, &flow->node);
     free(flow->actions);
     free(flow);
+}
+
+static void
+dp_netdev_free_flow(struct dp_netdev *dp, struct dp_netdev_flow *flow)
+{
+    struct dp_netdev_flow *p, *next;
+
+    LIST_FOR_EACH_SAFE (p, next, inner_flows, &flow->inner_flows) {
+        dp_netdev_free_flow__(dp, p);
+    }
+    dp_netdev_free_flow__(dp, flow);
 }
 
 static void
@@ -656,6 +702,22 @@ dp_netdev_lookup_flow(const struct dp_netdev *dp, const struct flow *key)
     return NULL;
 }
 
+static ovs_be16
+dpif_netdev_actions_allow_l3_extraction(const struct nlattr *actions,
+                                        size_t actions_len)
+{
+    const struct nlattr *a;
+    unsigned int left;
+
+    NL_ATTR_FOR_EACH_UNSAFE (a, left, actions, actions_len) {
+        if (nl_attr_type(a) == OVS_ACTION_ATTR_POP_MPLS) {
+            return nl_attr_get_be16(a);
+        }
+    }
+
+    return htons(0);
+}
+
 static void
 get_dpif_flow_stats(struct dp_netdev_flow *flow, struct dpif_flow_stats *stats)
 {
@@ -697,6 +759,23 @@ dpif_netdev_flow_from_nlattrs(const struct nlattr *key, uint32_t key_len,
     return 0;
 }
 
+static void
+dpif_netdev_outer_flow_from_inner_flow(const struct flow *inner_flow,
+                                       struct flow *outer_flow)
+{
+    *outer_flow = *inner_flow;
+
+    memset(&outer_flow->ipv6_src, 0, sizeof outer_flow->ipv6_src);
+    memset(&outer_flow->ipv6_dst, 0, sizeof outer_flow->ipv6_dst);
+    memset(&outer_flow->nd_target, 0, sizeof outer_flow->nd_target);
+    outer_flow->nw_src = outer_flow->nw_dst = 0;
+    outer_flow->tp_src = outer_flow->tp_dst = 0;
+    outer_flow->nw_proto = outer_flow->nw_tos = 0;
+    memset(&outer_flow->arp_sha, 0, sizeof outer_flow->arp_sha);
+    memset(&outer_flow->arp_tha, 0, sizeof outer_flow->arp_tha);
+    outer_flow->nw_ttl = outer_flow->nw_frag = 0;
+}
+
 static int
 dpif_netdev_flow_get(const struct dpif *dpif,
                      const struct nlattr *nl_key, size_t nl_key_len,
@@ -736,20 +815,40 @@ set_flow_actions(struct dp_netdev_flow *flow,
     return 0;
 }
 
+enum flow_type {
+    flow_inner,
+    flow_outer,
+    flow_singleton,
+};
+
 static int
 dp_netdev_flow_add(struct dp_netdev *dp, const struct flow *key,
-                   const struct nlattr *actions, size_t actions_len)
+                   const struct nlattr *actions, size_t actions_len,
+                   enum flow_type flow_type, struct dp_netdev_flow **flowp)
 {
     struct dp_netdev_flow *flow;
     int error;
 
     flow = xzalloc(sizeof *flow);
     flow->key = *key;
+    list_init(&flow->inner_flows);
 
     error = set_flow_actions(flow, actions, actions_len);
     if (error) {
         free(flow);
         return error;
+    }
+
+    switch (flow_type) {
+    case flow_inner:
+        flow->flags |= DP_NETDEV_FLOW_F_NO_DUMP;
+        *flowp = flow;
+        break;
+    case flow_outer:
+        list_insert(&flow->inner_flows, &(*flowp)->inner_flows);
+        break;
+    case flow_singleton:
+        break;
     }
 
     hmap_insert(&dp->flow_table, &flow->node, flow_hash(&flow->key, 0));
@@ -766,27 +865,23 @@ clear_stats(struct dp_netdev_flow *flow)
 }
 
 static int
-dpif_netdev_flow_put(struct dpif *dpif, const struct dpif_flow_put *put)
+dpif_netdev_flow_put__(struct dpif *dpif, const struct dpif_flow_put *put,
+                       struct flow *key, enum flow_type flow_type,
+                       struct dp_netdev_flow **flowp)
 {
     struct dp_netdev *dp = get_dp_netdev(dpif);
     struct dp_netdev_flow *flow;
-    struct flow key;
-    int error;
 
-    error = dpif_netdev_flow_from_nlattrs(put->key, put->key_len, &key);
-    if (error) {
-        return error;
-    }
-
-    flow = dp_netdev_lookup_flow(dp, &key);
+    flow = dp_netdev_lookup_flow(dp, key);
     if (!flow) {
         if (put->flags & DPIF_FP_CREATE) {
             if (hmap_count(&dp->flow_table) < MAX_FLOWS) {
                 if (put->stats) {
                     memset(put->stats, 0, sizeof *put->stats);
                 }
-                return dp_netdev_flow_add(dp, &key, put->actions,
-                                          put->actions_len);
+                return dp_netdev_flow_add(dp, key, put->actions,
+                                          put->actions_len,
+                                          flow_type, flowp);
             } else {
                 return EFBIG;
             }
@@ -794,8 +889,15 @@ dpif_netdev_flow_put(struct dpif *dpif, const struct dpif_flow_put *put)
             return ENOENT;
         }
     } else {
+        int error = EEXIST;
+        if (flow_type == flow_outer) {
+            /* An outer flow may legitimately already exist,
+             * if so update its inner flows */
+            list_insert(&flow->inner_flows, &(*flowp)->inner_flows);
+            error = 0;
+        }
         if (put->flags & DPIF_FP_MODIFY) {
-            int error = set_flow_actions(flow, put->actions, put->actions_len);
+            error = set_flow_actions(flow, put->actions, put->actions_len);
             if (!error) {
                 if (put->stats) {
                     get_dpif_flow_stats(flow, put->stats);
@@ -812,6 +914,44 @@ dpif_netdev_flow_put(struct dpif *dpif, const struct dpif_flow_put *put)
 }
 
 static int
+dpif_netdev_flow_put(struct dpif *dpif, const struct dpif_flow_put *put)
+{
+    struct flow key;
+    struct dp_netdev_flow *inner_flow;
+    int error;
+    ovs_be16 encap_dl_type;
+
+    error = dpif_netdev_flow_from_nlattrs(put->key, put->key_len, &key);
+    if (error) {
+        return error;
+    }
+
+    key.encap_dl_type = htons(0);
+    encap_dl_type = dpif_netdev_actions_allow_l3_extraction(put->actions,
+                                                            put->actions_len);
+
+    error = dpif_netdev_flow_put__(dpif, put, &key, encap_dl_type ?
+                                   flow_inner : flow_singleton, &inner_flow);
+    if (error) {
+        return error;
+    }
+
+    if (encap_dl_type) {
+        struct flow outer_key;
+        dpif_netdev_outer_flow_from_inner_flow(&key, &outer_key);
+        error = dpif_netdev_flow_put__(dpif, put, &outer_key, flow_outer,
+                                       &inner_flow);
+        if (error) {
+            struct dp_netdev *dp = get_dp_netdev(dpif);
+            dp_netdev_free_flow(dp, inner_flow);
+            return error;
+        }
+    }
+
+    return 0;
+}
+
+static int
 dpif_netdev_flow_del(struct dpif *dpif, const struct dpif_flow_del *del)
 {
     struct dp_netdev *dp = get_dp_netdev(dpif);
@@ -825,6 +965,7 @@ dpif_netdev_flow_del(struct dpif *dpif, const struct dpif_flow_del *del)
     }
 
     flow = dp_netdev_lookup_flow(dp, &key);
+
     if (flow) {
         if (del->stats) {
             get_dpif_flow_stats(flow, del->stats);
@@ -867,12 +1008,18 @@ dpif_netdev_flow_dump_next(const struct dpif *dpif, void *state_,
     struct dp_netdev_flow *flow;
     struct hmap_node *node;
 
-    node = hmap_at_position(&dp->flow_table, &state->bucket, &state->offset);
-    if (!node) {
-        return EOF;
-    }
+    while (1) {
+        node = hmap_at_position(&dp->flow_table, &state->bucket,
+                                &state->offset);
+        if (!node) {
+            return EOF;
+        }
 
-    flow = CONTAINER_OF(node, struct dp_netdev_flow, node);
+        flow = CONTAINER_OF(node, struct dp_netdev_flow, node);
+        if (!(flow->flags & DP_NETDEV_FLOW_F_NO_DUMP)) {
+            break;
+        }
+    }
 
     if (key) {
         struct ofpbuf buf;
@@ -917,6 +1064,7 @@ dpif_netdev_execute(struct dpif *dpif, const struct dpif_execute *execute)
     struct dp_netdev *dp = get_dp_netdev(dpif);
     struct ofpbuf copy;
     struct flow key;
+    ovs_be16 encap_dl_type;
     int error;
 
     if (execute->packet->size < ETH_HEADER_LEN ||
@@ -930,6 +1078,12 @@ dpif_netdev_execute(struct dpif *dpif, const struct dpif_execute *execute)
     ofpbuf_put(&copy, execute->packet->data, execute->packet->size);
 
     flow_extract(&copy, 0, 0, NULL, -1, &key);
+    encap_dl_type = dpif_netdev_actions_allow_l3_extraction(execute->actions,
+                                                execute->actions_len);
+    if (encap_dl_type) {
+        flow_extract_l3_onwards(&copy, &key, encap_dl_type);
+    }
+
     error = dpif_netdev_flow_from_nlattrs(execute->key, execute->key_len,
                                           &key);
     if (!error) {
@@ -1029,6 +1183,10 @@ dp_netdev_port_input(struct dp_netdev *dp, struct dp_netdev_port *port,
     }
     flow_extract(packet, 0, 0, NULL, port->port_no, &key);
     flow = dp_netdev_lookup_flow(dp, &key);
+    if (flow && flow->encap_dl_type) {
+        flow_extract_l3_onwards(packet, &key, flow->encap_dl_type);
+        flow = dp_netdev_lookup_flow(dp, &key);
+    }
     if (flow) {
         dp_netdev_flow_used(flow, packet);
         dp_netdev_execute_actions(dp, packet, &key,
