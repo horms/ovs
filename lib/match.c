@@ -45,6 +45,7 @@ match_wc_init(struct match *match, const struct flow *flow)
 {
     struct flow_wildcards *wc;
     int i;
+    ovs_be16 dl_type = flow_innermost_dl_type(flow);
 
     match->flow = *flow;
     wc = &match->wc;
@@ -89,25 +90,25 @@ match_wc_init(struct match *match, const struct flow *flow)
     memset(&wc->masks.dl_src, 0xff, sizeof wc->masks.dl_src);
     memset(&wc->masks.dl_dst, 0xff, sizeof wc->masks.dl_dst);
 
-    if (flow->dl_type == htons(ETH_TYPE_IPV6)) {
+    if (dl_type == htons(ETH_TYPE_IPV6)) {
         memset(&wc->masks.ipv6_src, 0xff, sizeof wc->masks.ipv6_src);
         memset(&wc->masks.ipv6_dst, 0xff, sizeof wc->masks.ipv6_dst);
         memset(&wc->masks.ipv6_label, 0xff, sizeof wc->masks.ipv6_label);
-    } else if (flow->dl_type == htons(ETH_TYPE_IP) ||
-               (flow->dl_type == htons(ETH_TYPE_ARP)) ||
-               (flow->dl_type == htons(ETH_TYPE_RARP))) {
+    } else if (dl_type == htons(ETH_TYPE_IP) ||
+               (dl_type == htons(ETH_TYPE_ARP)) ||
+               (dl_type == htons(ETH_TYPE_RARP))) {
         memset(&wc->masks.nw_src, 0xff, sizeof wc->masks.nw_src);
         memset(&wc->masks.nw_dst, 0xff, sizeof wc->masks.nw_dst);
     }
 
-    if (flow->dl_type == htons(ETH_TYPE_ARP) ||
-        flow->dl_type == htons(ETH_TYPE_RARP)) {
+    if (dl_type == htons(ETH_TYPE_ARP) ||
+        dl_type == htons(ETH_TYPE_RARP)) {
         memset(&wc->masks.arp_sha, 0xff, sizeof wc->masks.arp_sha);
         memset(&wc->masks.arp_tha, 0xff, sizeof wc->masks.arp_tha);
     }
 
-    if (flow->dl_type == htons(ETH_TYPE_IPV6) ||
-        flow->dl_type == htons(ETH_TYPE_IP)) {
+    if (dl_type == htons(ETH_TYPE_IPV6) ||
+        dl_type == htons(ETH_TYPE_IP)) {
         memset(&wc->masks.nw_tos, 0xff, sizeof wc->masks.nw_tos);
         memset(&wc->masks.nw_ttl, 0xff, sizeof wc->masks.nw_ttl);
     }
