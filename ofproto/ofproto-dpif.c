@@ -5398,6 +5398,8 @@ compose_output_action__(struct action_xlate_ctx *ctx, uint16_t ofp_port,
     const struct ofport_dpif *ofport = get_ofp_port(ctx->ofproto, ofp_port);
     uint32_t odp_port = ofp_port_to_odp_port(ctx->ofproto, ofp_port);
     ovs_be16 flow_vlan_tci = ctx->flow.vlan_tci;
+    ovs_be32 flow_mpls_lse = ctx->flow.mpls_lse;
+    uint16_t flow_mpls_depth = ctx->flow.mpls_depth;
     uint8_t flow_nw_tos = ctx->flow.nw_tos;
     struct priority_to_dscp *pdscp;
     uint32_t out_port;
@@ -5431,6 +5433,8 @@ compose_output_action__(struct action_xlate_ctx *ctx, uint16_t ofp_port,
     ctx->sflow_n_outputs++;
     ctx->nf_output_iface = ofp_port;
     ctx->flow.vlan_tci = flow_vlan_tci;
+    ctx->flow.mpls_lse = flow_mpls_lse;
+    ctx->flow.mpls_depth = flow_mpls_depth;
     ctx->flow.nw_tos = flow_nw_tos;
 }
 
@@ -5572,21 +5576,26 @@ execute_controller_action(struct action_xlate_ctx *ctx, int len,
 
     if (packet->l2 && packet->l3) {
         struct eth_header *eh;
+        uint16_t mpls_depth;
 
         eth_pop_vlan(packet);
         eh = packet->l2;
-
-        /* If the Ethernet type is less than ETH_TYPE_MIN, it's likely an 802.2
-         * LLC frame.  Calculating the Ethernet type of these frames is more
-         * trouble than seems appropriate for a simple assertion. */
-        assert(ntohs(eh->eth_type) < ETH_TYPE_MIN
-               || eh->eth_type == ctx->flow.dl_type);
 
         memcpy(eh->eth_src, ctx->flow.dl_src, sizeof eh->eth_src);
         memcpy(eh->eth_dst, ctx->flow.dl_dst, sizeof eh->eth_dst);
 
         if (ctx->flow.vlan_tci & htons(VLAN_CFI)) {
             eth_push_vlan(packet, ctx->flow.vlan_tci);
+        }
+
+        mpls_depth = eth_mpls_depth(packet);
+
+        if (mpls_depth < ctx->flow.mpls_depth) {
+            push_mpls(packet, ctx->flow.dl_type, ctx->flow.mpls_lse);
+        } else if (mpls_depth > ctx->flow.mpls_depth) {
+            pop_mpls(packet, ctx->flow.dl_type);
+        } else if (mpls_depth) {
+            set_mpls_lse(packet, ctx->flow.mpls_lse);
         }
 
         if (packet->l4) {
@@ -5619,6 +5628,53 @@ execute_controller_action(struct action_xlate_ctx *ctx, int len,
 
     connmgr_send_packet_in(ctx->ofproto->up.connmgr, &pin);
     ofpbuf_delete(packet);
+}
+
+static void
+compose_mpls_push_action(struct action_xlate_ctx *ctx, ovs_be16 eth_type)
+{
+    assert(eth_type_mpls(eth_type));
+
+    if (ctx->base_flow.mpls_depth) {
+        ctx->flow.mpls_lse = ctx->base_flow.mpls_lse;
+        ctx->flow.mpls_lse &= ~htonl(MPLS_BOS_MASK);
+        ctx->flow.mpls_depth++;
+    } else {
+        ovs_be32 label;
+        uint8_t tc, ttl;
+
+        ctx->flow.mpls_lse &= ~htonl(MPLS_LABEL_MASK | MPLS_TC_MASK |
+                                     MPLS_TTL_MASK | MPLS_BOS_MASK);
+        if (ctx->flow.dl_type == htons(ETH_TYPE_IPV6)) {
+            label = htonl(0x2); /* IPV6 Explicit Null. */
+        } else {
+            label = htonl(0x0); /* IPV4 Explicit Null. */
+        }
+        tc = (ctx->flow.nw_tos & IP_DSCP_MASK) >> 2;
+        ttl = ctx->flow.nw_ttl ? ctx->flow.nw_ttl : 0x40;
+        ctx->flow.mpls_lse = set_mpls_lse_values(ttl, tc, 1, label);
+        ctx->flow.encap_dl_type = ctx->flow.dl_type;
+        ctx->flow.mpls_depth = 1;
+    }
+    ctx->flow.dl_type = eth_type;
+}
+
+static void
+compose_mpls_pop_action(struct action_xlate_ctx *ctx, ovs_be16 eth_type)
+{
+    assert(eth_type_mpls(ctx->flow.dl_type));
+    assert(!eth_type_mpls(eth_type));
+
+    nl_msg_put_be16(ctx->odp_actions, OVS_ACTION_ATTR_POP_MPLS, eth_type);
+
+    if (ctx->flow.mpls_depth) {
+        ctx->flow.mpls_depth--;
+        ctx->base_flow.mpls_depth--;
+        if (!ctx->flow.mpls_depth) {
+            ctx->flow.dl_type = eth_type;
+            ctx->flow.encap_dl_type = htons(0);
+        }
+    }
 }
 
 static bool
@@ -6005,6 +6061,14 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_REG_LOAD:
             nxm_execute_reg_load(ofpact_get_REG_LOAD(a), &ctx->flow);
+            break;
+
+        case OFPACT_PUSH_MPLS:
+            compose_mpls_push_action(ctx, ofpact_get_PUSH_MPLS(a)->ethertype);
+            break;
+
+        case OFPACT_POP_MPLS:
+            compose_mpls_pop_action(ctx, ofpact_get_POP_MPLS(a)->ethertype);
             break;
 
         case OFPACT_DEC_TTL:

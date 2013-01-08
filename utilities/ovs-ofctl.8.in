@@ -914,6 +914,26 @@ Push a new VLAN tag onto the packet.  Ethertype is used as the the Ethertype
 for the tag. Only ethertype 0x8100 should be used. (0x88a8 which the spec
 allows isn't supported at the moment.)
 A priority of zero and the tag of zero are used for the new tag.
+.IP \fBpush_mpls\fR:\fIethertype\fR
+Modifies the ethertype of a packet with the value specified. The new MPLS
+label stack entry is set with value copied from outermost MPLS label stack
+entry if present and stack bit set to 0 or MPLS label stack entry is set with
+\fBlabel\fR:\fI0 for IPv4, 2 for IPv6 or default 0\fR, \fBtc\fR:\fIleast
+significant 3 bits from IPv4 DSCP or IPv6 traffic-class or 0\fR,
+\fBstack\fR:\fI1\fR, \fBttl\fR:\fIIPv4 ttl or IPv6 hlim or default 64\fR.
+.IP
+There are some limitations in the implementation.
+push_mpls followed by pop_mpls will be synthesised to a no-op. push_mpls
+followed by another push_mpls will result in the first push_mpls being
+discarded.
+.
+.IP \fBpop_mpls\fR:\fIethertype\fR
+Strips the outermost MPLS label stack entry and modifies the ethertype of a
+packet with the value specified if MPLS stack bit is set(i.e. bottom of stack).
+.IP
+There are some limitations in the implementation.
+push_mpls followed by pop_mpls will be synthesised to a no-op. pop_mpls
+followed by another push_mpls without an intermediate push_mpls will result in the first push_mpls being discarded.
 .
 .IP \fBmod_dl_src\fB:\fImac\fR
 Sets the source Ethernet address to \fImac\fR.

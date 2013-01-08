@@ -1230,6 +1230,7 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
      case OVS_KEY_ATTR_ETHERTYPE:
      case OVS_KEY_ATTR_IN_PORT:
      case OVS_KEY_ATTR_VLAN:
+     case OVS_KEY_ATTR_MPLS:
      case OVS_KEY_ATTR_ICMP:
      case OVS_KEY_ATTR_ICMPV6:
      case OVS_KEY_ATTR_ARP:
@@ -1270,6 +1271,20 @@ dp_netdev_execute_actions(struct dp_netdev *dp,
         case OVS_ACTION_ATTR_POP_VLAN:
             eth_pop_vlan(packet);
             break;
+
+        case OVS_ACTION_ATTR_PUSH_MPLS: {
+            const struct ovs_action_push_mpls *mpls = nl_attr_get(a);
+            push_mpls(packet, mpls->mpls_ethertype, mpls->mpls_label);
+            break;
+         }
+
+        case OVS_ACTION_ATTR_POP_MPLS:
+             pop_mpls(packet, nl_attr_get_be16(a));
+             break;
+
+        case OVS_ACTION_ATTR_SET_MPLS:
+             set_mpls_lse(packet, nl_attr_get_be32(a));
+             break;
 
         case OVS_ACTION_ATTR_SET:
             execute_set_action(packet, nl_attr_get(a));

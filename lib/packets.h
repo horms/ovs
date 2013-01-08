@@ -140,12 +140,26 @@ void compose_rarp(struct ofpbuf *, const uint8_t eth_src[ETH_ADDR_LEN]);
 void eth_push_vlan(struct ofpbuf *, ovs_be16 tci);
 void eth_pop_vlan(struct ofpbuf *);
 
+uint16_t eth_mpls_depth(struct ofpbuf *packet);
+
+void set_ethertype(struct ofpbuf *packet, ovs_be16 eth_type);
+
 const char *eth_from_hex(const char *hex, struct ofpbuf **packetp);
 void eth_format_masked(const uint8_t eth[ETH_ADDR_LEN],
                        const uint8_t mask[ETH_ADDR_LEN], struct ds *s);
 void eth_addr_bitand(const uint8_t src[ETH_ADDR_LEN],
                      const uint8_t mask[ETH_ADDR_LEN],
                      uint8_t dst[ETH_ADDR_LEN]);
+
+void set_mpls_lse(struct ofpbuf *, ovs_be32 label);
+void push_mpls(struct ofpbuf *packet, ovs_be16 ethtype, ovs_be32 lse);
+void pop_mpls(struct ofpbuf *, ovs_be16 ethtype);
+
+void set_mpls_lse_tc(ovs_be32 *tag, uint8_t tc);
+void set_mpls_lse_label(ovs_be32 *tag, ovs_be32 label);
+void set_mpls_lse_bos(ovs_be32 *tag, uint8_t bos);
+ovs_be32 set_mpls_lse_values(uint8_t ttl, uint8_t tc, uint8_t bos,
+                             ovs_be32 label);
 
 /* Example:
  *
@@ -185,6 +199,12 @@ void eth_addr_bitand(const uint8_t src[ETH_ADDR_LEN],
 #define ETH_TYPE_RARP          0x8035
 #define ETH_TYPE_MPLS          0x8847
 #define ETH_TYPE_MPLS_MCAST    0x8848
+
+static inline bool eth_type_mpls(ovs_be16 eth_type)
+{
+    return eth_type == htons(ETH_TYPE_MPLS) ||
+        eth_type == htons(ETH_TYPE_MPLS_MCAST);
+}
 
 /* Minimum value for an Ethernet type.  Values below this are IEEE 802.2 frame
  * lengths. */
@@ -272,6 +292,76 @@ struct vlan_eth_header {
 } __attribute__((packed));
 BUILD_ASSERT_DECL(VLAN_ETH_HEADER_LEN == sizeof(struct vlan_eth_header));
 
+/* MPLS related definitions */
+#define MPLS_TTL_MASK       0x000000ff
+#define MPLS_TTL_SHIFT      0
+
+#define MPLS_BOS_MASK       0x00000100
+#define MPLS_BOS_SHIFT      8
+
+#define MPLS_TC_MASK        0x00000e00
+#define MPLS_TC_SHIFT       9
+
+#define MPLS_LABEL_MASK     0xfffff000
+#define MPLS_LABEL_SHIFT    12
+
+#define MPLS_HLEN           4
+
+struct mpls_hdr {
+    ovs_be32 mpls_lse;
+};
+BUILD_ASSERT_DECL(MPLS_HLEN == sizeof(struct mpls_hdr));
+
+#define MPLS_ETH_HEADER_LEN (ETH_HEADER_LEN + MPLS_HLEN)
+struct mpls_eth_header {
+    uint8_t  eth_dst[ETH_ADDR_LEN];
+    uint8_t  eth_src[ETH_ADDR_LEN];
+    ovs_be16 eth_type;         /* htons(ETH_TYPE_MPLS) or
+                                  htons(ETH_TYPE_MPLS_MCAST). */
+    ovs_be32 mpls_lse;
+} __attribute__((packed));
+BUILD_ASSERT_DECL(MPLS_ETH_HEADER_LEN == sizeof(struct mpls_eth_header));
+
+/* Given a mpls label stack entry in network byte order
+ * return mpls label in host byte order */
+static inline uint32_t
+mpls_lse_to_label(ovs_be32 mpls_lse)
+{
+    return (ntohl(mpls_lse) & MPLS_LABEL_MASK) >> MPLS_LABEL_SHIFT;
+}
+
+/* Given a mpls label stack entry in network byte order
+ * return mpls tc */
+static inline uint8_t
+mpls_lse_to_tc(ovs_be32 mpls_lse)
+{
+    return (ntohl(mpls_lse) & MPLS_TC_MASK) >> MPLS_TC_SHIFT;
+}
+
+/* Given a mpls label stack entry in network byte order
+ * return mpls ttl */
+static inline uint8_t
+mpls_lse_to_ttl(ovs_be32 mpls_lse)
+{
+    return (ntohl(mpls_lse) & MPLS_TTL_MASK) >> MPLS_TTL_SHIFT;
+}
+
+/* Set TTL in mpls lse. */
+static inline void
+flow_set_mpls_lse_ttl(ovs_be32 *mpls_lse, uint8_t ttl)
+{
+    *mpls_lse &= ~htonl(MPLS_TTL_MASK);
+    *mpls_lse |= htonl(ttl << MPLS_TTL_SHIFT);
+}
+
+/* Given a mpls label stack entry in network byte order
+ * return mpls BoS bit  */
+static inline uint8_t
+mpls_lse_to_bos(ovs_be32 mpls_lse)
+{
+    return (mpls_lse & htonl(MPLS_BOS_MASK)) != 0;
+}
+
 #define IP_FMT "%"PRIu32".%"PRIu32".%"PRIu32".%"PRIu32
 #define IP_ARGS(ip)                             \
     ntohl(ip) >> 24,                            \
@@ -331,6 +421,8 @@ void ip_format_masked(ovs_be32 ip, ovs_be32 mask, struct ds *);
 #define IP_DSCP_MASK 0xfc
 
 #define IP_VERSION 4
+
+#define IP_DSCP(ip_tos) ((ip_tos & IP_DSCP_MASK) >> 2)
 
 #define IP_DONT_FRAGMENT  0x4000 /* Don't fragment. */
 #define IP_MORE_FRAGMENTS 0x2000 /* More fragments. */
@@ -431,6 +523,10 @@ BUILD_ASSERT_DECL(ARP_ETH_HEADER_LEN == sizeof(struct arp_eth_header));
 
 /* The IPv6 flow label is in the lower 20 bits of the first 32-bit word. */
 #define IPV6_LABEL_MASK 0x000fffff
+
+#define IP6_VERSION    6
+
+#define IP6_VER(ip6_vfc) ((ip6_vfc) >> 4)
 
 /* Example:
  *
