@@ -283,6 +283,7 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_ND,        /* struct ovs_key_nd */
 	OVS_KEY_ATTR_SKB_MARK,  /* u32 skb mark */
 	OVS_KEY_ATTR_IPV4_TUNNEL,  /* struct ovs_key_ipv4_tunnel */
+	OVS_KEY_ATTR_MPLS,      /* struct ovs_key_mpls */
 	OVS_KEY_ATTR_TUN_ID = 63,  /* be64 tunnel ID */
 	__OVS_KEY_ATTR_MAX
 };
@@ -310,6 +311,10 @@ enum ovs_frag_type {
 struct ovs_key_ethernet {
 	__u8	 eth_src[6];
 	__u8	 eth_dst[6];
+};
+
+struct ovs_key_mpls {
+	__be32 mpls_top_label;
 };
 
 struct ovs_key_ipv4 {
@@ -457,6 +462,19 @@ enum ovs_userspace_attr {
 #define OVS_USERSPACE_ATTR_MAX (__OVS_USERSPACE_ATTR_MAX - 1)
 
 /**
+ * struct ovs_action_push_mpls - %OVS_ACTION_ATTR_PUSH_MPLS action argument.
+ * @mpls_label: MPLS label to push.
+ * @mpls_ethertype: Ethertype to set in the encapsulating ethernet frame.
+ *
+ * The only values @mpls_ethertype should ever be given are %ETH_P_MPLS_UC and
+ * %ETH_P_MPLS_MC, indicating MPLS unicast or multicast. Other are rejected.
+ */
+struct ovs_action_push_mpls {
+	__be32 mpls_label;
+	__be16 mpls_ethertype; /* Either %ETH_P_MPLS_UC or %ETH_P_MPLS_MC */ 
+};
+
+/**
  * struct ovs_action_push_vlan - %OVS_ACTION_ATTR_PUSH_VLAN action argument.
  * @vlan_tpid: Tag protocol identifier (TPID) to push.
  * @vlan_tci: Tag control identifier (TCI) to push.  The CFI bit must be set
@@ -478,14 +496,22 @@ struct ovs_action_push_vlan {
  * @OVS_ACTION_ATTR_OUTPUT: Output packet to port.
  * @OVS_ACTION_ATTR_USERSPACE: Send packet to userspace according to nested
  * %OVS_USERSPACE_ATTR_* attributes.
- * @OVS_ACTION_ATTR_SET: Replaces the contents of an existing header.  The
- * single nested %OVS_KEY_ATTR_* attribute specifies a header to modify and its
- * value.
  * @OVS_ACTION_ATTR_PUSH_VLAN: Push a new outermost 802.1Q header onto the
  * packet.
  * @OVS_ACTION_ATTR_POP_VLAN: Pop the outermost 802.1Q header off the packet.
  * @OVS_ACTION_ATTR_SAMPLE: Probabilitically executes actions, as specified in
  * the nested %OVS_SAMPLE_ATTR_* attributes.
+ * @OVS_ACTION_ATTR_SET: Replaces the contents of an existing header.  The
+ * single nested %OVS_KEY_ATTR_* attribute specifies a header to modify and its
+ * value.
+ * @OVS_ACTION_ATTR_PUSH_MPLS: Push a new MPLS label onto the top of the packet
+ * MPLS stack. Set the ethertype of the encapsulating frame to either
+ * %ETH_P_MPLS_UC or %ETH_P_MPLS_MC to indicate the new packet contents.
+ * @OVS_ACTION_ATTR_POP_MPLS: Pop an MPLS label off of the packet's MPLS stack.
+ * Set the encapsulating frame's ethertype to indicate the new packet contents
+ * (this could potentially still be %ETH_P_MPLS_* if there are remaining MPLS
+ * labels).  If there are no MPLS labels as determined by ethertype, no action
+ * is taken.
  *
  * Only a single header can be set with a single %OVS_ACTION_ATTR_SET.  Not all
  * fields within a header are modifiable, e.g. the IPv4 protocol and fragment
@@ -500,6 +526,8 @@ enum ovs_action_attr {
 	OVS_ACTION_ATTR_PUSH_VLAN,    /* struct ovs_action_push_vlan. */
 	OVS_ACTION_ATTR_POP_VLAN,     /* No argument. */
 	OVS_ACTION_ATTR_SAMPLE,       /* Nested OVS_SAMPLE_ATTR_*. */
+	OVS_ACTION_ATTR_PUSH_MPLS,    /* struct ovs_action_push_mpls. */
+	OVS_ACTION_ATTR_POP_MPLS,     /* __be16 ethertype. */
 	__OVS_ACTION_ATTR_MAX
 };
 
