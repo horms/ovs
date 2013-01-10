@@ -5079,12 +5079,6 @@ execute_controller_action(struct action_xlate_ctx *ctx, int len,
 
         eh = packet->l2;
 
-        /* If the Ethernet type is less than ETH_TYPE_MIN, it's likely an 802.2
-         * LLC frame.  Calculating the Ethernet type of these frames is more
-         * trouble than seems appropriate for a simple assertion. */
-        assert(ntohs(eh->eth_type) < ETH_TYPE_MIN
-               || eh->eth_type == ctx->flow.dl_type);
-
         memcpy(eh->eth_src, ctx->flow.dl_src, sizeof eh->eth_src);
         memcpy(eh->eth_dst, ctx->flow.dl_dst, sizeof eh->eth_dst);
 
