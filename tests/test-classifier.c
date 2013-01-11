@@ -588,7 +588,7 @@ test_rule_replacement(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)
         tcls_init(&tcls);
         tcls_insert(&tcls, rule2);
         assert(test_rule_from_cls_rule(
-                   classifier_replace(&cls, &rule2->cls_rule)) == rule1);
+                   classifier_replace(&cls, &rule2->cls_rule, false)) == rule1);
         free(rule1);
         check_tables(&cls, 1, 1, 0);
         compare_classifiers(&cls, &tcls);
@@ -699,7 +699,7 @@ test_many_rules_in_one_list (int argc OVS_UNUSED, char *argv[] OVS_UNUSED)
 
                     tcls_rules[j] = tcls_insert(&tcls, rules[j]);
                     displaced_rule = test_rule_from_cls_rule(
-                        classifier_replace(&cls, &rules[j]->cls_rule));
+                        classifier_replace(&cls, &rules[j]->cls_rule, false));
                     if (pri_rules[pris[j]] >= 0) {
                         int k = pri_rules[pris[j]];
                         assert(displaced_rule != NULL);

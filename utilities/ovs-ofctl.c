@@ -1650,7 +1650,7 @@ fte_free_all(struct classifier *cls)
  * Takes ownership of 'version'. */
 static void
 fte_insert(struct classifier *cls, const struct cls_rule *rule,
-           struct fte_version *version, int index)
+           struct fte_version *version, int index, bool may_expire)
 {
     struct fte *old, *fte;
 
@@ -1658,7 +1658,7 @@ fte_insert(struct classifier *cls, const struct cls_rule *rule,
     fte->rule = *rule;
     fte->versions[index] = version;
 
-    old = fte_from_cls_rule(classifier_replace(cls, &fte->rule));
+    old = fte_from_cls_rule(classifier_replace(cls, &fte->rule, may_expire));
     if (old) {
         fte_version_free(old->versions[index]);
         fte->versions[!index] = old->versions[!index];
@@ -1686,6 +1686,7 @@ read_flows_from_file(const char *filename, struct classifier *cls, int index)
     while (!ds_get_preprocessed_line(&s, file)) {
         struct fte_version *version;
         struct ofputil_flow_mod fm;
+        bool may_expire = fm.idle_timeout || fm.hard_timeout;
 
         parse_ofp_str(&fm, OFPFC_ADD, ds_cstr(&s), true);
 
@@ -1699,7 +1700,7 @@ read_flows_from_file(const char *filename, struct classifier *cls, int index)
 
         usable_protocols &= ofputil_usable_protocols(&fm.cr);
 
-        fte_insert(cls, &fm.cr, version, index);
+        fte_insert(cls, &fm.cr, version, index, may_expire);
     }
     ds_destroy(&s);
 
@@ -1763,6 +1764,7 @@ read_flows_from_switch(struct vconn *vconn,
                 struct ofputil_flow_stats fs;
                 struct ofpbuf ofpacts;
                 int retval;
+                bool may_expire = fs.idle_timeout || fs.hard_timeout;
 
                 ofpbuf_init(&ofpacts, 64);
                 retval = ofputil_decode_flow_stats_reply(&fs, reply, false,
@@ -1783,7 +1785,7 @@ read_flows_from_switch(struct vconn *vconn,
                 version->ofpacts = ofpbuf_steal_data(&ofpacts);
                 version->ofpacts_len = ofpacts.size;
 
-                fte_insert(cls, &fs.rule, version, index);
+                fte_insert(cls, &fs.rule, version, index, may_expire);
             }
         } else {
             VLOG_DBG("received reply with xid %08"PRIx32" "

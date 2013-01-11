@@ -4293,7 +4293,7 @@ oftable_replace_rule(struct rule *rule)
     struct oftable *table = &ofproto->tables[rule->table_id];
     struct rule *victim;
 
-    victim = rule_from_cls_rule(classifier_replace(&table->cls, &rule->cr));
+    victim = rule_replace(&table->cls, rule);
     if (victim) {
         eviction_group_remove_rule(victim);
     }

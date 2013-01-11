@@ -40,6 +40,7 @@ extern "C" {
 struct classifier {
     int n_rules;                /* Total number of rules. */
     struct hmap tables;         /* Contains "struct cls_table"s.  */
+    struct list expirable;      /* Contains expirable rules. */
 };
 
 /* A set of rules that all have the same fields wildcarded. */
@@ -74,6 +75,7 @@ cls_table_is_catchall(const struct cls_table *table)
 struct cls_rule {
     struct hmap_node hmap_node; /* Within struct cls_table 'rules'. */
     struct list list;           /* List of identical, lower-priority rules. */
+    struct list expirable;      /* Entry in struct classifier 'expirable'. */
     struct flow flow;           /* All field values. */
     struct flow_wildcards wc;   /* Wildcards for fields. */
     unsigned int priority;      /* Larger numbers are higher priorities. */
@@ -164,7 +166,8 @@ void classifier_destroy(struct classifier *);
 bool classifier_is_empty(const struct classifier *);
 int classifier_count(const struct classifier *);
 void classifier_insert(struct classifier *, struct cls_rule *);
-struct cls_rule *classifier_replace(struct classifier *, struct cls_rule *);
+struct cls_rule *classifier_replace(struct classifier *, struct cls_rule *,
+                                    bool may_expire);
 void classifier_remove(struct classifier *, struct cls_rule *);
 struct cls_rule *classifier_lookup(const struct classifier *,
                                    const struct flow *);

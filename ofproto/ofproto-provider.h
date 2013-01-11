@@ -198,6 +198,13 @@ rule_from_cls_rule(const struct cls_rule *cls_rule)
     return cls_rule ? CONTAINER_OF(cls_rule, struct rule, cr) : NULL;
 }
 
+static inline struct rule *
+rule_replace(struct classifier *cls, struct rule *rule)
+{
+    bool may_expire = rule->hard_timeout || rule->idle_timeout;
+    return rule_from_cls_rule(classifier_replace(cls, &rule->cr, may_expire));
+}
+
 void ofproto_rule_update_used(struct rule *, long long int used);
 void ofproto_rule_expire(struct rule *, uint8_t reason);
 void ofproto_rule_destroy(struct rule *);
