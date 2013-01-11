@@ -66,6 +66,10 @@ struct ofproto {
     struct oftable *tables;
     int n_tables;
 
+    /* Optimisation for flow expiry.
+     * These flows should all be present in tables */
+    struct list expirable;      /* List of expirable 'struct rule"s */
+
     /* OpenFlow connections. */
     struct connmgr *connmgr;
 
@@ -181,6 +185,10 @@ struct rule {
 
     struct ofpact *ofpacts;      /* "OFPACT_*"s.  Ends with OFPACT_END. */
     unsigned int ofpacts_len;    /* Size of 'ofpacts', in bytes. */
+
+    /* Optimisation for flow expiry. */
+    struct list expirable;      /* Element of ofproto's expirable list
+                                 * if this rule is expirable */
 };
 
 struct ofproto_table_stats {

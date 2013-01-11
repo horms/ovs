@@ -381,6 +381,7 @@ ofproto_create(const char *datapath_name, const char *datapath_type,
     shash_init(&ofproto->port_by_name);
     ofproto->tables = NULL;
     ofproto->n_tables = 0;
+    list_init(&ofproto->expirable);
     ofproto->connmgr = connmgr_create(ofproto, datapath_name, datapath_name);
     ofproto->state = S_OPENFLOW;
     list_init(&ofproto->pending);
@@ -3023,6 +3024,7 @@ add_flow(struct ofproto *ofproto, struct ofconn *ofconn,
     rule->ofpacts_len = fm->ofpacts_len;
     rule->evictable = true;
     rule->eviction_group = NULL;
+    list_init(&rule->expirable);
 
     /* Insert new rule. */
     victim = oftable_replace_rule(rule);
@@ -4281,6 +4283,8 @@ oftable_remove_rule(struct rule *rule)
 
     classifier_remove(&table->cls, &rule->cr);
     eviction_group_remove_rule(rule);
+    if (!list_is_empty(&rule->expirable))
+        list_remove(&rule->expirable);
 }
 
 /* Inserts 'rule' into its oftable.  Removes any existing rule from 'rule''s
@@ -4292,6 +4296,11 @@ oftable_replace_rule(struct rule *rule)
     struct ofproto *ofproto = rule->ofproto;
     struct oftable *table = &ofproto->tables[rule->table_id];
     struct rule *victim;
+    bool may_expire = rule->hard_timeout || rule->idle_timeout;
+
+    if (may_expire) {
+        list_insert(&ofproto->expirable, &rule->expirable);
+    }
 
     victim = rule_from_cls_rule(classifier_replace(&table->cls, &rule->cr));
     if (victim) {
