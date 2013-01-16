@@ -860,7 +860,6 @@ classifier_init(struct classifier *cls)
 {
     cls->n_rules = 0;
     hmap_init(&cls->tables);
-    list_init(&cls->expirable);
 }
 
 /* Destroys 'cls'.  Rules within 'cls', if any, are not freed; this is the
@@ -907,8 +906,7 @@ classifier_count(const struct classifier *cls)
  * rule, even rules that cannot have any effect because the new rule matches a
  * superset of their flows and has higher priority. */
 struct cls_rule *
-classifier_replace(struct classifier *cls, struct cls_rule *rule,
-                   bool may_expire)
+classifier_replace(struct classifier *cls, struct cls_rule *rule)
 {
     struct cls_rule *old_rule;
     struct cls_table *table;
@@ -923,10 +921,6 @@ classifier_replace(struct classifier *cls, struct cls_rule *rule,
         table->n_table_rules++;
         cls->n_rules++;
     }
-    if (may_expire) {
-        list_init(&rule->expirable);
-        list_insert(&cls->expirable, &rule->expirable);
-    }
     return old_rule;
 }
 
@@ -939,7 +933,7 @@ classifier_replace(struct classifier *cls, struct cls_rule *rule,
 void
 classifier_insert(struct classifier *cls, struct cls_rule *rule)
 {
-    struct cls_rule *displaced_rule = classifier_replace(cls, rule, false);
+    struct cls_rule *displaced_rule = classifier_replace(cls, rule);
     assert(!displaced_rule);
 }
 
@@ -968,9 +962,6 @@ classifier_remove(struct classifier *cls, struct cls_rule *rule)
     if (--table->n_table_rules == 0) {
         destroy_table(cls, table);
     }
-
-    if (!list_is_empty(&rule->expirable))
-        list_remove(&rule->expirable);
 
     cls->n_rules--;
 }

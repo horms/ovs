@@ -3261,6 +3261,7 @@ static void expire_subfacets(struct ofproto_dpif *, int dp_max_idle);
 static int
 expire(struct ofproto_dpif *ofproto)
 {
+    struct rule_dpif *rule, *next_rule;
     struct oftable *table;
     int dp_max_idle;
 
@@ -3273,10 +3274,11 @@ expire(struct ofproto_dpif *ofproto)
 
     /* Expire OpenFlow flows whose idle_timeout or hard_timeout has passed. */
     OFPROTO_FOR_EACH_TABLE (table, &ofproto->up) {
-        struct cls_rule *rule, *next_rule;
+        struct cls_cursor cursor;
 
-        LIST_FOR_EACH_SAFE(rule, next_rule, expirable, &table->cls.expirable) {
-            rule_expire(rule_dpif_cast(rule_from_cls_rule(rule)));
+        cls_cursor_init(&cursor, &table->cls, NULL);
+        CLS_CURSOR_FOR_EACH_SAFE (rule, next_rule, up.cr, &cursor) {
+            rule_expire(rule);
         }
     }
 
