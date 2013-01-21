@@ -3262,7 +3262,6 @@ static int
 expire(struct ofproto_dpif *ofproto)
 {
     struct rule *rule, *next_rule;
-    struct oftable *table;
     int dp_max_idle;
 
     /* Update stats for each flow in the datapath. */
