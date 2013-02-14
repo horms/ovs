@@ -218,7 +218,7 @@ struct action_xlate_ctx {
 
     /* The packet corresponding to 'flow', or a null pointer if we are
      * revalidating without a packet to refer to. */
-    const struct ofpbuf *packet;
+    struct ofpbuf *packet;
 
     /* Should OFPP_NORMAL update the MAC learning table?  Should "learn"
      * actions update the flow table?
@@ -288,7 +288,7 @@ struct action_xlate_ctx {
 static void action_xlate_ctx_init(struct action_xlate_ctx *,
                                   struct ofproto_dpif *, const struct flow *,
                                   ovs_be16 initial_tci, struct rule_dpif *,
-                                  uint8_t tcp_flags, const struct ofpbuf *);
+                                  uint8_t tcp_flags, struct ofpbuf *);
 static void xlate_actions(struct action_xlate_ctx *,
                           const struct ofpact *ofpacts, size_t ofpacts_len,
                           struct ofpbuf *odp_actions);
@@ -398,7 +398,7 @@ static void subfacet_update_time(struct subfacet *, long long int used);
 static void subfacet_update_stats(struct subfacet *,
                                   const struct dpif_flow_stats *);
 static void subfacet_make_actions(struct subfacet *,
-                                  const struct ofpbuf *packet,
+                                  struct ofpbuf *packet,
                                   struct ofpbuf *odp_actions);
 static int subfacet_install(struct subfacet *,
                             const struct nlattr *actions, size_t actions_len,
@@ -719,7 +719,7 @@ static struct ofport_dpif *get_ofp_port(const struct ofproto_dpif *,
 static struct ofport_dpif *get_odp_port(const struct ofproto_dpif *,
                                         uint32_t odp_port);
 static void ofproto_trace(struct ofproto_dpif *, const struct flow *,
-                          const struct ofpbuf *, ovs_be16 initial_tci,
+                          struct ofpbuf *, ovs_be16 initial_tci,
                           struct ds *);
 static bool may_dpif_port_del(struct ofport_dpif *);
 
@@ -5091,7 +5091,7 @@ subfacet_get_key(struct subfacet *subfacet, struct odputil_keybuf *keybuf,
  * Translates the actions into 'odp_actions', which the caller must have
  * initialized and is responsible for uninitializing. */
 static void
-subfacet_make_actions(struct subfacet *subfacet, const struct ofpbuf *packet,
+subfacet_make_actions(struct subfacet *subfacet, struct ofpbuf *packet,
                       struct ofpbuf *odp_actions)
 {
     struct facet *facet = subfacet->facet;
@@ -6486,7 +6486,7 @@ static void
 action_xlate_ctx_init(struct action_xlate_ctx *ctx,
                       struct ofproto_dpif *ofproto, const struct flow *flow,
                       ovs_be16 initial_tci, struct rule_dpif *rule,
-                      uint8_t tcp_flags, const struct ofpbuf *packet)
+                      uint8_t tcp_flags, struct ofpbuf *packet)
 {
     ovs_be64 initial_tun_id = flow->tunnel.tun_id;
 
@@ -7708,7 +7708,7 @@ exit:
 
 static void
 ofproto_trace(struct ofproto_dpif *ofproto, const struct flow *flow,
-              const struct ofpbuf *packet, ovs_be16 initial_tci,
+              struct ofpbuf *packet, ovs_be16 initial_tci,
               struct ds *ds)
 {
     struct rule_dpif *rule;
