@@ -6119,9 +6119,17 @@ execute_mpls_pop_action(struct action_xlate_ctx *ctx, ovs_be16 eth_type)
             ctx->base_flow.encap_dl_type = ctx->flow.dl_type = eth_type;
             ctx->flow.encap_dl_type = htons(0);
             if (ctx->packet) {
+                uint8_t nw_ttl = ctx->flow.nw_ttl;
                 flow_extract_l3_onwards(ctx->packet, &ctx->base_flow, eth_type);
                 ctx->inner_flow = ctx->base_flow;
                 flow_copy_l3_onwards(&ctx->flow, &ctx->base_flow);
+                /* If nw_ttl is non-zero then nw_ttl was already set in
+                 * ctx->flow. his can only have occured due to a previous
+                 * copy_ttl_in action so restore the value calculated by
+                 * the action */
+                if (nw_ttl) {
+                    ctx->flow.nw_ttl = nw_ttl;
+                }
             }
         }
     }
@@ -6149,6 +6157,34 @@ compose_dec_ttl(struct action_xlate_ctx *ctx, struct ofpact_cnt_ids *ids)
         /* Stop processing for current table. */
         return true;
     }
+}
+
+static bool
+execute_copy_ttl_in_action(struct action_xlate_ctx *ctx)
+{
+    uint8_t nw_ttl;
+
+    if (!eth_type_mpls(ctx->flow.dl_type)) {
+        /* Copying TTL from IP is not supported */
+        return true;
+    }
+
+    if (ctx->flow.mpls_depth > 1) {
+        /* Copying TTL from MPLS to MPLS is not supported */
+        return true;
+    } else {
+        /* MPLS -> IP */
+        nw_ttl = mpls_lse_to_ttl(ctx->flow.mpls_lse);
+    }
+
+    /* Treat a resulting TTL of zero as a stop condition */
+    if (!nw_ttl) {
+        execute_controller_action(ctx, UINT16_MAX, OFPR_INVALID_TTL, 0);
+        return true;
+    }
+
+    ctx->flow.nw_ttl = nw_ttl;
+    return false;
 }
 
 static bool
@@ -6556,6 +6592,12 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_POP_MPLS:
             execute_mpls_pop_action(ctx, ofpact_get_POP_MPLS(a)->ethertype);
+            break;
+
+        case OFPACT_COPY_TTL_IN:
+            if (execute_copy_ttl_in_action(ctx)) {
+                goto out;
+            }
             break;
 
         case OFPACT_COPY_TTL_OUT:

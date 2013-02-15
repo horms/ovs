@@ -66,7 +66,7 @@ ofp_packet_to_string(const void *data, size_t len)
     flow_extract(&buf, 0, 0, NULL, 0, &flow);
     flow_format(&ds, &flow);
 
-    if (buf.l7) {
+    if (buf.l7 && !eth_type_mpls(flow.dl_type)) {
         if (flow.nw_proto == IPPROTO_TCP) {
             struct tcp_header *th = buf.l4;
             ds_put_format(&ds, " tcp_csum:%"PRIx16,
@@ -644,8 +644,10 @@ ofp10_match_to_string(const struct ofp10_match *om, int verbosity)
             ds_put_cstr(&f, "rarp,");
         } else if (om->dl_type == htons(ETH_TYPE_MPLS)) {
             ds_put_cstr(&f, "mpls,");
+            skip_proto = true;
         } else if (om->dl_type == htons(ETH_TYPE_MPLS_MCAST)) {
             ds_put_cstr(&f, "mplsm,");
+            skip_proto = true;
         } else {
             skip_type = false;
         }
