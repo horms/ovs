@@ -1801,10 +1801,14 @@ parse_l2_5_onward(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
                   const struct nlattr *key, size_t key_len)
 {
     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+    enum odp_key_fitness fitness, mpls_fitness = 0;
     ovs_be16 dl_type;
 
     /* Parse MPLS label stack entry */
     if (eth_type_mpls(flow->dl_type)) {
+        const struct nlattr *encap
+            = (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_ENCAP)
+               ? attrs[OVS_KEY_ATTR_ENCAP] : NULL);
         /* Calculate fitness of outer attributes. */
         expected_attrs |= (UINT64_C(1) << OVS_KEY_ATTR_MPLS);
 
@@ -1815,12 +1819,27 @@ parse_l2_5_onward(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
         flow->mpls_lse = nl_attr_get_be32(attrs[OVS_KEY_ATTR_MPLS]);
         flow->mpls_depth++;
 
-        if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV4)) {
-            flow->encap_dl_type = htons(ETH_TYPE_IP);
-        } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV6)) {
-            flow->encap_dl_type = htons(ETH_TYPE_IPV6);
-        } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_ARP)) {
-            flow->encap_dl_type = htons(ETH_TYPE_ARP);
+        /* Encap may not be present if nothing is known about the
+         * encapsulated frame */
+        if (encap) {
+            expected_attrs |= (UINT64_C(1) << OVS_KEY_ATTR_ENCAP);
+            mpls_fitness = check_expectations(present_attrs, out_of_range_attr,
+                                              expected_attrs, key, key_len);
+
+            /* Now parse the encapsulated attributes. */
+            if (!parse_flow_nlattrs(nl_attr_get(encap), nl_attr_get_size(encap),
+                                    attrs, &present_attrs, &out_of_range_attr)) {
+                return ODP_FIT_ERROR;
+            }
+            expected_attrs = 0;
+
+            if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV4)) {
+                flow->encap_dl_type = htons(ETH_TYPE_IP);
+            } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV6)) {
+                flow->encap_dl_type = htons(ETH_TYPE_IPV6);
+            } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_ARP)) {
+                flow->encap_dl_type = htons(ETH_TYPE_ARP);
+            }
         }
     }
 
@@ -1939,8 +1958,11 @@ parse_l2_5_onward(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
         }
     }
 
-    return check_expectations(present_attrs, out_of_range_attr, expected_attrs,
-                              key, key_len);
+    fitness = check_expectations(present_attrs, out_of_range_attr,
+                                 expected_attrs, key, key_len);
+
+    /* The overall fitness is the worse of the outer and inner attributes. */
+    return MAX(fitness, mpls_fitness);
 }
 
 /* Parse 802.1Q header then encapsulated L3 attributes. */
