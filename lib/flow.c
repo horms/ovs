@@ -493,6 +493,28 @@ flow_extract_l3_onwards(struct ofpbuf *packet, struct flow *flow,
     }
 }
 
+/* Copy the l3 and higher information from flow 'src' to flow 'dst'. */
+void
+flow_copy_l3_onwards(struct flow *dst, const struct flow *src)
+{
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 19);
+
+    dst->ipv6_src = src->ipv6_src;
+    dst->ipv6_dst = src->ipv6_dst;
+    dst->nd_target = src->nd_target;
+    dst->nw_src = src->nw_src;
+    dst->nw_dst = src->nw_dst;
+    dst->ipv6_label = src->ipv6_label;
+    dst->tp_src = src->tp_src;
+    dst->tp_dst = src->tp_dst;
+    dst->nw_proto = src->nw_proto;
+    dst->nw_tos = src->nw_tos;
+    memcpy(&dst->arp_sha, &src->arp_sha, sizeof dst->arp_sha);
+    memcpy(&dst->arp_tha, &src->arp_tha, sizeof dst->arp_tha);
+    dst->nw_ttl = src->nw_ttl;
+    dst->nw_frag = src->nw_frag;
+}
+
 /* For every bit of a field that is wildcarded in 'wildcards', sets the
  * corresponding bit in 'flow' to zero. */
 void
