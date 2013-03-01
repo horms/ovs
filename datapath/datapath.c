@@ -201,32 +201,42 @@ void ovs_dp_detach_port(struct vport *p)
 	ovs_vport_del(p);
 }
 
+#define MAX_RECIRCULATION_DEPTH	128	/* Completely arbitrary */
+
 /* Must be called with rcu_read_lock. */
 void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 {
 	struct datapath *dp = p->dp;
-	struct sw_flow *flow;
 	struct dp_stats_percpu *stats;
-	u64 *stats_counter;
-	int error;
+	int recirculate, limit = MAX_RECIRCULATION_DEPTH;
+	__be32 recirculation_id = htonl(0);
 
 	stats = this_cpu_ptr(dp->stats_percpu);
 
-	if (!OVS_CB(skb)->flow) {
+	while (1) {
+		u64 *stats_counter;
 		struct sw_flow_key key;
-		int key_len;
+		int error, key_len;
 
-		/* Extract flow from 'skb' into 'key'. */
-		error = ovs_flow_extract(skb, p->port_no, &key, &key_len);
-		if (unlikely(error)) {
-			kfree_skb(skb);
-			return;
+		if (!OVS_CB(skb)->flow) {
+			struct sw_flow *flow;
+
+			/* Extract flow from 'skb' into 'key'. */
+			error = ovs_flow_extract(skb, recirculation_id,
+						 p->port_no, &key, &key_len);
+			if (unlikely(error)) {
+				kfree_skb(skb);
+				return;
+			}
+
+			/* Look up flow. */
+			flow = ovs_flow_tbl_lookup(rcu_dereference(dp->table),
+						   &key, key_len);
+			OVS_CB(skb)->flow = flow;
 		}
 
-		/* Look up flow. */
-		flow = ovs_flow_tbl_lookup(rcu_dereference(dp->table),
-					   &key, key_len);
-		if (unlikely(!flow)) {
+		recirculation_id = htonl(0);
+		if (unlikely(!OVS_CB(skb)->flow)) {
 			struct dp_upcall_info upcall;
 
 			upcall.cmd = OVS_PACKET_CMD_MISS;
@@ -236,21 +246,31 @@ void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 			ovs_dp_upcall(dp, skb, &upcall);
 			consume_skb(skb);
 			stats_counter = &stats->n_missed;
-			goto out;
+			recirculate = 0;
+		} else {
+			stats_counter = &stats->n_hit;
+			ovs_flow_used(OVS_CB(skb)->flow, skb);
+			recirculate = ovs_execute_actions(dp, skb,
+						&recirculation_id);
+			if (unlikely(recirculate < 0)) {
+				kfree_skb(skb);
+				return;
+			}
 		}
 
-		OVS_CB(skb)->flow = flow;
+		/* Update datapath statistics. */
+		u64_stats_update_begin(&stats->sync);
+		(*stats_counter)++;
+		u64_stats_update_end(&stats->sync);
+
+		if (likely(!recirculate))
+			break;
+		if (unlikely(!limit--)) {
+			kfree_skb(skb);
+			return;
+		}
+		OVS_CB(skb)->flow = NULL;
 	}
-
-	stats_counter = &stats->n_hit;
-	ovs_flow_used(OVS_CB(skb)->flow, skb);
-	ovs_execute_actions(dp, skb);
-
-out:
-	/* Update datapath statistics. */
-	u64_stats_update_begin(&stats->sync);
-	(*stats_counter)++;
-	u64_stats_update_end(&stats->sync);
 }
 
 static struct genl_family dp_packet_genl_family = {
@@ -741,6 +761,7 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 			[OVS_ACTION_ATTR_POP_MPLS] = sizeof(__be16),
 			[OVS_ACTION_ATTR_PUSH_VLAN] = sizeof(struct ovs_action_push_vlan),
 			[OVS_ACTION_ATTR_POP_VLAN] = 0,
+			[OVS_ACTION_ATTR_RECIRCULATE] = sizeof(u32),
 			[OVS_ACTION_ATTR_SET] = (u32)-1,
 			[OVS_ACTION_ATTR_SAMPLE] = (u32)-1
 		};
@@ -806,6 +827,9 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 			if (err)
 				return err;
 			skip_copy = true;
+			break;
+
+		case OVS_ACTION_ATTR_RECIRCULATE:
 			break;
 
 		default:
@@ -877,7 +901,7 @@ static int ovs_packet_cmd_execute(struct sk_buff *skb, struct genl_info *info)
 	if (IS_ERR(flow))
 		goto err_kfree_skb;
 
-	err = ovs_flow_extract(packet, -1, &flow->key, &key_len);
+	err = ovs_flow_extract(packet, htonl(0), -1, &flow->key, &key_len);
 	if (err)
 		goto err_flow_free;
 
@@ -905,9 +929,15 @@ static int ovs_packet_cmd_execute(struct sk_buff *skb, struct genl_info *info)
 		goto err_unlock;
 
 	local_bh_disable();
-	err = ovs_execute_actions(dp, packet);
+	err = ovs_execute_actions(dp, packet, NULL);
 	local_bh_enable();
 	rcu_read_unlock();
+
+	if (err > 0) {
+		/* Recirculation is invalid on packet execute */
+		err = -EINVAL;
+		goto err_flow_free;
+	}
 
 	ovs_flow_free(flow);
 	return err;

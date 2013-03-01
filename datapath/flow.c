@@ -608,6 +608,8 @@ out:
  * ovs_flow_extract - extracts a flow key from an Ethernet frame.
  * @skb: sk_buff that contains the frame, with skb->data pointing to the
  * Ethernet header
+ * @recirculation_id: identifier used when a packet is recirculated to
+ * locate the parent facet
  * @in_port: port number on which @skb was received.
  * @key: output flow key
  * @key_lenp: length of output flow key
@@ -628,8 +630,8 @@ out:
  *      of a correct length, otherwise the same as skb->network_header.
  *      For other key->dl_type values it is left untouched.
  */
-int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
-		 int *key_lenp)
+int ovs_flow_extract(struct sk_buff *skb, u32 recirculation_id,
+		     u16 in_port, struct sw_flow_key *key, int *key_lenp)
 {
 	int error = 0;
 	int key_len = SW_FLOW_KEY_OFFSET(eth);
@@ -640,6 +642,7 @@ int ovs_flow_extract(struct sk_buff *skb, u16 in_port, struct sw_flow_key *key,
 	key->phy.priority = skb->priority;
 	if (OVS_CB(skb)->tun_key)
 		memcpy(&key->tun_key, OVS_CB(skb)->tun_key, sizeof(key->tun_key));
+	key->recirculation_id = recirculation_id;
 	key->phy.in_port = in_port;
 	key->phy.skb_mark = skb_get_mark(skb);
 
@@ -879,6 +882,7 @@ static const int ovs_key_lens[OVS_KEY_ATTR_MAX + 1] = {
 	/* Not upstream. */
 	[OVS_KEY_ATTR_MPLS] = sizeof(struct ovs_key_mpls),
 	[OVS_KEY_ATTR_TUN_ID] = sizeof(__be64),
+	[OVS_KEY_ATTR_RECIRCULATION_ID] = sizeof(__be32),
 };
 
 /* Set the bit of a type in ovs_key_arrays if it is
@@ -1212,6 +1216,11 @@ int ovs_flow_from_nlattrs(struct sw_flow_key *swkey, int *key_lenp,
 		attrs &= ~(1ULL << OVS_KEY_ATTR_TUNNEL);
 	}
 
+	if (attrs & (1ULL << OVS_KEY_ATTR_RECIRCULATION_ID)) {
+		swkey->recirculation_id = nla_get_be32(a[OVS_KEY_ATTR_RECIRCULATION_ID]);
+		attrs &= ~(1ULL << OVS_KEY_ATTR_RECIRCULATION_ID);
+	}
+
 	/* Data attributes. */
 	if (!(attrs & (1 << OVS_KEY_ATTR_ETHERNET)))
 		return -EINVAL;
@@ -1458,6 +1467,10 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey, struct sk_buff *skb)
 
 	if ((swkey->tun_key.tun_flags & OVS_TNL_F_KEY) &&
 	    nla_put_be64(skb, OVS_KEY_ATTR_TUN_ID, swkey->tun_key.tun_id))
+		goto nla_put_failure;
+
+	if ((swkey->recirculation_id != htonl(0)) &&
+	    nla_put_be32(skb, OVS_KEY_ATTR_RECIRCULATION_ID, swkey->recirculation_id))
 		goto nla_put_failure;
 
 	if (swkey->phy.in_port != DP_MAX_PORTS &&

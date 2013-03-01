@@ -152,8 +152,9 @@ static int dpif_netdev_open(const struct dpif_class *, const char *name,
 static int dp_netdev_output_userspace(struct dp_netdev *, const struct ofpbuf *,
                                     int queue_no, const struct flow *,
                                     const struct nlattr *userdata);
-static void dp_netdev_execute_actions(struct dp_netdev *,
+static bool dp_netdev_execute_actions(struct dp_netdev *,
                                       struct ofpbuf *, struct flow *,
+                                      ovs_be32 *recirculation_id,
                                       const struct nlattr *actions,
                                       size_t actions_len);
 
@@ -936,12 +937,20 @@ dpif_netdev_execute(struct dpif *dpif, const struct dpif_execute *execute)
     ofpbuf_reserve(&copy, DP_NETDEV_HEADROOM);
     ofpbuf_put(&copy, execute->packet->data, execute->packet->size);
 
-    flow_extract(&copy, 0, 0, NULL, -1, &key);
+    flow_extract(&copy, 0, 0, htonl(0), NULL, -1, &key);
     error = dpif_netdev_flow_from_nlattrs(execute->key, execute->key_len,
                                           &key);
     if (!error) {
-        dp_netdev_execute_actions(dp, &copy, &key,
-                                  execute->actions, execute->actions_len);
+        bool recirculate;
+
+        recirculate = dp_netdev_execute_actions(dp, &copy, &key, NULL,
+                                                execute->actions,
+                                                execute->actions_len);
+        /* This should never happen, the actions and packet
+         * should already have been cooked so as not to include
+         * a recirculate action. */
+        if (recirculate)
+            error = EINVAL;
     }
 
     ofpbuf_uninit(&copy);
@@ -1028,23 +1037,32 @@ static void
 dp_netdev_port_input(struct dp_netdev *dp, struct dp_netdev_port *port,
                      struct ofpbuf *packet)
 {
-    struct dp_netdev_flow *flow;
-    struct flow key;
+    bool recirculate;
+    ovs_be32 recirculation_id = htonl(0);
+    int limit = MAX_RECIRCULATION_DEPTH;
 
-    if (packet->size < ETH_HEADER_LEN) {
-        return;
-    }
-    flow_extract(packet, 0, 0, NULL, port->port_no, &key);
-    flow = dp_netdev_lookup_flow(dp, &key);
-    if (flow) {
-        dp_netdev_flow_used(flow, packet);
-        dp_netdev_execute_actions(dp, packet, &key,
-                                  flow->actions, flow->actions_len);
-        dp->n_hit++;
-    } else {
-        dp->n_missed++;
-        dp_netdev_output_userspace(dp, packet, DPIF_UC_MISS, &key, NULL);
-    }
+    do {
+        struct dp_netdev_flow *flow;
+        struct flow key;
+
+        if (packet->size < ETH_HEADER_LEN) {
+            return;
+        }
+        flow_extract(packet, 0, 0, recirculation_id, NULL, port->port_no, &key);
+        flow = dp_netdev_lookup_flow(dp, &key);
+        if (flow) {
+            dp_netdev_flow_used(flow, packet);
+            recirculate = dp_netdev_execute_actions(dp, packet, &key,
+                                                    &recirculation_id,
+                                                    flow->actions,
+                                                    flow->actions_len);
+            dp->n_hit++;
+        } else {
+            dp->n_missed++;
+            dp_netdev_output_userspace(dp, packet, DPIF_UC_MISS, &key, NULL);
+            recirculate = false;
+        }
+    } while (recirculate && limit--);
 }
 
 static void
@@ -1176,7 +1194,7 @@ dp_netdev_sample(struct dp_netdev *dp,
         }
     }
 
-    dp_netdev_execute_actions(dp, packet, key, nl_attr_get(subactions),
+    dp_netdev_execute_actions(dp, packet, key, NULL, nl_attr_get(subactions),
                               nl_attr_get_size(subactions));
 }
 
@@ -1191,9 +1209,10 @@ dp_netdev_action_userspace(struct dp_netdev *dp,
     dp_netdev_output_userspace(dp, packet, DPIF_UC_ACTION, key, userdata);
 }
 
-static void
+static bool
 dp_netdev_execute_actions(struct dp_netdev *dp,
                           struct ofpbuf *packet, struct flow *key,
+                          ovs_be32 *recirculation_id,
                           const struct nlattr *actions,
                           size_t actions_len)
 {
@@ -1240,11 +1259,19 @@ dp_netdev_execute_actions(struct dp_netdev *dp,
             dp_netdev_sample(dp, packet, key, a);
             break;
 
+        case OVS_ACTION_ATTR_RECIRCULATE:
+            if (recirculation_id) {
+                *recirculation_id = nl_attr_get_be32(a);
+            }
+            return true;
+
         case OVS_ACTION_ATTR_UNSPEC:
         case __OVS_ACTION_ATTR_MAX:
             NOT_REACHED();
         }
     }
+
+    return false;
 }
 
 const struct dpif_class dpif_netdev_class = {

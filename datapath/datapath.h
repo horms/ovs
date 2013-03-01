@@ -192,7 +192,8 @@ const char *ovs_dp_name(const struct datapath *dp);
 struct sk_buff *ovs_vport_cmd_build_info(struct vport *, u32 portid, u32 seq,
 					 u8 cmd);
 
-int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb);
+int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb,
+			__be32 *recirculate_id);
 
 unsigned char *skb_cb_mpls_stack(const struct sk_buff *skb);
 #endif /* datapath.h */

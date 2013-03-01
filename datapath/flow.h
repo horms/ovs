@@ -62,6 +62,11 @@ struct ovs_key_ipv4_tunnel {
 
 struct sw_flow_key {
 	struct ovs_key_ipv4_tunnel tun_key;  /* Encapsulating tunnel key. */
+	__be32	recirculation_id;	/* Identification of parent facet used
+					 * progress of recirculation of a
+					 * packet.  Zero if the flow is not
+					 * the result of a recirculation
+					 * access. */
 	struct {
 		u32	priority;	/* Packet QoS priority. */
 		u32	skb_mark;	/* SKB mark. */
@@ -164,8 +169,8 @@ struct sw_flow_actions *ovs_flow_actions_alloc(int actions_len);
 void ovs_flow_actions_free(struct sw_flow_actions *sfa);
 void ovs_flow_deferred_free_acts(struct sw_flow_actions *);
 
-int ovs_flow_extract(struct sk_buff *, u16 in_port, struct sw_flow_key *,
-		     int *key_lenp);
+int ovs_flow_extract(struct sk_buff *, u32 recirculation_id,
+		     u16 in_port, struct sw_flow_key *, int *key_lenp);
 void ovs_flow_used(struct sw_flow *, struct sk_buff *);
 u64 ovs_flow_used_time(unsigned long flow_jiffies);
 

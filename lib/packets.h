@@ -24,6 +24,7 @@
 #include <string.h>
 #include "compiler.h"
 #include "flow.h"
+#include "netlink.h"
 #include "openvswitch/types.h"
 #include "random.h"
 #include "util.h"
@@ -154,6 +155,7 @@ void eth_addr_bitand(const uint8_t src[ETH_ADDR_LEN],
 void set_mpls_lse(struct ofpbuf *, ovs_be32 label);
 void push_mpls(struct ofpbuf *packet, ovs_be16 ethtype, ovs_be32 lse);
 void pop_mpls(struct ofpbuf *, ovs_be16 ethtype);
+void execute_set_action(struct ofpbuf *packet, const struct nlattr *a);
 
 void set_mpls_lse_ttl(ovs_be32 *lse, uint8_t ttl);
 void set_mpls_lse_tc(ovs_be32 *lse, uint8_t tc);

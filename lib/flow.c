@@ -337,8 +337,8 @@ invalid:
 
 }
 
-/* Initializes 'flow' members from 'packet', 'skb_priority', 'tnl', and
- * 'ofp_in_port'.
+/* Initializes 'flow' members from 'packet', 'skb_priority',
+ * 'skb_mark', 'recirculation_id', 'tnl', and 'ofp_in_port'.
  *
  * Initializes 'packet' header pointers as follows:
  *
@@ -358,8 +358,8 @@ invalid:
  */
 void
 flow_extract(struct ofpbuf *packet, uint32_t skb_priority, uint32_t skb_mark,
-             const struct flow_tnl *tnl, uint16_t ofp_in_port,
-             struct flow *flow)
+             ovs_be32 recirculation_id, const struct flow_tnl *tnl,
+             uint16_t ofp_in_port, struct flow *flow)
 {
     struct ofpbuf b = *packet;
     struct eth_header *eth;
@@ -375,6 +375,7 @@ flow_extract(struct ofpbuf *packet, uint32_t skb_priority, uint32_t skb_mark,
     flow->in_port = ofp_in_port;
     flow->skb_priority = skb_priority;
     flow->skb_mark = skb_mark;
+    flow->recirculation_id = recirculation_id;
 
     packet->l2   = b.data;
     packet->l2_5 = NULL;
@@ -492,7 +493,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 20);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 21);
 
     fmd->tun_id = flow->tunnel.tun_id;
     fmd->metadata = flow->metadata;

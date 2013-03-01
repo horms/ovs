@@ -36,7 +36,7 @@ struct ofpbuf;
 /* This sequence number should be incremented whenever anything involving flows
  * or the wildcarding of flows changes.  This will cause build assertion
  * failures in places which likely need to be updated. */
-#define FLOW_WC_SEQ 20
+#define FLOW_WC_SEQ 21
 
 #define FLOW_N_REGS 8
 BUILD_ASSERT_DECL(FLOW_N_REGS <= NXM_NX_MAX_REGS);
@@ -92,6 +92,10 @@ struct flow {
                                    is the datapath port number. */
     uint32_t skb_mark;          /* Packet mark. */
     ovs_be32 mpls_lse;          /* MPLS label stack entry. */
+    ovs_be32 recirculation_id;  /* Identification of parent facet used
+                                 * progress of recirculation of a packet.
+                                 * Zero if the flow is not the result of
+                                 * a recirculation acess. */
     uint16_t mpls_depth;        /* Depth of MPLS stack. */
     ovs_be16 vlan_tci;          /* If 802.1Q, TCI | VLAN_CFI; otherwise 0. */
     ovs_be16 dl_type;           /* Ethernet frame type. */
@@ -105,7 +109,7 @@ struct flow {
     uint8_t arp_tha[6];         /* ARP/ND target hardware address. */
     uint8_t nw_ttl;             /* IP TTL/Hop Limit. */
     uint8_t nw_frag;            /* FLOW_FRAG_* flags. */
-    uint8_t zeros[6];
+    uint8_t zeros[2];
 };
 BUILD_ASSERT_DECL(sizeof(struct flow) % 4 == 0);
 
@@ -113,7 +117,7 @@ BUILD_ASSERT_DECL(sizeof(struct flow) % 4 == 0);
 
 /* Remember to update FLOW_WC_SEQ when changing 'struct flow'. */
 BUILD_ASSERT_DECL(sizeof(struct flow) == sizeof(struct flow_tnl) + 160 &&
-                  FLOW_WC_SEQ == 20);
+                  FLOW_WC_SEQ == 21);
 
 /* Represents the metadata fields of struct flow. */
 struct flow_metadata {
@@ -124,7 +128,8 @@ struct flow_metadata {
 };
 
 void flow_extract(struct ofpbuf *, uint32_t priority, uint32_t mark,
-                  const struct flow_tnl *, uint16_t in_port, struct flow *);
+                  ovs_be32 recirculation_id, const struct flow_tnl *,
+                  uint16_t in_port, struct flow *);
 
 void flow_zero_wildcards(struct flow *, const struct flow_wildcards *);
 void flow_get_metadata(const struct flow *, struct flow_metadata *);
@@ -295,5 +300,8 @@ uint32_t minimask_hash(const struct minimask *, uint32_t basis);
 
 bool minimask_has_extra(const struct minimask *, const struct minimask *);
 bool minimask_is_catchall(const struct minimask *);
+
+#define MAX_RECIRCULATION_DEPTH 128 /* Completely arbitrary value to
+                                     * guard against infinite loops */
 
 #endif /* flow.h */

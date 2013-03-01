@@ -38,6 +38,7 @@
 #include "vport.h"
 
 static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
+			      __be32 *recirculation_id,
 			      const struct nlattr *attr, int len,
 			      struct ovs_key_ipv4_tunnel *tun_key, bool keep_skb);
 
@@ -511,7 +512,7 @@ static int sample(struct datapath *dp, struct sk_buff *skb,
 		}
 	}
 
-	return do_execute_actions(dp, skb, nla_data(acts_list),
+	return do_execute_actions(dp, skb, NULL, nla_data(acts_list),
 				  nla_len(acts_list), tun_key, true);
 }
 
@@ -580,6 +581,7 @@ static int execute_set_action(struct sk_buff *skb,
 
 /* Execute a list of actions against 'skb'. */
 static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
+                        __be32 *recirculation_id,
 			const struct nlattr *attr, int len,
 			struct ovs_key_ipv4_tunnel *tun_key, bool keep_skb)
 {
@@ -634,6 +636,12 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		case OVS_ACTION_ATTR_SAMPLE:
 			err = sample(dp, skb, a, tun_key);
 			break;
+
+		case OVS_ACTION_ATTR_RECIRCULATE:
+			if (recirculation_id) {
+				*recirculation_id = nla_get_u32(a);
+			}
+			return 1;
 		}
 
 		if (unlikely(err)) {
@@ -674,11 +682,12 @@ static int loop_suppress(struct datapath *dp, struct sw_flow_actions *actions)
 }
 
 /* Execute a list of actions against 'skb'. */
-int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb)
+int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb,
+			__be32 *recirculate_id)
 {
 	struct sw_flow_actions *acts = rcu_dereference(OVS_CB(skb)->flow->sf_acts);
 	struct loop_counter *loop;
-	int error;
+	int status;
 	struct ovs_key_ipv4_tunnel tun_key;
 
 	/* Check whether we've looped too much. */
@@ -686,23 +695,28 @@ int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb)
 	if (unlikely(++loop->count > MAX_LOOPS))
 		loop->looping = true;
 	if (unlikely(loop->looping)) {
-		error = loop_suppress(dp, acts);
-		kfree_skb(skb);
+		printk("%s: looping", __func__);
+		status = loop_suppress(dp, acts);
 		goto out_loop;
 	}
 
 	OVS_CB(skb)->tun_key = NULL;
-	error = do_execute_actions(dp, skb, acts->actions,
-					 acts->actions_len, &tun_key, false);
+	status = do_execute_actions(dp, skb, recirculate_id, acts->actions,
+				    acts->actions_len, &tun_key, false);
+	if (unlikely(status < 0))
+		goto out_loop;
 
 	/* Check whether sub-actions looped too much. */
-	if (unlikely(loop->looping))
-		error = loop_suppress(dp, acts);
+	if (unlikely(loop->looping)) {
+		int err = loop_suppress(dp, acts);
+		if (unlikely(err < 0))
+			status = err;
+	}
 
 out_loop:
 	/* Decrement loop counter. */
 	if (!--loop->count)
 		loop->looping = false;
 
-	return error;
+	return status;
 }

@@ -75,6 +75,7 @@ odp_action_len(uint16_t type)
     case OVS_ACTION_ATTR_POP_VLAN: return 0;
     case OVS_ACTION_ATTR_PUSH_MPLS: return sizeof(struct ovs_action_push_mpls);
     case OVS_ACTION_ATTR_POP_MPLS: return sizeof(ovs_be16);
+    case OVS_ACTION_ATTR_RECIRCULATE: return sizeof(ovs_be32);
     case OVS_ACTION_ATTR_SET: return -2;
     case OVS_ACTION_ATTR_SAMPLE: return -2;
 
@@ -96,6 +97,7 @@ ovs_key_attr_to_string(enum ovs_key_attr attr)
     case OVS_KEY_ATTR_ENCAP: return "encap";
     case OVS_KEY_ATTR_PRIORITY: return "skb_priority";
     case OVS_KEY_ATTR_SKB_MARK: return "skb_mark";
+    case OVS_KEY_ATTR_RECIRCULATION_ID: return "recirculation_id";
     case OVS_KEY_ATTR_TUN_ID: return "tun_id";
     case OVS_KEY_ATTR_TUNNEL: return "tunnel";
     case OVS_KEY_ATTR_IN_PORT: return "in_port";
@@ -375,6 +377,11 @@ format_odp_action(struct ds *ds, const struct nlattr *a)
     case OVS_ACTION_ATTR_POP_MPLS: {
         ovs_be16 ethertype = nl_attr_get_be16(a);
         ds_put_format(ds, "pop_mpls(eth_type=0x%"PRIx16")", ntohs(ethertype));
+        break;
+    }
+    case OVS_ACTION_ATTR_RECIRCULATE: {
+        ovs_be32 id = nl_attr_get_be32(a);
+        ds_put_format(ds, "recirculate(id=0x%"PRIx32")", ntohl(id));
         break;
     }
     case OVS_ACTION_ATTR_SAMPLE:
@@ -665,6 +672,7 @@ odp_flow_key_attr_len(uint16_t type)
     case OVS_KEY_ATTR_ENCAP: return -2;
     case OVS_KEY_ATTR_PRIORITY: return 4;
     case OVS_KEY_ATTR_SKB_MARK: return 4;
+    case OVS_KEY_ATTR_RECIRCULATION_ID: return 4;
     case OVS_KEY_ATTR_TUN_ID: return 8;
     case OVS_KEY_ATTR_TUNNEL: return -2;
     case OVS_KEY_ATTR_IN_PORT: return 4;
@@ -868,6 +876,10 @@ format_odp_key_attr(const struct nlattr *a, struct ds *ds)
 
     case OVS_KEY_ATTR_SKB_MARK:
         ds_put_format(ds, "(%#"PRIx32")", nl_attr_get_u32(a));
+        break;
+
+    case OVS_KEY_ATTR_RECIRCULATION_ID:
+        ds_put_format(ds, "(%#"PRIx32")", ntohl(nl_attr_get_be32(a)));
         break;
 
     case OVS_KEY_ATTR_TUN_ID:
@@ -1546,6 +1558,11 @@ odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
         nl_msg_put_u32(buf, OVS_KEY_ATTR_SKB_MARK, flow->skb_mark);
     }
 
+    if (flow->recirculation_id) {
+        nl_msg_put_u32(buf, OVS_KEY_ATTR_RECIRCULATION_ID,
+                       flow->recirculation_id);
+    }
+
     if (odp_in_port != OVSP_NONE) {
         nl_msg_put_u32(buf, OVS_KEY_ATTR_IN_PORT, odp_in_port);
     }
@@ -2056,6 +2073,11 @@ odp_flow_key_to_flow(const struct nlattr *key, size_t key_len,
         expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_SKB_MARK;
     }
 
+    if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_RECIRCULATION_ID)) {
+        flow->recirculation_id = nl_attr_get_be32(attrs[OVS_KEY_ATTR_RECIRCULATION_ID]);
+        expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_RECIRCULATION_ID;
+    }
+
     if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_TUN_ID)) {
         flow->tunnel.tun_id = nl_attr_get_be64(attrs[OVS_KEY_ATTR_TUN_ID]);
         expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_TUN_ID;
@@ -2197,6 +2219,14 @@ commit_odp_tunnel_action(const struct flow *flow, struct flow *base,
         commit_set_action(odp_actions, OVS_KEY_ATTR_TUN_ID,
                           &base->tunnel.tun_id, sizeof base->tunnel.tun_id);
     }
+}
+
+void
+commit_odp_recirculate_action(const struct flow *flow,
+                              struct ofpbuf *odp_actions)
+{
+    nl_msg_put_be32(odp_actions, OVS_ACTION_ATTR_RECIRCULATE,
+                    flow->recirculation_id);
 }
 
 static void
@@ -2346,6 +2376,7 @@ static void
 commit_set_nw_action(const struct flow *flow, struct flow *base,
                      struct ofpbuf *odp_actions)
 {
+    //VLOG_WARN("%s: %u 0x%04x", __func__, flow->nw_proto, ntohs(flow->dl_type));
     /* Check if flow really have an IP header. */
     if (!flow->nw_proto) {
         return;
@@ -2419,7 +2450,8 @@ commit_set_skb_mark_action(const struct flow *flow, struct flow *base,
  * 'base' and 'flow', appends ODP actions to 'odp_actions' that change the flow
  * key from 'base' into 'flow', and then changes 'base' the same way.  Does not
  * commit set_tunnel actions.  Users should call commit_odp_tunnel_action()
- * in addition to this function if needed. */
+ * and commit_recirculate_action() in addition to those functions are needed.
+ */
 void
 commit_odp_actions(const struct flow *flow, struct flow *base,
                    struct ofpbuf *odp_actions)
@@ -2456,6 +2488,7 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
     case OVS_KEY_ATTR_PRIORITY:
     case OVS_KEY_ATTR_SKB_MARK:
     case OVS_KEY_ATTR_TUNNEL:
+    case OVS_KEY_ATTR_RECIRCULATION_ID:
         /* not implemented */
         break;
 
