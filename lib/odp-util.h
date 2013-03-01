@@ -159,6 +159,8 @@ void odp_put_tunnel_action(const struct flow_tnl *tunnel,
 void odp_put_skb_mark_action(const uint32_t skb_mark,
                              struct ofpbuf *odp_actions);
 
+void execute_set_action(struct ofpbuf *packet, const struct nlattr *a);
+
 /* Reasons why a subfacet might not be fast-pathable. */
 enum slow_path_reason {
     /* These reasons are mutually exclusive. */
