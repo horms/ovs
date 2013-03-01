@@ -22,7 +22,7 @@
 #include "netlink-protocol.h"
 #include "ofpbuf.h"
 
-void
+bool
 execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
                 const struct nlattr *actions, size_t actions_len,
                 uint32_t *skb_priority, uint32_t *skb_mark,

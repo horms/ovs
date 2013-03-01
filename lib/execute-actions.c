@@ -155,7 +155,7 @@ execute_sample(void *dp, struct ofpbuf *packet, struct flow *key,
                     tun_key, output, userspace);
 }
 
-void
+bool
 execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
                 const struct nlattr *actions, size_t actions_len,
                 uint32_t *skb_priority, uint32_t *skb_mark,
@@ -212,9 +212,14 @@ execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
                            output, userspace);
             break;
 
+        case OVS_ACTION_ATTR_RECIRCULATE:
+            return true;
+
         case OVS_ACTION_ATTR_UNSPEC:
         case __OVS_ACTION_ATTR_MAX:
             NOT_REACHED();
         }
     }
+
+    return false;
 }
