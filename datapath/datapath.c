@@ -225,52 +225,65 @@ void ovs_dp_detach_port(struct vport *p)
 	ovs_vport_del(p);
 }
 
+#define MAX_RECIRCULATION_DEPTH	4	/* Completely arbitrary */
+
 /* Must be called with rcu_read_lock. */
 void ovs_dp_process_received_packet(struct vport *p, struct sk_buff *skb)
 {
 	struct datapath *dp = p->dp;
-	struct sw_flow *flow;
 	struct dp_stats_percpu *stats;
-	struct sw_flow_key key;
-	u64 *stats_counter;
-	int error;
+	int limit = MAX_RECIRCULATION_DEPTH;
 
 	stats = this_cpu_ptr(dp->stats_percpu);
 
-	/* Extract flow from 'skb' into 'key'. */
-	error = ovs_flow_extract(skb, p->port_no, &key);
-	if (unlikely(error)) {
-		kfree_skb(skb);
-		return;
+	while (1) {
+		u64 *stats_counter;
+		struct sw_flow *flow;
+		struct sw_flow_key key;
+		int error;
+
+		/* Extract flow from 'skb' into 'key'. */
+		error = ovs_flow_extract(skb, p->port_no, &key);
+		if (unlikely(error)) {
+			kfree_skb(skb);
+			return;
+		}
+
+		/* Look up flow. */
+		flow = ovs_flow_lookup(rcu_dereference(dp->table), &key);
+		if (unlikely(!flow)) {
+			struct dp_upcall_info upcall;
+
+			upcall.cmd = OVS_PACKET_CMD_MISS;
+			upcall.key = &key;
+			upcall.userdata = NULL;
+			upcall.portid = p->upcall_portid;
+			ovs_dp_upcall(dp, skb, &upcall);
+			consume_skb(skb);
+			stats_counter = &stats->n_missed;
+			skb = NULL;
+		} else {
+			OVS_CB(skb)->flow = flow;
+			OVS_CB(skb)->pkt_key = &key;
+			stats_counter = &stats->n_hit;
+			ovs_flow_used(flow, skb);
+			skb = ovs_execute_actions(dp, skb);
+		}
+
+		/* Update datapath statistics. */
+		u64_stats_update_begin(&stats->sync);
+		(*stats_counter)++;
+		u64_stats_update_end(&stats->sync);
+
+		if (IS_ERR_OR_NULL(skb)) {
+			break;
+		} else if (unlikely(!--limit)) {
+			net_warn_ratelimited("droped packet that has "
+					     "been recirculated too much");
+			kfree_skb(skb);
+			return;
+		}
 	}
-
-	/* Look up flow. */
-	flow = ovs_flow_lookup(rcu_dereference(dp->table), &key);
-	if (unlikely(!flow)) {
-		struct dp_upcall_info upcall;
-
-		upcall.cmd = OVS_PACKET_CMD_MISS;
-		upcall.key = &key;
-		upcall.userdata = NULL;
-		upcall.portid = p->upcall_portid;
-		ovs_dp_upcall(dp, skb, &upcall);
-		consume_skb(skb);
-		stats_counter = &stats->n_missed;
-		goto out;
-	}
-
-	OVS_CB(skb)->flow = flow;
-	OVS_CB(skb)->pkt_key = &key;
-
-	stats_counter = &stats->n_hit;
-	ovs_flow_used(OVS_CB(skb)->flow, skb);
-	ovs_execute_actions(dp, skb);
-
-out:
-	/* Update datapath statistics. */
-	u64_stats_update_begin(&stats->sync);
-	(*stats_counter)++;
-	u64_stats_update_end(&stats->sync);
 }
 
 static struct genl_family dp_packet_genl_family = {
@@ -775,6 +788,7 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 {
 	const struct nlattr *a;
 	int rem, err;
+	bool recirculate = false;
 
 	if (depth >= SAMPLE_ACTION_DEPTH)
 		return -EOVERFLOW;
@@ -786,12 +800,16 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 			[OVS_ACTION_ATTR_USERSPACE] = (u32)-1,
 			[OVS_ACTION_ATTR_PUSH_VLAN] = sizeof(struct ovs_action_push_vlan),
 			[OVS_ACTION_ATTR_POP_VLAN] = 0,
+			[OVS_ACTION_ATTR_RECIRCULATE] = 0,
 			[OVS_ACTION_ATTR_SET] = (u32)-1,
 			[OVS_ACTION_ATTR_SAMPLE] = (u32)-1
 		};
 		const struct ovs_action_push_vlan *vlan;
 		int type = nla_type(a);
 		bool skip_copy;
+
+		if (recirculate)
+			break;
 
 		if (type > OVS_ACTION_ATTR_MAX ||
 		    (action_lens[type] != nla_len(a) &&
@@ -837,6 +855,10 @@ static int validate_and_copy_actions(const struct nlattr *attr,
 			if (err)
 				return err;
 			skip_copy = true;
+			break;
+
+		case OVS_ACTION_ATTR_RECIRCULATE:
+			recirculate = true;
 			break;
 
 		default:
@@ -935,12 +957,23 @@ static int ovs_packet_cmd_execute(struct sk_buff *skb, struct genl_info *info)
 		goto err_unlock;
 
 	local_bh_disable();
-	err = ovs_execute_actions(dp, packet);
+	packet = ovs_execute_actions(dp, packet);
+	if (!IS_ERR_OR_NULL(packet)) {
+		struct vport *vport;
+		vport = ovs_lookup_vport(dp, flow->key.phy.in_port);
+		if (!vport) {
+			err = -ENODEV;
+			goto err_unlock;
+		}
+		/* Recirculate */
+		ovs_dp_process_received_packet(vport, packet);
+		packet = NULL;
+	}
 	local_bh_enable();
 	rcu_read_unlock();
 
 	ovs_flow_free(flow, false);
-	return err;
+	return PTR_ERR(packet);
 
 err_unlock:
 	rcu_read_unlock();

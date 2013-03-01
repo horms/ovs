@@ -18,6 +18,7 @@
 #ifndef EXECUTE_ACTIONS_H
 #define EXECUTE_ACTIONS_H 1
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -25,7 +26,7 @@ struct flow;
 struct nlattr;
 struct ofpbuf;
 
-void
+bool
 odp_execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
                     const struct nlattr *actions, size_t actions_len,
                     void (*output)(void *dp, struct ofpbuf *packet,

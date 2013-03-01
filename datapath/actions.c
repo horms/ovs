@@ -521,6 +521,9 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		case OVS_ACTION_ATTR_SAMPLE:
 			err = sample(dp, skb, a);
 			break;
+
+		case OVS_ACTION_ATTR_RECIRCULATE:
+			return 1;
 		}
 
 		if (unlikely(err)) {
@@ -561,7 +564,7 @@ static int loop_suppress(struct datapath *dp, struct sw_flow_actions *actions)
 }
 
 /* Execute a list of actions against 'skb'. */
-int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb)
+struct sk_buff *ovs_execute_actions(struct datapath *dp, struct sk_buff *skb)
 {
 	struct sw_flow_actions *acts = rcu_dereference(OVS_CB(skb)->flow->sf_acts);
 	struct loop_counter *loop;
@@ -580,6 +583,8 @@ int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb)
 	OVS_CB(skb)->tun_key = NULL;
 	error = do_execute_actions(dp, skb, acts->actions,
 					 acts->actions_len, false);
+	if (likely(error <= 0))
+		skb = NULL;
 
 	/* Check whether sub-actions looped too much. */
 	if (unlikely(loop->looping))
@@ -590,5 +595,5 @@ out_loop:
 	if (!--loop->count)
 		loop->looping = false;
 
-	return error;
+	return (error < 0) ? ERR_PTR(error) : skb;
 }

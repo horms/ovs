@@ -146,6 +146,12 @@ struct xlate_ctx {
     /* The rule that we are currently translating, or NULL. */
     struct rule_dpif *rule;
 
+    size_t ofpacts_len;         /* The number of bytes of the ofpacts
+                                 * argument to xlate_actions() processed
+                                 * by it. This is used to calculate an
+                                 * offset into ofpacts for calls to
+                                 * xlate_actions on recirculated packets */
+
     int recurse;                /* Recursion level, via xlate_table_action. */
     bool max_resubmit_trigger;  /* Recursed too deeply during translation. */
     uint32_t orig_skb_priority; /* Priority when packet arrived. */
@@ -1517,6 +1523,24 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
 }
 
 static void
+compose_recirculate_action(struct xlate_ctx *ctx)
+{
+    struct flow_wildcards *wc = &ctx->xout->wc;
+
+    if (ctx->xin->recirculation_id == RECIRCULATION_ID_NONE) {
+        ctx->xin->recirculation_id = get_recirculation_id();
+    }
+    ctx->xin->recirculated = true;
+    ctx->xin->flow.skb_mark = ctx->xin->recirculation_id;
+
+    /* Other than the skb_mark, a recirculated facet may have the match as
+     * the facet that caused it to be recirculated. So unmask the skb_mark
+     * of facets that cause recirculation. The skb_mark of recirculated
+     * facets is unmasked in handle_flow_miss() */
+    memset(&wc->masks.skb_mark, 0xff, sizeof wc->masks.skb_mark);
+}
+
+static void
 compose_mpls_push_action(struct xlate_ctx *ctx, ovs_be16 eth_type)
 {
     struct flow_wildcards *wc = &ctx->xout->wc;
@@ -1904,6 +1928,7 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
     struct flow_wildcards *wc = &ctx->xout->wc;
     struct flow *flow = &ctx->xin->flow;
     bool was_evictable = true;
+    bool may_xlate_l3_actions = true;
     const struct ofpact *a;
 
     if (ctx->rule) {
@@ -1970,18 +1995,30 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_SET_IPV4_SRC:
             if (flow->dl_type == htons(ETH_TYPE_IP)) {
+                if (!may_xlate_l3_actions) {
+                    compose_recirculate_action(ctx);
+                    goto out;
+                }
                 flow->nw_src = ofpact_get_SET_IPV4_SRC(a)->ipv4;
             }
             break;
 
         case OFPACT_SET_IPV4_DST:
             if (flow->dl_type == htons(ETH_TYPE_IP)) {
+                if (!may_xlate_l3_actions) {
+                    compose_recirculate_action(ctx);
+                    goto out;
+                }
                 flow->nw_dst = ofpact_get_SET_IPV4_DST(a)->ipv4;
             }
             break;
 
         case OFPACT_SET_IPV4_DSCP:
             /* OpenFlow 1.0 only supports IPv4. */
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            }
             if (flow->dl_type == htons(ETH_TYPE_IP)) {
                 flow->nw_tos &= ~IP_DSCP_MASK;
                 flow->nw_tos |= ofpact_get_SET_IPV4_DSCP(a)->dscp;
@@ -1991,6 +2028,10 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
         case OFPACT_SET_L4_SRC_PORT:
             memset(&wc->masks.nw_proto, 0xff, sizeof wc->masks.nw_proto);
             if (is_ip_any(flow)) {
+                if (!may_xlate_l3_actions) {
+                    compose_recirculate_action(ctx);
+                    goto out;
+                }
                 flow->tp_src = htons(ofpact_get_SET_L4_SRC_PORT(a)->port);
             }
             break;
@@ -1998,6 +2039,10 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
         case OFPACT_SET_L4_DST_PORT:
             memset(&wc->masks.nw_proto, 0xff, sizeof wc->masks.nw_proto);
             if (is_ip_any(flow)) {
+                if (!may_xlate_l3_actions) {
+                    compose_recirculate_action(ctx);
+                    goto out;
+                }
                 flow->tp_dst = htons(ofpact_get_SET_L4_DST_PORT(a)->port);
             }
             break;
@@ -2019,28 +2064,49 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             break;
 
         case OFPACT_REG_MOVE:
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            }
             nxm_execute_reg_move(ofpact_get_REG_MOVE(a), flow, wc);
             break;
 
         case OFPACT_REG_LOAD:
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            }
             nxm_execute_reg_load(ofpact_get_REG_LOAD(a), flow);
             break;
 
         case OFPACT_STACK_PUSH:
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            }
             nxm_execute_stack_push(ofpact_get_STACK_PUSH(a), flow, wc,
                                    &ctx->stack);
             break;
 
         case OFPACT_STACK_POP:
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            }
             nxm_execute_stack_pop(ofpact_get_STACK_POP(a), flow, &ctx->stack);
             break;
 
         case OFPACT_PUSH_MPLS:
             compose_mpls_push_action(ctx, ofpact_get_PUSH_MPLS(a)->ethertype);
+            may_xlate_l3_actions = true;
             break;
 
         case OFPACT_POP_MPLS:
             compose_mpls_pop_action(ctx, ofpact_get_POP_MPLS(a)->ethertype);
+            if (ctx->xin->flow.dl_type == htons(ETH_TYPE_IP) ||
+                ctx->xin->flow.dl_type == htons(ETH_TYPE_IPV6)) {
+                may_xlate_l3_actions = false;
+            }
             break;
 
         case OFPACT_SET_MPLS_TTL:
@@ -2057,7 +2123,10 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             break;
 
         case OFPACT_DEC_TTL:
-            if (compose_dec_ttl(ctx, ofpact_get_DEC_TTL(a))) {
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            } else if (compose_dec_ttl(ctx, ofpact_get_DEC_TTL(a))) {
                 goto out;
             }
             break;
@@ -2068,9 +2137,17 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_MULTIPATH:
             multipath_execute(ofpact_get_MULTIPATH(a), flow, wc);
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            }
             break;
 
         case OFPACT_BUNDLE:
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            }
             xlate_bundle_action(ctx, ofpact_get_BUNDLE(a));
             break;
 
@@ -2079,6 +2156,10 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             break;
 
         case OFPACT_LEARN:
+            if (!may_xlate_l3_actions) {
+                compose_recirculate_action(ctx);
+                goto out;
+            }
             xlate_learn_action(ctx, ofpact_get_LEARN(a));
             break;
 
@@ -2152,15 +2233,27 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
     }
 
 out:
+    ctx->ofpacts_len = (char *)(a) - (char *)ofpacts;
     if (ctx->rule) {
         ctx->rule->up.evictable = was_evictable;
     }
 }
 
+static void
+xlate_in_reset(struct xlate_in *xin, uint32_t recirculation_id)
+{
+    xin->resubmit_hook = NULL;
+    xin->report_hook = NULL;
+    xin->resubmit_stats = NULL;
+    xin->recirculation_id = recirculation_id;
+    xin->recirculated = false;
+}
+
 void
 xlate_in_init(struct xlate_in *xin, struct ofproto_dpif *ofproto,
               const struct flow *flow, struct rule_dpif *rule,
-              uint8_t tcp_flags, const struct ofpbuf *packet)
+              uint8_t tcp_flags, const struct ofpbuf *packet,
+              uint32_t recirculation_id)
 {
     xin->ofproto = ofproto;
     xin->flow = *flow;
@@ -2170,9 +2263,18 @@ xlate_in_init(struct xlate_in *xin, struct ofproto_dpif *ofproto,
     xin->ofpacts = NULL;
     xin->ofpacts_len = 0;
     xin->tcp_flags = tcp_flags;
-    xin->resubmit_hook = NULL;
-    xin->report_hook = NULL;
-    xin->resubmit_stats = NULL;
+    xlate_in_reset(xin, recirculation_id);
+}
+
+void
+xlate_in_init_ofpacts(struct xlate_in *xin, size_t offset, size_t len)
+{
+    /* Only use the facet's rule offset and length if the rule was found
+     * correctly, not if the default miss rule was used. */
+    if (xin->rule != rule_dpif_miss_rule(xin->ofproto, &xin->flow)) {
+        xin->ofpacts = ofpact_end(xin->rule->up.ofpacts, offset);
+        xin->ofpacts_len = len;
+    }
 }
 
 void
@@ -2385,6 +2487,14 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
 
         if (tunnel_ecn_ok(&ctx) && (!in_port || may_receive(in_port, &ctx))) {
             do_xlate_actions(ofpacts, ofpacts_len, &ctx);
+            if (ctx.xin->recirculated) {
+                commit_odp_actions(&ctx.xin->flow, &ctx.base_flow,
+                                   &ctx.xout->odp_actions, &ctx.xout->wc);
+                commit_odp_recirculate_action(&ctx.xout->odp_actions);
+                xin->ofpacts_len -= ctx.ofpacts_len;
+                xin->ofpacts = ofpact_end(xin->ofpacts, ctx.ofpacts_len);
+                xin->recirculated = ctx.xin->recirculated;
+            }
 
             /* We've let OFPP_NORMAL and the learning action look at the
              * packet, so drop it now if forwarding is disabled. */
@@ -2428,4 +2538,66 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
      * use non-header fields as part of the cache. */
     memset(&wc->masks.metadata, 0, sizeof wc->masks.metadata);
     memset(&wc->masks.regs, 0, sizeof wc->masks.regs);
+}
+
+/* A loop which translates the actions for 'xin->flow'. If a recirculate
+ * action was not added by the translation then the loop ends. Otherwise
+ * the actions are executed, modifying 'xin->packet' and the loop iterates,
+ * performing translation again.
+ *
+ * The purpose of this function is to handle translation of actions
+ * in cases where facts are not use. */
+void
+xlate_and_recirculate(struct xlate_in *xin, struct xlate_out *xout,
+                      struct ofpbuf *packet, size_t occupied_packet_headroom)
+{
+    /* The packet field of struct xlate_in is const, which makes
+     * sense other than in this function where packet is modified.
+     * So packet is based as a non-const parameter. Ensure that it
+     * is the same as xin->packet */
+    ovs_assert(packet == xin->packet);
+
+    while (1) {
+        struct flow_tnl tunnel_copy;
+
+        xin->recirculated = false;
+        xin->recirculation_id = RECIRCULATION_ID_DUMMY;
+        xlate_actions(xin, xout);
+        if (!xin->recirculated) {
+            break;
+        }
+
+        /* Copy the tunnel to allow it to be passed to flow_extract() */
+        tunnel_copy = xin->flow.tunnel;
+
+        if (occupied_packet_headroom) {
+            /* In the presence of an mpls_push action odp_execute_actions()
+             * may use the trailing MPLS_HLEN bytes of headroom, which may
+             * encroach on leading portions of the headroom that are used
+             * for the key in the case of handle_flow_miss_without_facet()
+             */
+            size_t old_headroom = ofpbuf_headroom(packet);
+            void *old_base = packet->base;
+
+            ofpbuf_prealloc_headroom(packet, occupied_packet_headroom +
+                                     MPLS_HLEN);
+            if (old_base != packet->base) {
+                /* If packet->base has changed then move the key from
+                 * just before packet->data to packet->base */
+                memmove(packet->base,
+                        (char *)packet->data - old_headroom,
+                        occupied_packet_headroom);
+            }
+        }
+
+        /* Update the packet */
+        odp_execute_actions(NULL, packet, &xin->flow, xout->odp_actions.data,
+                            xout->odp_actions.size, NULL, NULL);
+
+        /* Replace the flow */
+        flow_extract(packet, xin->flow.skb_priority, xin->flow.skb_mark,
+                     &tunnel_copy, &xin->flow.in_port, &xin->flow);
+
+        xlate_in_reset(xin, RECIRCULATION_ID_DUMMY);
+    }
 }
