@@ -175,6 +175,12 @@ ofpact_end(const struct ofpact *ofpacts, size_t ofpacts_len)
     return (void *) ((uint8_t *) ofpacts + ofpacts_len);
 }
 
+static inline unsigned
+ofpact_offset(const struct ofpact *start, const struct ofpact *offset)
+{
+    return (uint8_t*) offset - (uint8_t *) start;
+}
+
 /* Assigns POS to each ofpact, in turn, in the OFPACTS_LEN bytes of ofpacts
  * starting at OFPACTS. */
 #define OFPACT_FOR_EACH(POS, OFPACTS, OFPACTS_LEN)                      \
