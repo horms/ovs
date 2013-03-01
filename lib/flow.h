@@ -296,4 +296,7 @@ uint32_t minimask_hash(const struct minimask *, uint32_t basis);
 bool minimask_has_extra(const struct minimask *, const struct minimask *);
 bool minimask_is_catchall(const struct minimask *);
 
+#define MAX_RECIRCULATION_DEPTH 4   /* Completely arbitrary value to
+                                     * guard against infinite loops */
+
 #endif /* flow.h */
