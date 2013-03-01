@@ -153,13 +153,16 @@ static int dpif_netdev_open(const struct dpif_class *, const char *name,
 static int dp_netdev_output_userspace(struct dp_netdev *, const struct ofpbuf *,
                                     int queue_no, const struct flow *,
                                     const struct nlattr *userdata);
-static void dp_netdev_execute_actions(struct dp_netdev *,
+static bool dp_netdev_execute_actions(struct dp_netdev *,
                                       struct ofpbuf *, struct flow *,
                                       const struct nlattr *actions,
                                       size_t actions_len,
                                       uint32_t *skb_priority,
                                       uint32_t *skb_mark,
                                       struct flow_tnl *tun_key);
+static void dp_netdev_port_input(struct dp_netdev *dp,
+                                 struct dp_netdev_port *port,
+                                 struct ofpbuf *packet);
 
 static struct dpif_netdev *
 dpif_netdev_cast(const struct dpif *dpif)
@@ -944,14 +947,26 @@ dpif_netdev_execute(struct dpif *dpif, const struct dpif_execute *execute)
     error = dpif_netdev_flow_from_nlattrs(execute->key, execute->key_len,
                                           &key);
     if (!error) {
+        bool recirculate;
         uint32_t skb_priority = 0;
         uint32_t skb_mark = 0;
         struct flow_tnl tun_key;
 
         memset(&tun_key, 0, sizeof tun_key);
-        dp_netdev_execute_actions(dp, &copy, &key,
-                                  execute->actions, execute->actions_len,
-                                  &skb_priority, &skb_mark, &tun_key);
+        recirculate = dp_netdev_execute_actions(dp, &copy, &key,
+                                                execute->actions,
+                                                execute->actions_len,
+                                                &skb_priority, &skb_mark,
+                                                &tun_key);
+        if (recirculate) {
+            struct dp_netdev_port *port;
+            port = (key.in_port < MAX_PORTS) ? dp->ports[key.in_port] : NULL;
+            if (port) {
+                dp_netdev_port_input(dp, port, &copy);
+                return 0;
+            }
+            error = ENOENT;
+        }
     }
 
     ofpbuf_uninit(&copy);
@@ -1038,28 +1053,36 @@ static void
 dp_netdev_port_input(struct dp_netdev *dp, struct dp_netdev_port *port,
                      struct ofpbuf *packet)
 {
-    struct dp_netdev_flow *flow;
-    struct flow key;
+    bool recirculate;
     uint32_t skb_priority = 0;
     uint32_t skb_mark = 0;
     struct flow_tnl tun_key;
+    int limit = MAX_RECIRCULATION_DEPTH;
 
-    if (packet->size < ETH_HEADER_LEN) {
-        return;
-    }
-    flow_extract(packet, 0, 0, NULL, port->port_no, &key);
-    flow = dp_netdev_lookup_flow(dp, &key);
-    if (flow) {
-        memset(&tun_key, 0, sizeof tun_key);
-        dp_netdev_flow_used(flow, packet);
-        dp_netdev_execute_actions(dp, packet, &key,
-                                  flow->actions, flow->actions_len,
-                                  &skb_priority, &skb_mark, &tun_key);
-        dp->n_hit++;
-    } else {
-        dp->n_missed++;
-        dp_netdev_output_userspace(dp, packet, DPIF_UC_MISS, &key, NULL);
-    }
+    do {
+        struct dp_netdev_flow *flow;
+        struct flow key;
+
+        if (packet->size < ETH_HEADER_LEN) {
+            return;
+        }
+        flow_extract(packet, 0, skb_mark, NULL, port->port_no, &key);
+        flow = dp_netdev_lookup_flow(dp, &key);
+        if (flow) {
+            dp_netdev_flow_used(flow, packet);
+            memset(&tun_key, 0, sizeof tun_key);
+            recirculate = dp_netdev_execute_actions(dp, packet, &key,
+                                                    flow->actions,
+                                                    flow->actions_len,
+                                                    &skb_priority, &skb_mark,
+                                                    &tun_key);
+            dp->n_hit++;
+        } else {
+            dp->n_missed++;
+            dp_netdev_output_userspace(dp, packet, DPIF_UC_MISS, &key, NULL);
+            recirculate = false;
+        }
+    } while (recirculate && --limit);
 }
 
 static void
@@ -1171,16 +1194,16 @@ dp_netdev_action_userspace(void *dp, struct ofpbuf *packet, struct flow *key,
     dp_netdev_output_userspace(dp, packet, DPIF_UC_ACTION, key, userdata);
 }
 
-static void
+static bool
 dp_netdev_execute_actions(struct dp_netdev *dp,
                           struct ofpbuf *packet, struct flow *key,
                           const struct nlattr *actions,
                           size_t actions_len, uint32_t *skb_priority,
                           uint32_t *skb_mark, struct flow_tnl *tun_key)
 {
-    execute_actions(dp, packet, key, actions, actions_len, skb_priority,
-                    skb_mark, tun_key, dp_netdev_output_port,
-                    dp_netdev_action_userspace);
+    return execute_actions(dp, packet, key, actions, actions_len, skb_priority,
+                           skb_mark, tun_key, dp_netdev_output_port,
+                           dp_netdev_action_userspace);
 }
 
 const struct dpif_class dpif_netdev_class = {
