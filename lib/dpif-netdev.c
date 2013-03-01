@@ -152,10 +152,14 @@ static int dpif_netdev_open(const struct dpif_class *, const char *name,
 static int dp_netdev_output_userspace(struct dp_netdev *, const struct ofpbuf *,
                                     int queue_no, const struct flow *,
                                     const struct nlattr *userdata);
-static void dp_netdev_execute_actions(struct dp_netdev *,
+static bool dp_netdev_execute_actions(struct dp_netdev *,
                                       struct ofpbuf *, struct flow *,
                                       const struct nlattr *actions,
-                                      size_t actions_len);
+                                      size_t actions_len,
+                                      uint32_t *skb_mark);
+static void dp_netdev_port_input(struct dp_netdev *dp,
+                                 struct dp_netdev_port *port,
+                                 struct ofpbuf *packet);
 
 static struct dpif_netdev *
 dpif_netdev_cast(const struct dpif *dpif)
@@ -940,8 +944,22 @@ dpif_netdev_execute(struct dpif *dpif, const struct dpif_execute *execute)
     error = dpif_netdev_flow_from_nlattrs(execute->key, execute->key_len,
                                           &key);
     if (!error) {
-        dp_netdev_execute_actions(dp, &copy, &key,
-                                  execute->actions, execute->actions_len);
+        bool recirculate;
+        uint32_t skb_mark = 0;
+
+        recirculate = dp_netdev_execute_actions(dp, &copy, &key,
+                                                execute->actions,
+                                                execute->actions_len,
+                                                &skb_mark);
+        if (recirculate) {
+            struct dp_netdev_port *port;
+            port = (key.in_port < MAX_PORTS) ? dp->ports[key.in_port] : NULL;
+            if (port) {
+                dp_netdev_port_input(dp, port, &copy);
+                return 0;
+            }
+            error = ENOENT;
+        }
     }
 
     ofpbuf_uninit(&copy);
@@ -1028,23 +1046,32 @@ static void
 dp_netdev_port_input(struct dp_netdev *dp, struct dp_netdev_port *port,
                      struct ofpbuf *packet)
 {
-    struct dp_netdev_flow *flow;
-    struct flow key;
+    bool recirculate;
+    uint32_t skb_mark = 0;
+    int limit = MAX_RECIRCULATION_DEPTH;
 
-    if (packet->size < ETH_HEADER_LEN) {
-        return;
-    }
-    flow_extract(packet, 0, 0, NULL, port->port_no, &key);
-    flow = dp_netdev_lookup_flow(dp, &key);
-    if (flow) {
-        dp_netdev_flow_used(flow, packet);
-        dp_netdev_execute_actions(dp, packet, &key,
-                                  flow->actions, flow->actions_len);
-        dp->n_hit++;
-    } else {
-        dp->n_missed++;
-        dp_netdev_output_userspace(dp, packet, DPIF_UC_MISS, &key, NULL);
-    }
+    do {
+        struct dp_netdev_flow *flow;
+        struct flow key;
+
+        if (packet->size < ETH_HEADER_LEN) {
+            return;
+        }
+        flow_extract(packet, 0, skb_mark, NULL, port->port_no, &key);
+        flow = dp_netdev_lookup_flow(dp, &key);
+        if (flow) {
+            dp_netdev_flow_used(flow, packet);
+            recirculate = dp_netdev_execute_actions(dp, packet, &key,
+                                                    flow->actions,
+                                                    flow->actions_len,
+                                                    &skb_mark);
+            dp->n_hit++;
+        } else {
+            dp->n_missed++;
+            dp_netdev_output_userspace(dp, packet, DPIF_UC_MISS, &key, NULL);
+            recirculate = false;
+        }
+    } while (recirculate && limit--);
 }
 
 static void
@@ -1163,6 +1190,7 @@ dp_netdev_sample(struct dp_netdev *dp,
     const struct nlattr *subactions = NULL;
     const struct nlattr *a;
     size_t left;
+    uint32_t skb_mark;
 
     NL_NESTED_FOR_EACH_UNSAFE (a, left, action) {
         int type = nl_attr_type(a);
@@ -1186,7 +1214,7 @@ dp_netdev_sample(struct dp_netdev *dp,
     }
 
     dp_netdev_execute_actions(dp, packet, key, nl_attr_get(subactions),
-                              nl_attr_get_size(subactions));
+                              nl_attr_get_size(subactions), &skb_mark);
 }
 
 static void
@@ -1201,7 +1229,8 @@ dp_netdev_action_userspace(struct dp_netdev *dp,
 }
 
 static void
-execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
+execute_set_action(struct ofpbuf *packet, const struct nlattr *a,
+                   uint32_t *skb_mark)
 {
     enum ovs_key_attr type = nl_attr_type(a);
     const struct ovs_key_ipv4 *ipv4_key;
@@ -1211,9 +1240,12 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
 
     switch (type) {
     case OVS_KEY_ATTR_PRIORITY:
-    case OVS_KEY_ATTR_SKB_MARK:
     case OVS_KEY_ATTR_TUNNEL:
         /* not implemented */
+        break;
+
+    case OVS_KEY_ATTR_SKB_MARK:
+        *skb_mark = nl_attr_get_u32(a);
         break;
 
     case OVS_KEY_ATTR_ETHERNET:
@@ -1263,11 +1295,11 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
     }
 }
 
-static void
+static bool
 dp_netdev_execute_actions(struct dp_netdev *dp,
                           struct ofpbuf *packet, struct flow *key,
                           const struct nlattr *actions,
-                          size_t actions_len)
+                          size_t actions_len, uint32_t *skb_mark)
 {
     const struct nlattr *a;
     unsigned int left;
@@ -1305,18 +1337,23 @@ dp_netdev_execute_actions(struct dp_netdev *dp,
             break;
 
         case OVS_ACTION_ATTR_SET:
-            execute_set_action(packet, nl_attr_get(a));
+            execute_set_action(packet, nl_attr_get(a), skb_mark);
             break;
 
         case OVS_ACTION_ATTR_SAMPLE:
             dp_netdev_sample(dp, packet, key, a);
             break;
 
+        case OVS_ACTION_ATTR_RECIRCULATE:
+            return true;
+
         case OVS_ACTION_ATTR_UNSPEC:
         case __OVS_ACTION_ATTR_MAX:
             NOT_REACHED();
         }
     }
+
+    return false;
 }
 
 const struct dpif_class dpif_netdev_class = {
