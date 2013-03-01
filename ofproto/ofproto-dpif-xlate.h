@@ -114,6 +114,24 @@ struct xlate_in {
      * This is normally null so the client has to set it manually after
      * calling xlate_in_init(). */
     const struct dpif_flow_stats *resubmit_stats;
+
+    /* skb_mark to use to identify recirculation.
+     *
+     * If RECIRCULATION_ID_NONE at the time that a recirculate action is
+     * added then get_recirculation_id() is used to obtain a recirculation
+     * id which is saved in recirculation_id.  Otherwise the value
+     * recirculation_id is used.
+     *
+     * In this way both the value of the recirculation_id used and the need
+     * to call get_recirculation_id() may be controlled.
+     *
+     * The value RECIRCULATION_ID_DUMMY may be used as a temporary
+     * recirculation id.
+     */
+    uint32_t recirculation_id;
+
+    /* True if the context added a recirculate action. False otherwise. */
+    bool recirculated;
 };
 
 void xlate_ofproto_set(struct ofproto_dpif *, const char *name,
@@ -141,9 +159,14 @@ void xlate_ofport_remove(struct ofport_dpif *);
 void xlate_actions(struct xlate_in *, struct xlate_out *);
 void xlate_in_init(struct xlate_in *, struct ofproto_dpif *,
                    const struct flow *, struct rule_dpif *,
-                   uint8_t tcp_flags, const struct ofpbuf *packet);
+                   uint8_t tcp_flags, const struct ofpbuf *packet,
+                   uint32_t recirculation_id);
+void xlate_in_init_ofpacts(struct xlate_in *, size_t ofpacts_offset,
+                           size_t ofpacts_len);
 void xlate_out_uninit(struct xlate_out *);
 void xlate_actions_for_side_effects(struct xlate_in *);
 void xlate_out_copy(struct xlate_out *dst, const struct xlate_out *src);
-
+void xlate_and_recirculate(struct xlate_in *, struct xlate_out *,
+                           struct ofpbuf *packet,
+                           size_t occupied_packet_headroom);
 #endif /* ofproto-dpif-xlate.h */

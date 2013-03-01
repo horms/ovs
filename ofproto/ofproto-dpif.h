@@ -27,6 +27,10 @@ union user_action_cookie;
 struct ofproto_dpif;
 struct ofport_dpif;
 
+/* Recirculation Id */
+#define RECIRCULATION_ID_NONE  0
+#define RECIRCULATION_ID_DUMMY 2
+
 struct rule_dpif {
     struct rule up;
 
@@ -95,4 +99,5 @@ void ofproto_dpif_send_packet_in(struct ofproto_dpif *,
                                  struct ofputil_packet_in *pin);
 int ofproto_dpif_flow_mod(struct ofproto_dpif *, struct ofputil_flow_mod *);
 
+uint32_t get_recirculation_id(void);
 #endif /* ofproto-dpif.h */

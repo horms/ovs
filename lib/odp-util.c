@@ -76,6 +76,7 @@ odp_action_len(uint16_t type)
     case OVS_ACTION_ATTR_POP_VLAN: return 0;
     case OVS_ACTION_ATTR_PUSH_MPLS: return sizeof(struct ovs_action_push_mpls);
     case OVS_ACTION_ATTR_POP_MPLS: return sizeof(ovs_be16);
+    case OVS_ACTION_ATTR_RECIRCULATE: return 0;
     case OVS_ACTION_ATTR_SET: return -2;
     case OVS_ACTION_ATTR_SAMPLE: return -2;
 
@@ -424,6 +425,10 @@ format_odp_action(struct ds *ds, const struct nlattr *a)
     case OVS_ACTION_ATTR_POP_MPLS: {
         ovs_be16 ethertype = nl_attr_get_be16(a);
         ds_put_format(ds, "pop_mpls(eth_type=0x%"PRIx16")", ntohs(ethertype));
+        break;
+    }
+    case OVS_ACTION_ATTR_RECIRCULATE: {
+        ds_put_format(ds, "recirculate");
         break;
     }
     case OVS_ACTION_ATTR_SAMPLE:
@@ -2331,7 +2336,7 @@ odp_flow_key_from_flow__(struct ofpbuf *buf, const struct flow *data,
         tun_key_to_attr(buf, &data->tunnel);
     }
 
-    if (flow->skb_mark) {
+    if (flow->skb_mark || data->skb_mark) {
         nl_msg_put_u32(buf, OVS_KEY_ATTR_SKB_MARK, data->skb_mark);
     }
 
@@ -3041,6 +3046,12 @@ commit_odp_tunnel_action(const struct flow *flow, struct flow *base,
     }
 }
 
+void
+commit_odp_recirculate_action(struct ofpbuf *odp_actions)
+{
+    nl_msg_put_flag(odp_actions, OVS_ACTION_ATTR_RECIRCULATE);
+}
+
 static void
 commit_set_ether_addr_action(const struct flow *flow, struct flow *base,
                              struct ofpbuf *odp_actions,
@@ -3293,8 +3304,8 @@ commit_set_skb_mark_action(const struct flow *flow, struct flow *base,
  * 'base' and 'flow', appends ODP actions to 'odp_actions' that change the flow
  * key from 'base' into 'flow', and then changes 'base' the same way.  Does not
  * commit set_tunnel actions.  Users should call commit_odp_tunnel_action()
- * in addition to this function if needed.  Sets fields in 'wc' that are
- * used as part of the action.
+ * and commit_odp_recirculate_action() in addition to those functions if
+ * needed. Sets fields in 'wc' that are used as part of the action.
  *
  * VLAN actions may be committed twice; If vlan_tci in 'flow' differs from the
  * one in 'base', then it is committed before MPLS actions. If 'final_vlan_tci'
