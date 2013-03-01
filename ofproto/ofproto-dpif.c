@@ -234,17 +234,51 @@ struct facet {
     struct subfacet one_subfacet;
 
     long long int learn_rl;      /* Rate limiter for facet_learn(). */
+
+    const struct ofpact *ofpacts;   /* ofpacts for this facet.
+                                     * Will differ from rule->up.ofpacts
+                                     * if facet is for a recirculated packet. */
+    size_t ofpacts_len;             /* ofpacts_len for this facet
+                                     * Will differ from * rule->up.ofpacts_len
+                                     * if facet is for a recirculated packet. */
+
+    uint32_t recirculation_id;       /* Recirculation id.
+                                      * Non-zero for a facet
+                                      * that recirculates packets;
+                                      * used as the value of flow.skb_mark
+                                      * in the facet of recirculated packets.
+                                      * Zero otherwise. */
+    struct hmap_node recirculation_id_hmap_node;
+                                    /* In owning ofproto's 'recirculation_ids'
+                                     * hmap. */
+    const struct ofpact *recirculation_ofpacts;
+                                    /* ofpacts for facets of packets
+                                     * recirculated by this facet */
+    unsigned recirculation_cnt;     /* Number of facets present as a result
+                                     * of * recirculation of this facet.
+                                     * Facets may only be destroyed when
+                                     * this value is zero. */
+    size_t recirculation_ofpacts_len;
+                                    /* ofpacts_len for facets of packets
+                                     * recirculated by this facet */
+
+    bool recirculated;              /* Facet of a recirculated packet? */
 };
 
 static struct facet *facet_create(const struct flow_miss *, struct rule_dpif *,
                                   struct xlate_out *,
-                                  struct dpif_flow_stats *);
+                                  struct dpif_flow_stats *,
+                                  const struct ofpact *, size_t ofpacts_len,
+                                  bool recirculated);
 static void facet_remove(struct facet *);
 static void facet_free(struct facet *);
 
 static struct facet *facet_find(struct ofproto_dpif *, const struct flow *);
+static struct facet *facet_find_by_id(struct ofproto_dpif *, uint32_t id);
 static struct facet *facet_lookup_valid(struct ofproto_dpif *,
                                         const struct flow *);
+static struct facet *facet_lookup_valid_by_id(struct ofproto_dpif *,
+                                              uint32_t id);
 static bool facet_revalidate(struct facet *);
 static bool facet_check_consistency(struct facet *);
 
@@ -1027,6 +1061,7 @@ construct(struct ofproto *ofproto_)
     ofproto->has_bonded_bundles = false;
 
     classifier_init(&ofproto->facets);
+    hmap_init(&ofproto->recirculation_ids);
     ofproto->consistency_rl = LLONG_MIN;
 
     for (i = 0; i < N_TABLES; i++) {
@@ -3214,6 +3249,107 @@ port_is_lacp_current(const struct ofport *ofport_)
             : -1);
 }
 
+/* Recirculation Id */
+#define RECIRCULATION_ID_MIN   (RECIRCULATION_ID_DUMMY + 2)
+
+#define RECIRCULATION_ID_MAX_LOOP 1024  /* Arbitrary value to prevent
+                                         * endless loop */
+
+static uint32_t recirculation_id_hash(uint32_t id)
+{
+    return hash_words(&id, 1, 0);
+}
+
+static uint32_t recirculation_id = RECIRCULATION_ID_MIN;
+static uint32_t validated_recirculation_id = RECIRCULATION_ID_NONE;
+
+/* Pre-allocate the next recirculation id that may be used by a facet.
+ * The recirculation id should be obtained using get_recirculation_id.
+ * Returns RECIRCULATION_ID_NONE on success,
+ * RECIRCULATION_ID_DUMMY on error */
+static uint32_t peek_recirculation_id(struct ofproto_dpif *ofproto)
+{
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 15);
+
+    int loop = RECIRCULATION_ID_MAX_LOOP;
+
+    if (validated_recirculation_id == recirculation_id) {
+        return RECIRCULATION_ID_NONE;
+    }
+
+    while (loop--) {
+        if (recirculation_id < RECIRCULATION_ID_MIN)
+            recirculation_id = RECIRCULATION_ID_MIN;
+        /* Skip IPSEC_MARK bit it is reserved */
+        if (recirculation_id & IPSEC_MARK) {
+            recirculation_id += IPSEC_MARK;
+        }
+        if (!facet_find_by_id(ofproto, recirculation_id)) {
+            validated_recirculation_id = recirculation_id;
+            return RECIRCULATION_ID_NONE;
+        }
+        recirculation_id++;
+    }
+
+    VLOG_WARN_RL(&rl, "Failed to allocate recirulation id after %d attempts\n",
+                 RECIRCULATION_ID_MAX_LOOP);
+    return RECIRCULATION_ID_DUMMY;
+}
+
+/* Obtain a recirculation id for a facet.
+ * peek_recirculation_id() should have be called prior to each
+ * call to get_recirculation_id().
+ * This function always succeeds.
+ */
+uint32_t get_recirculation_id(void)
+{
+    ovs_assert(recirculation_id == validated_recirculation_id);
+    return recirculation_id++;
+}
+
+/* Removes 'facet' from the recirculation_ids hmap of its ofproto */
+static void
+facet_recirculation_id_remove(struct facet *facet)
+{
+    struct ofproto_dpif *ofproto = ofproto_dpif_cast(facet->rule->up.ofproto);
+
+    if (hmap_node_is_null(&facet->recirculation_id_hmap_node)) {
+        return;
+    }
+
+    hmap_remove(&ofproto->recirculation_ids,
+                &facet->recirculation_id_hmap_node);
+}
+
+static bool
+valid_recirculation_id(uint32_t id)
+{
+    return id != RECIRCULATION_ID_NONE && !(id & IPSEC_MARK);
+}
+
+/* Set parameters for 'facet' which has a recirculate action.
+ * 'id' will be 'facet''s recirculation_id.
+ * 'ofpacts_offset will be used to calculate 'facet''s
+ * recirculation_ofpacts and recirculation_ofpacts_len.
+ *
+ * The ofpacts and opacts_len of the facet must have already been set. */
+static void
+facet_set_recirculation(struct facet *facet, uint32_t id,
+                        const struct ofpact *ofpacts, size_t ofpacts_len)
+{
+    struct ofproto_dpif *ofproto = ofproto_dpif_cast(facet->rule->up.ofproto);
+
+    facet->recirculation_ofpacts = ofpacts;
+    facet->recirculation_ofpacts_len = ofpacts_len;
+
+    if (facet->recirculation_id != id) {
+        facet->recirculation_id = id;
+        hmap_insert(&ofproto->recirculation_ids,
+                    &facet->recirculation_id_hmap_node,
+                    recirculation_id_hash(facet->recirculation_id));
+    }
+}
+
 /* Upcall handling. */
 
 /* Flow miss batching.
@@ -3344,7 +3480,8 @@ handle_flow_miss_common(struct rule_dpif *rule,
 static bool
 flow_miss_should_make_facet(struct flow_miss *miss, struct flow_wildcards *wc)
 {
-    struct dpif_backer *backer = miss->ofproto->backer;
+    struct ofproto_dpif *ofproto = miss->ofproto;
+    struct dpif_backer *backer = ofproto->backer;
     uint32_t hash;
 
     switch (flow_miss_model) {
@@ -3378,22 +3515,36 @@ flow_miss_should_make_facet(struct flow_miss *miss, struct flow_wildcards *wc)
 static void
 handle_flow_miss_without_facet(struct rule_dpif *rule, struct xlate_out *xout,
                                struct flow_miss *miss,
+                               const struct ofpact *ofpacts, size_t ofpacts_len,
+                               bool recirculated,
                                struct flow_miss_op *ops, size_t *n_ops)
 {
     struct ofpbuf *packet;
 
     LIST_FOR_EACH (packet, list_node, &miss->packets) {
-
         COVERAGE_INC(facet_suppress);
 
         handle_flow_miss_common(rule, packet, &miss->flow);
 
-        if (xout->slow) {
+        if (xout->slow || recirculated) {
             struct xlate_in xin;
+            struct xlate_out xout_tmp;
+            bool key_is_packet_base = miss->key == packet->base;
 
-            xlate_in_init(&xin, miss->ofproto, &miss->flow, rule, 0, packet);
-            xlate_actions_for_side_effects(&xin);
+            xlate_in_init(&xin, miss->ofproto, &miss->flow, rule, 0,
+                          packet, RECIRCULATION_ID_DUMMY);
+            xin.ofpacts_len = ofpacts_len;
+            xin.ofpacts = ofpacts;
+            xlate_and_recirculate(&xin, &xout_tmp, packet,
+                                  key_is_packet_base ? miss->key_len : 0);
+            if (key_is_packet_base && miss->key != packet->base) {
+                /* xlate_and_recirculate may have reallocated packet->base */
+                miss->key = packet->base;
+            }
+            xlate_out_copy(xout, &xout_tmp);
+            xlate_out_uninit(&xout_tmp);
         }
+
 
         if (xout->odp_actions.size) {
             struct flow_miss_op *op = &ops[*n_ops];
@@ -3445,7 +3596,10 @@ handle_flow_miss_with_facet(struct flow_miss *miss, struct facet *facet,
         if (want_path != SF_FAST_PATH) {
             struct xlate_in xin;
 
-            xlate_in_init(&xin, ofproto, &miss->flow, facet->rule, 0, packet);
+            xlate_in_init(&xin, ofproto, &miss->flow, facet->rule, 0, packet,
+                          facet->recirculation_id);
+            xin.ofpacts = facet->ofpacts;
+            xin.ofpacts_len = facet->ofpacts_len;
             xlate_actions_for_side_effects(&xin);
         }
 
@@ -3498,10 +3652,14 @@ handle_flow_miss(struct flow_miss *miss, struct flow_miss_op *ops,
     now = time_msec();
     memset(stats, 0, sizeof *stats);
     stats->used = now;
-    LIST_FOR_EACH (packet, list_node, &miss->packets) {
-        stats->tcp_flags |= packet_get_tcp_flags(packet, &miss->flow);
-        stats->n_bytes += packet->size;
-        stats->n_packets++;
+    /* Do not update stats for packets that have been recirculated
+     * as the packet has already been counted before it was recirculated. */
+    if (!valid_recirculation_id(miss->flow.skb_mark)) {
+        LIST_FOR_EACH (packet, list_node, &miss->packets) {
+            stats->tcp_flags |= packet_get_tcp_flags(packet, &miss->flow);
+            stats->n_bytes += packet->size;
+            stats->n_packets++;
+        }
     }
 
     facet = facet_lookup_valid(ofproto, &miss->flow);
@@ -3510,15 +3668,42 @@ handle_flow_miss(struct flow_miss *miss, struct flow_miss_op *ops,
         struct rule_dpif *rule;
         struct xlate_out xout;
         struct xlate_in xin;
+        struct facet *parent_facet = NULL;
+        const struct ofpact *ofpacts;
+        size_t ofpacts_len;
 
         flow_wildcards_init_catchall(&wc);
-        rule = rule_dpif_lookup(ofproto, &miss->flow, &wc);
+
+        if (valid_recirculation_id(miss->flow.skb_mark)) {
+            parent_facet = facet_lookup_valid_by_id(ofproto,
+                                                    miss->flow.skb_mark);
+            if (parent_facet) {
+                rule = parent_facet->rule;
+                ofpacts = parent_facet->recirculation_ofpacts;
+                ofpacts_len = parent_facet->recirculation_ofpacts_len;
+                /* The skb_mark should be matched in order to differentiate
+                 * recirculated packets based on their skb_mark which is
+                 * their recirculation_id */
+                memset(&wc.masks.skb_mark, 0xff, sizeof wc.masks.skb_mark);
+            } else {
+                rule = rule_dpif_miss_rule(ofproto, &miss->flow);
+            }
+        } else {
+            rule = rule_dpif_lookup(ofproto, &miss->flow, &wc);
+        }
+        if (!parent_facet) {
+            ofpacts = rule->up.ofpacts;
+            ofpacts_len = rule->up.ofpacts_len;
+        }
+
         rule_credit_stats(rule, stats);
 
         xlate_in_init(&xin, ofproto, &miss->flow, rule, stats->tcp_flags,
-                      NULL);
+                      NULL, peek_recirculation_id(ofproto));
         xin.resubmit_stats = stats;
         xin.may_learn = true;
+        xin.ofpacts = ofpacts;
+        xin.ofpacts_len = ofpacts_len;
         xlate_actions(&xin, &xout);
         flow_wildcards_or(&xout.wc, &xout.wc, &wc);
 
@@ -3526,14 +3711,30 @@ handle_flow_miss(struct flow_miss *miss, struct flow_miss_op *ops,
          * flow keys with fitness ODP_FIT_TO_LITTLE.  This breaks a fundamental
          * assumption used throughout the facet and subfacet handling code.
          * Since we have to handle these misses in userspace anyway, we simply
-         * skip facet creation, avoiding the problem altogether. */
+         * skip facet creation, avoiding the problem altogether.
+         *
+         * If xlate_actions() has added a recirculation action
+         * then xin.recirculated will be true and in this case
+         * a non-dummy recirculation-id is required in order to use facets. */
         if (miss->key_fitness == ODP_FIT_TOO_LITTLE
+            || (xin.recirculated &&
+                xin.recirculation_id == RECIRCULATION_ID_DUMMY)
             || !flow_miss_should_make_facet(miss, &xout.wc)) {
-            handle_flow_miss_without_facet(rule, &xout, miss, ops, n_ops);
+            handle_flow_miss_without_facet(rule, &xout, miss, ofpacts,
+                                           ofpacts_len, xin.recirculated,
+                                           ops, n_ops);
             return;
         }
 
-        facet = facet_create(miss, rule, &xout, stats);
+        facet = facet_create(miss, rule, &xout, stats,
+                             ofpacts, ofpacts_len, parent_facet);
+        if (xin.recirculated) {
+            facet_set_recirculation(facet, xin.recirculation_id,
+                                    xin.ofpacts, xin.ofpacts_len);
+        }
+        if (parent_facet) {
+            parent_facet->recirculation_cnt++;
+        }
         stats = NULL;
     }
     handle_flow_miss_with_facet(miss, facet, now, stats, ops, n_ops);
@@ -4056,6 +4257,15 @@ update_subfacet_stats(struct subfacet *subfacet,
     diff.tcp_flags = stats->tcp_flags;
     diff.used = stats->used;
 
+    if (facet->recirculated) {
+        /* Do not update stats for facets with recirculation_id set.
+         * This avoids duplicate counting packets that have more than
+         * one facet due to recirculation - only hits for
+         * the top-most facet are counted here: the only facet
+         * in the case where there is no recirculation. */
+        return;
+    }
+
     if (stats->n_packets >= subfacet->dp_packet_count) {
         diff.n_packets = stats->n_packets - subfacet->dp_packet_count;
     } else {
@@ -4335,7 +4545,9 @@ rule_expire(struct rule_dpif *rule)
  * least) one subfacet with subfacet_create(). */
 static struct facet *
 facet_create(const struct flow_miss *miss, struct rule_dpif *rule,
-             struct xlate_out *xout, struct dpif_flow_stats *stats)
+             struct xlate_out *xout, struct dpif_flow_stats *stats,
+             const struct ofpact *ofpacts, size_t ofpacts_len,
+             bool recirculated)
 {
     struct ofproto_dpif *ofproto = miss->ofproto;
     struct facet *facet;
@@ -4351,6 +4563,10 @@ facet_create(const struct flow_miss *miss, struct rule_dpif *rule,
     facet->rule = rule;
 
     list_push_back(&facet->rule->facets, &facet->list_node);
+    hmap_node_nullify(&facet->recirculation_id_hmap_node);
+    facet->ofpacts = ofpacts;
+    facet->ofpacts_len = ofpacts_len;
+    facet->recirculated = recirculated;
     list_init(&facet->subfacets);
     netflow_flow_init(&facet->nf_flow);
     netflow_flow_update_time(ofproto->netflow, &facet->nf_flow, facet->used);
@@ -4407,8 +4623,23 @@ facet_remove(struct facet *facet)
 {
     struct ofproto_dpif *ofproto = ofproto_dpif_cast(facet->rule->up.ofproto);
     struct subfacet *subfacet, *next_subfacet;
+    struct facet *parent_facet;
 
     ovs_assert(!list_is_empty(&facet->subfacets));
+
+    /* If this facet caused recirculation then it may not be removed if
+     * facets resulting from reciculation are still present. */
+    if (facet->recirculation_cnt) {
+        return;
+    }
+
+    /* IF this facet was created by recirculation then decrement
+     * the recirculation_cnt of the facet that caused recirculation. */
+    parent_facet = facet_lookup_valid_by_id(ofproto, facet->flow.skb_mark);
+    if (parent_facet) {
+        ovs_assert(parent_facet->recirculation_cnt);
+        parent_facet->recirculation_cnt--;
+    }
 
     /* First uninstall all of the subfacets to get final statistics. */
     LIST_FOR_EACH (subfacet, list_node, &facet->subfacets) {
@@ -4430,6 +4661,7 @@ facet_remove(struct facet *facet)
     classifier_remove(&ofproto->facets, &facet->cr);
     cls_rule_destroy(&facet->cr);
     list_remove(&facet->list_node);
+    facet_recirculation_id_remove(facet);
     facet_free(facet);
 }
 
@@ -4535,6 +4767,15 @@ facet_flush_stats(struct facet *facet)
     struct ofproto_dpif *ofproto = ofproto_dpif_cast(facet->rule->up.ofproto);
     struct subfacet *subfacet;
 
+    if (facet->recirculated) {
+        /* Do not update stats for facets with recirculation_id set.
+         * This avoids duplicate counting packets that have more than
+         * one facet due to recirculation - only hits for
+         * the top-most facet are counted here: the only facet
+         * in the case where there is no recirculation. */
+        return;
+    }
+
     LIST_FOR_EACH (subfacet, list_node, &facet->subfacets) {
         ovs_assert(!subfacet->dp_byte_count);
         ovs_assert(!subfacet->dp_packet_count);
@@ -4575,6 +4816,34 @@ facet_find(struct ofproto_dpif *ofproto, const struct flow *flow)
     return cr ? CONTAINER_OF(cr, struct facet, cr) : NULL;
 }
 
+/* Searches 'ofproto''s table of facets with recirculation ids
+ * for a facet whose recirculation_id is 'id'.
+ * Returns it if found, otherwise a null pointer.
+ *
+ * The returned facet might need revalidation; use facet_lookup_valid_by_id()
+ * instead if that is important. */
+static struct facet *
+facet_find_by_id(struct ofproto_dpif *ofproto, uint32_t id)
+{
+    uint32_t hash;
+    struct facet *facet;
+
+    /* some values are never used */
+    if (!valid_recirculation_id(id)) {
+        return NULL;
+    }
+
+    hash = recirculation_id_hash(id);
+    HMAP_FOR_EACH_WITH_HASH (facet, recirculation_id_hmap_node,
+                             hash, &ofproto->recirculation_ids) {
+        if (facet->recirculation_id == id) {
+            return facet;
+        }
+    }
+
+    return NULL;
+}
+
 /* Searches 'ofproto''s table of facets for one capable that covers
  * 'flow'.  Returns it if found, otherwise a null pointer.
  *
@@ -4596,8 +4865,31 @@ facet_lookup_valid(struct ofproto_dpif *ofproto, const struct flow *flow)
     return facet;
 }
 
+/* Searches 'ofproto''s table of facets with recirculation ids
+ * for a facet whose recirculation_id is 'id'.
+ *
+ * The returned facet is guaranteed to be valid. */
+static struct facet *
+facet_lookup_valid_by_id(struct ofproto_dpif *ofproto, uint32_t id)
+{
+    struct facet *facet;
+
+    facet = facet_find_by_id(ofproto, id);
+    if (facet
+        && (ofproto->backer->need_revalidate
+            || tag_set_intersects(&ofproto->backer->revalidate_set,
+                                  facet->xout.tags))
+        && !facet_revalidate(facet)) {
+        return NULL;
+    }
+
+    return facet;
+}
+
 static bool
-facet_check_consistency(struct facet *facet)
+facet_check_actions_consistency(struct facet *facet, struct rule_dpif *rule,
+                                const struct ofpact *ofpacts,
+                                size_t *ofpacts_len)
 {
     static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 15);
 
@@ -4606,32 +4898,13 @@ facet_check_consistency(struct facet *facet)
     struct xlate_out xout;
     struct xlate_in xin;
 
-    struct rule_dpif *rule;
     bool ok;
 
-    /* Check the rule for consistency. */
-    rule = rule_dpif_lookup(ofproto, &facet->flow, NULL);
-    if (rule != facet->rule) {
-        if (!VLOG_DROP_WARN(&rl)) {
-            struct ds s = DS_EMPTY_INITIALIZER;
-
-            flow_format(&s, &facet->flow);
-            ds_put_format(&s, ": facet associated with wrong rule (was "
-                          "table=%"PRIu8",", facet->rule->up.table_id);
-            cls_rule_format(&facet->rule->up.cr, &s);
-            ds_put_format(&s, ") (should have been table=%"PRIu8",",
-                          rule->up.table_id);
-            cls_rule_format(&rule->up.cr, &s);
-            ds_put_char(&s, ')');
-
-            VLOG_WARN("%s", ds_cstr(&s));
-            ds_destroy(&s);
-        }
-        return false;
-    }
-
     /* Check the datapath actions for consistency. */
-    xlate_in_init(&xin, ofproto, &facet->flow, rule, 0, NULL);
+    xlate_in_init(&xin, ofproto, &facet->flow, rule, 0, NULL,
+                  facet->recirculation_id);
+    xin.ofpacts = ofpacts;
+    xin.ofpacts_len = *ofpacts_len;
     xlate_actions(&xin, &xout);
 
     ok = ofpbuf_equal(&facet->xout.odp_actions, &xout.odp_actions)
@@ -4661,7 +4934,117 @@ facet_check_consistency(struct facet *facet)
     }
     xlate_out_uninit(&xout);
 
+    *ofpacts_len = xin.ofpacts_len;
+
     return ok;
+}
+
+
+static void
+facet_warn_rl(struct vlog_rate_limit *rl, const struct facet *facet,
+              const char *msg)
+{
+    struct ds s;
+
+    if (VLOG_DROP_WARN(rl)) {
+        return;
+    }
+
+    ds_init(&s);
+    flow_format(&s, &facet->flow);
+    ds_put_format(&s, "%s", msg);
+    VLOG_WARN("%s", ds_cstr(&s));
+    ds_destroy(&s);
+}
+
+static size_t
+get_facet_chain(struct facet *facet, struct facet **chain, size_t len,
+                bool strict)
+{
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 15);
+    struct ofproto_dpif *ofproto = ofproto_dpif_cast(facet->rule->up.ofproto);
+    size_t top = 0;
+
+    ovs_assert(len > 0);
+
+    chain[top] = facet;
+    while (chain[top]->recirculated && top < len) {
+        chain[top + 1] = facet_find_by_id(ofproto, chain[top]->flow.skb_mark);
+        if (!chain[top + 1])  {
+            if (strict) {
+                facet_warn_rl(&rl, facet, ": parent facet of facet for "
+                              "recirculated packets could not be found");
+            }
+            return top + 1;
+        }
+        top++;
+    }
+
+    if (chain[top]->recirculated) {
+        facet_warn_rl(&rl, facet, ": parent facet of facet for "
+                       "recirculated packets could not be found "
+                       "due to under-size buffer");
+    }
+
+    return top + 1;
+}
+
+static bool
+facet_check_consistency(struct facet *facet)
+{
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 15);
+
+    struct ofproto_dpif *ofproto = ofproto_dpif_cast(facet->rule->up.ofproto);
+
+    const struct ofpact *ofpacts;
+    size_t ofpacts_len;
+
+    struct rule_dpif *rule;
+    struct facet *chain[MAX_RECIRCULATION_DEPTH + 1];
+    size_t chain_len;
+
+    chain_len = get_facet_chain(facet, chain, ARRAY_SIZE(chain), true);
+    rule = rule_dpif_lookup(ofproto, &chain[chain_len - 1]->flow, NULL);
+    if (rule != chain[chain_len - 1]->rule) {
+        if (!VLOG_DROP_WARN(&rl)) {
+            struct ds s = DS_EMPTY_INITIALIZER;
+
+            flow_format(&s, &chain[chain_len - 1]->flow);
+            ds_put_format(&s, ": facet associated with wrong rule (was "
+                          "table=%"PRIu8",",
+                          chain[chain_len - 1]->rule->up.table_id);
+            cls_rule_format(&chain[chain_len - 1]->rule->up.cr, &s);
+            ds_put_format(&s, ") (should have been table=%"PRIu8",",
+                          rule->up.table_id);
+            cls_rule_format(&rule->up.cr, &s);
+            ds_put_char(&s, ')');
+
+            VLOG_WARN("%s", ds_cstr(&s));
+            ds_destroy(&s);
+        }
+        return false;
+    }
+
+    if (chain[chain_len - 1]->recirculated) {
+        return false;
+    }
+
+    ofpacts = rule->up.ofpacts;
+    ofpacts_len = rule->up.ofpacts_len;
+    while (chain_len--) {
+        size_t new_ofpacts_len = ofpacts_len;
+        bool ok;
+
+        ok = facet_check_actions_consistency(chain[chain_len], rule,
+                                             ofpacts, &new_ofpacts_len);
+        if (!ok) {
+            return false;
+        }
+        ofpacts = ofpact_end(ofpacts, ofpacts_len - new_ofpacts_len);
+        ofpacts_len = new_ofpacts_len;
+    }
+
+    return true;
 }
 
 /* Re-searches the classifier for 'facet':
@@ -4675,12 +5058,23 @@ facet_check_consistency(struct facet *facet)
  *   - If any of 'facet''s subfacets correspond to a new flow according to
  *     ofproto_receive(), 'facet' is removed.
  *
+ *   - If 'facet' is for a recirculated packet but the new rule does
+ *     not reciculate to the depth provide by 'facet' then 'facet' is
+ *     removed.
+ *
  *   Returns true if 'facet' is still valid.  False if 'facet' was removed. */
 static bool
 facet_revalidate(struct facet *facet)
 {
     struct ofproto_dpif *ofproto = ofproto_dpif_cast(facet->rule->up.ofproto);
     struct rule_dpif *new_rule;
+
+    const struct ofpact *ofpacts;
+    size_t ofpacts_len;
+
+    struct facet *chain[MAX_RECIRCULATION_DEPTH + 1];
+    size_t chain_len;
+
     struct subfacet *subfacet;
     struct flow_wildcards wc;
     struct xlate_out xout;
@@ -4701,22 +5095,72 @@ facet_revalidate(struct facet *facet)
                                 &recv_ofproto, NULL);
         if (error
             || recv_ofproto != ofproto
+            || peek_recirculation_id(ofproto) == RECIRCULATION_ID_DUMMY
             || facet != facet_find(ofproto, &recv_flow)) {
             facet_remove(facet);
             return false;
         }
     }
 
+    chain_len = get_facet_chain(facet, chain, ARRAY_SIZE(chain), false);
+    /* If the top-most facet in the chain is a facet for a recirculated
+     * packet then the original top-most can't be found because it has been
+     * revalidated with a rule that has fewer of recirculation actions than
+     * the previous rule.  In this case, remove the facets in the chain as
+     * they are longer useful. */
+    if (chain[chain_len - 1]->recirculated) {
+        while(chain_len--) {
+            facet_remove(chain[chain_len]);
+        }
+        return false;
+    }
+
     flow_wildcards_init_catchall(&wc);
-    new_rule = rule_dpif_lookup(ofproto, &facet->flow, &wc);
+    new_rule = rule_dpif_lookup(ofproto, &chain[chain_len - 1]->flow, &wc);
+    ofpacts = new_rule->up.ofpacts;
+    ofpacts_len = new_rule->up.ofpacts_len;
+
+    /* In the case of a facet of a recirculated packet there
+     * will be a chain of facets leading up to the top-most facet which
+     * is for the original unrecirculated packet. Step through the chain
+     * from the top until one before the facet being revalidated in
+     * order to calculate the ofpacts and ofpacts_len. */
+    while (chain_len-- > 1) {
+        struct facet *f = chain[chain_len];
+
+        xlate_in_init(&xin, ofproto, &f->flow, new_rule, 0, NULL,
+                      f->recirculation_id);
+        xin.ofpacts = ofpacts;
+        xin.ofpacts_len = ofpacts_len;
+        xlate_actions(&xin, &xout);
+
+        if (valid_recirculation_id(f->recirculation_id) && !xin.recirculated) {
+           /* If the facet no longer adds a recirculation then it is
+            * no longer part of the chain of facets and should be removed. */
+            facet_remove(facet);
+            xlate_out_uninit(&xout);
+            return false;
+        }
+
+        ofpacts = xin.ofpacts;
+        ofpacts_len = xin.ofpacts_len;
+    }
 
     /* Calculate new datapath actions.
      *
      * We do not modify any 'facet' state yet, because we might need to, e.g.,
      * emit a NetFlow expiration and, if so, we need to have the old state
      * around to properly compose it. */
-    xlate_in_init(&xin, ofproto, &facet->flow, new_rule, 0, NULL);
+    xlate_in_init(&xin, ofproto, &facet->flow, new_rule, 0, NULL,
+                  facet->recirculation_id);
+    xin.ofpacts = ofpacts;
+    xin.ofpacts_len = ofpacts_len;
     xlate_actions(&xin, &xout);
+    if (valid_recirculation_id(facet->flow.skb_mark)) {
+        /* The skb_mark is part of the match for recirculated facets */
+        flow_wildcards_init_catchall(&wc);
+        memset(&wc.masks.skb_mark, 0xff, sizeof wc.masks.skb_mark);
+    }
     flow_wildcards_or(&xout.wc, &xout.wc, &wc);
 
     /* A facet's slow path reason should only change under dramatic
@@ -4742,6 +5186,17 @@ facet_revalidate(struct facet *facet)
                 subfacet_install(subfacet, &xout.odp_actions, &stats);
                 subfacet_update_stats(subfacet, &stats);
             }
+        }
+
+
+        /* Update ofpacts and recirculation fields of facet before calling
+         * facet_flush_stats() as it may indirectly call xlate_in_init()
+         * which requires those fields to be accurate. */
+        facet->ofpacts = ofpacts;
+        facet->ofpacts_len = ofpacts_len;
+        if (xin.recirculated) {
+            facet_set_recirculation(facet, xin.recirculation_id,
+                                    xin.ofpacts, xin.ofpacts_len);
         }
 
         facet_flush_stats(facet);
@@ -4822,9 +5277,11 @@ facet_push_stats(struct facet *facet, bool may_learn)
                             stats.n_bytes);
 
         xlate_in_init(&xin, ofproto, &facet->flow, facet->rule,
-                      stats.tcp_flags, NULL);
+                      stats.tcp_flags, NULL, facet->recirculation_id);
         xin.resubmit_stats = &stats;
         xin.may_learn = may_learn;
+        xin.ofpacts = facet->ofpacts;
+        xin.ofpacts_len = facet->ofpacts_len;
         xlate_actions_for_side_effects(&xin);
     }
 }
@@ -5295,7 +5752,8 @@ rule_dpif_execute(struct rule_dpif *rule, const struct flow *flow,
     dpif_flow_stats_extract(flow, packet, time_msec(), &stats);
     rule_credit_stats(rule, &stats);
 
-    xlate_in_init(&xin, ofproto, flow, rule, stats.tcp_flags, packet);
+    xlate_in_init(&xin, ofproto, flow, rule, stats.tcp_flags, packet,
+                  RECIRCULATION_ID_DUMMY);
     xin.resubmit_stats = &stats;
     xlate_actions(&xin, &xout);
 
@@ -5352,7 +5810,8 @@ send_packet(const struct ofport_dpif *ofport, struct ofpbuf *packet)
     output.port = ofport->up.ofp_port;
     output.max_len = 0;
 
-    xlate_in_init(&xin, ofproto, &flow, NULL, 0, packet);
+    xlate_in_init(&xin, ofproto, &flow, NULL, 0, packet,
+                  RECIRCULATION_ID_DUMMY);
     xin.ofpacts_len = sizeof output;
     xin.ofpacts = &output.ofpact;
     xin.resubmit_stats = &stats;
@@ -5600,12 +6059,13 @@ packet_out(struct ofproto *ofproto_, struct ofpbuf *packet,
 
     dpif_flow_stats_extract(flow, packet, time_msec(), &stats);
 
-    xlate_in_init(&xin, ofproto, flow, NULL, stats.tcp_flags, packet);
+    xlate_in_init(&xin, ofproto, flow, NULL, stats.tcp_flags, packet,
+                  RECIRCULATION_ID_DUMMY);
     xin.resubmit_stats = &stats;
     xin.ofpacts_len = ofpacts_len;
     xin.ofpacts = ofpacts;
 
-    xlate_actions(&xin, &xout);
+    xlate_and_recirculate(&xin, &xout, packet, 0);
     dpif_execute(ofproto->backer->dpif, key.data, key.size,
                  xout.odp_actions.data, xout.odp_actions.size, packet);
     xlate_out_uninit(&xout);
@@ -5987,7 +6447,8 @@ ofproto_trace(struct ofproto_dpif *ofproto, const struct flow *flow,
         trace.flow = *flow;
         ofpbuf_use_stub(&odp_actions,
                         odp_actions_stub, sizeof odp_actions_stub);
-        xlate_in_init(&trace.xin, ofproto, flow, rule, tcp_flags, packet);
+        xlate_in_init(&trace.xin, ofproto, flow, rule, tcp_flags, packet,
+                      RECIRCULATION_ID_DUMMY);
         trace.xin.resubmit_hook = trace_resubmit;
         trace.xin.report_hook = trace_report;
 

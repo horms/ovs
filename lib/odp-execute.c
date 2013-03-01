@@ -153,7 +153,7 @@ odp_execute_sample(void *dp, struct ofpbuf *packet, struct flow *key,
                         nl_attr_get_size(subactions), output, userspace);
 }
 
-void
+bool
 odp_execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
                     const struct nlattr *actions, size_t actions_len,
                     void (*output)(void *dp, struct ofpbuf *packet,
@@ -211,9 +211,14 @@ odp_execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
             odp_execute_sample(dp, packet, key, a, output, userspace);
             break;
 
+        case OVS_ACTION_ATTR_RECIRCULATE:
+            return true;
+
         case OVS_ACTION_ATTR_UNSPEC:
         case __OVS_ACTION_ATTR_MAX:
             NOT_REACHED();
         }
     }
+
+    return false;
 }
