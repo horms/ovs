@@ -35,6 +35,10 @@ enum { N_TABLES = 255 };
 enum { TBL_INTERNAL = N_TABLES - 1 };    /* Used for internal hidden rules. */
 BUILD_ASSERT_DECL(N_TABLES >= 2 && N_TABLES <= 255);
 
+/* Recirculation Id */
+#define RECIRCULATION_ID_NONE  0
+#define RECIRCULATION_ID_DUMMY 2
+
 struct rule_dpif {
     struct rule up;
 
@@ -92,6 +96,7 @@ struct ofproto_dpif {
 
     /* Facets. */
     struct classifier facets;     /* Contains 'struct facet's. */
+    struct hmap recirculation_ids;
     long long int consistency_rl;
 
     /* Revalidation. */
@@ -270,5 +275,5 @@ bool ofproto_dpif_dscp_from_priority(const struct ofport_dpif *,
 int ofproto_dpif_queue_to_priority(const struct ofproto_dpif *,
                                    uint32_t queue_id, uint32_t *priority);
 
-
+uint32_t get_recirculation_id(void);
 #endif /* ofproto-dpif.h */

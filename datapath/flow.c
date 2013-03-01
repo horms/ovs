@@ -1635,8 +1635,9 @@ int ovs_flow_to_nlattrs(const struct sw_flow_key *swkey,
 			goto nla_put_failure;
 	}
 
-	if (swkey->phy.skb_mark &&
-	    nla_put_u32(skb, OVS_KEY_ATTR_SKB_MARK, output->phy.skb_mark))
+	/* Always include the skb_mark so that it may be utilised
+	 * by recirculation */
+	if (nla_put_u32(skb, OVS_KEY_ATTR_SKB_MARK, output->phy.skb_mark))
 		goto nla_put_failure;
 
 	nla = nla_reserve(skb, OVS_KEY_ATTR_ETHERNET, sizeof(*eth_key));
