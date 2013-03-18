@@ -2323,9 +2323,9 @@ commit_set_nw_action(const struct flow *flow, struct flow *base,
         return;
     }
 
-    if (flow->dl_type == htons(ETH_TYPE_IP)) {
+    if (base->dl_type == htons(ETH_TYPE_IP)) {
         commit_set_ipv4_action(flow, base, odp_actions);
-    } else if (flow->dl_type == htons(ETH_TYPE_IPV6)) {
+    } else if (base->dl_type == htons(ETH_TYPE_IPV6)) {
         commit_set_ipv6_action(flow, base, odp_actions);
     }
 }
@@ -2398,9 +2398,9 @@ commit_odp_actions(const struct flow *flow, struct flow *base,
 {
     commit_set_ether_addr_action(flow, base, odp_actions);
     commit_vlan_action(flow, base, odp_actions);
-    commit_mpls_action(flow, base, odp_actions);
     commit_set_nw_action(flow, base, odp_actions);
     commit_set_port_action(flow, base, odp_actions);
+    commit_mpls_action(flow, base, odp_actions);
     commit_set_priority_action(flow, base, odp_actions);
     commit_set_skb_mark_action(flow, base, odp_actions);
 }
