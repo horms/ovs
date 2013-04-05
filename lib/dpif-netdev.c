@@ -1115,15 +1115,6 @@ dpif_netdev_wait(struct dpif *dpif)
 }
 
 static void
-dp_netdev_set_dl(struct ofpbuf *packet, const struct ovs_key_ethernet *eth_key)
-{
-    struct eth_header *eh = packet->l2;
-
-    memcpy(eh->eth_src, eth_key->eth_src, sizeof eh->eth_src);
-    memcpy(eh->eth_dst, eth_key->eth_dst, sizeof eh->eth_dst);
-}
-
-static void
 dp_netdev_output_port(struct dp_netdev *dp, struct ofpbuf *packet,
                       uint32_t out_port)
 {
@@ -1226,73 +1217,6 @@ dp_netdev_action_userspace(struct dp_netdev *dp,
 
     userdata = nl_attr_find_nested(a, OVS_USERSPACE_ATTR_USERDATA);
     dp_netdev_output_userspace(dp, packet, DPIF_UC_ACTION, key, userdata);
-}
-
-static void
-execute_set_action(struct ofpbuf *packet, const struct nlattr *a,
-                   uint32_t *skb_mark)
-{
-    enum ovs_key_attr type = nl_attr_type(a);
-    const struct ovs_key_ipv4 *ipv4_key;
-    const struct ovs_key_ipv6 *ipv6_key;
-    const struct ovs_key_tcp *tcp_key;
-    const struct ovs_key_udp *udp_key;
-
-    switch (type) {
-    case OVS_KEY_ATTR_PRIORITY:
-    case OVS_KEY_ATTR_TUNNEL:
-        /* not implemented */
-        break;
-
-    case OVS_KEY_ATTR_SKB_MARK:
-        *skb_mark = nl_attr_get_u32(a);
-        break;
-
-    case OVS_KEY_ATTR_ETHERNET:
-        dp_netdev_set_dl(packet,
-                   nl_attr_get_unspec(a, sizeof(struct ovs_key_ethernet)));
-        break;
-
-    case OVS_KEY_ATTR_IPV4:
-        ipv4_key = nl_attr_get_unspec(a, sizeof(struct ovs_key_ipv4));
-        packet_set_ipv4(packet, ipv4_key->ipv4_src, ipv4_key->ipv4_dst,
-                        ipv4_key->ipv4_tos, ipv4_key->ipv4_ttl);
-        break;
-
-    case OVS_KEY_ATTR_IPV6:
-        ipv6_key = nl_attr_get_unspec(a, sizeof(struct ovs_key_ipv6));
-        packet_set_ipv6(packet, ipv6_key->ipv6_proto, ipv6_key->ipv6_src,
-                        ipv6_key->ipv6_dst, ipv6_key->ipv6_tclass,
-                        ipv6_key->ipv6_label, ipv6_key->ipv6_hlimit);
-        break;
-
-    case OVS_KEY_ATTR_TCP:
-        tcp_key = nl_attr_get_unspec(a, sizeof(struct ovs_key_tcp));
-        packet_set_tcp_port(packet, tcp_key->tcp_src, tcp_key->tcp_dst);
-        break;
-
-     case OVS_KEY_ATTR_UDP:
-        udp_key = nl_attr_get_unspec(a, sizeof(struct ovs_key_udp));
-        packet_set_udp_port(packet, udp_key->udp_src, udp_key->udp_dst);
-        break;
-
-     case OVS_KEY_ATTR_MPLS:
-         set_mpls_lse(packet, nl_attr_get_be32(a));
-         break;
-
-     case OVS_KEY_ATTR_UNSPEC:
-     case OVS_KEY_ATTR_ENCAP:
-     case OVS_KEY_ATTR_ETHERTYPE:
-     case OVS_KEY_ATTR_IN_PORT:
-     case OVS_KEY_ATTR_VLAN:
-     case OVS_KEY_ATTR_ICMP:
-     case OVS_KEY_ATTR_ICMPV6:
-     case OVS_KEY_ATTR_ARP:
-     case OVS_KEY_ATTR_ND:
-     case __OVS_KEY_ATTR_MAX:
-     default:
-        NOT_REACHED();
-    }
 }
 
 static bool
