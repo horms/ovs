@@ -3455,24 +3455,51 @@ port_is_lacp_current(const struct ofport *ofport_)
 #define RECIRCULATION_ID_DUMMY 2
 #define RECIRCULATION_ID_MIN   RECIRCULATION_ID_DUMMY
 
+#define RECIRCULATION_ID_MAX_LOOP 1024  /* Arbitrary value to prevent
+                                         * endless loop */
+
 static uint32_t recirculation_id_hash(uint32_t id)
 {
     return hash_words(&id, 1, 0);
 }
 
-/* XXX: This does not prevent id collision */
+static uint32_t recirculation_id = RECIRCULATION_ID_MIN;
+static uint32_t validated_recirculation_id = RECIRCULATION_ID_NONE;
+
+static uint32_t peek_recirculation_id(struct ofproto_dpif *ofproto)
+{
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 15);
+
+    int loop = RECIRCULATION_ID_MAX_LOOP;
+
+    if (validated_recirculation_id == recirculation_id) {
+        return recirculation_id;
+    }
+
+    while (loop--) {
+        if (recirculation_id < RECIRCULATION_ID_MIN)
+            recirculation_id = RECIRCULATION_ID_MIN;
+        /* Skip IPSEC_MARK bit it is reserved */
+        if (recirculation_id & IPSEC_MARK) {
+            recirculation_id++;
+            ovs_assert(!(recirculation_id & IPSEC_MARK));
+        }
+        if (!facet_find_by_id(ofproto, recirculation_id)) {
+            validated_recirculation_id = recirculation_id;
+            return recirculation_id;
+        }
+        recirculation_id++;
+    }
+
+    VLOG_WARN_RL(&rl, "Failed to allocate recirulation id after %d attempts\n",
+                 RECIRCULATION_ID_MAX_LOOP);
+    return RECIRCULATION_ID_NONE;
+}
+
 static uint32_t get_recirculation_id(void)
 {
-    static uint32_t id = RECIRCULATION_ID_MIN;
-
-    if (id < RECIRCULATION_ID_MIN)
-        id = RECIRCULATION_ID_MIN;
-    /* Skip IPSEC_MARK bit it is reserved */
-    if (id & IPSEC_MARK) {
-        id++;
-        ovs_assert(!(id & IPSEC_MARK));
-    }
-    return id++;
+    ovs_assert(recirculation_id == validated_recirculation_id);
+    return recirculation_id++;
 }
 
 /* Upcall handling. */
@@ -3690,6 +3717,14 @@ static bool
 flow_miss_should_make_facet(struct ofproto_dpif *ofproto,
                             struct flow_miss *miss, uint32_t hash)
 {
+    /* If the packet is MPLS then recirculation may be used and
+     * this will not be possible with facets if there are no recirculation
+     * ids available */
+    if (eth_type_mpls(miss->flow.dl_type) &&
+        peek_recirculation_id(ofproto) == RECIRCULATION_ID_NONE) {
+        return false;
+    }
+
     if (!ofproto->governor) {
         size_t n_subfacets;
 
