@@ -43,6 +43,8 @@ lib_libopenvswitch_a_SOURCES = \
 	lib/dpif-provider.h \
 	lib/dpif.c \
 	lib/dpif.h \
+	lib/execute-actions.c \
+	lib/execute-actions.h \
 	lib/heap.c \
 	lib/heap.h \
 	lib/dynamic-string.c \
