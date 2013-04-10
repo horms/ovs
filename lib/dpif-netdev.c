@@ -159,6 +159,10 @@ static void dp_netdev_execute_actions(struct dp_netdev *,
                                       struct ofpbuf *, struct flow *,
                                       const struct nlattr *actions,
                                       size_t actions_len);
+static void dp_netdev_port_input(struct dp_netdev *dp,
+                                 struct dp_netdev_port *port,
+                                 struct ofpbuf *packet, uint32_t skb_priority,
+                                 uint32_t skb_mark, const struct flow_tnl *tnl);
 
 static struct dpif_netdev *
 dpif_netdev_cast(const struct dpif *dpif)
@@ -1032,20 +1036,21 @@ dp_netdev_flow_used(struct dp_netdev_flow *flow, const struct ofpbuf *packet)
 
 static void
 dp_netdev_port_input(struct dp_netdev *dp, struct dp_netdev_port *port,
-                     struct ofpbuf *packet)
+                     struct ofpbuf *packet, uint32_t skb_priority,
+                     uint32_t skb_mark, const struct flow_tnl *tnl)
 {
-    struct dp_netdev_flow *flow;
+    struct dp_netdev_flow *dp_flow;
     struct flow key;
 
     if (packet->size < ETH_HEADER_LEN) {
         return;
     }
-    flow_extract(packet, 0, 0, NULL, port->port_no, &key);
-    flow = dp_netdev_lookup_flow(dp, &key);
-    if (flow) {
-        dp_netdev_flow_used(flow, packet);
+    flow_extract(packet, skb_priority, skb_mark, tnl, port->port_no, &key);
+    dp_flow = dp_netdev_lookup_flow(dp, &key);
+    if (dp_flow) {
+        dp_netdev_flow_used(dp_flow, packet);
         dp_netdev_execute_actions(dp, packet, &key,
-                                  flow->actions, flow->actions_len);
+                                  dp_flow->actions, dp_flow->actions_len);
         dp->n_hit++;
     } else {
         dp->n_missed++;
@@ -1071,7 +1076,7 @@ dpif_netdev_run(struct dpif *dpif)
 
         error = port->rx ? netdev_rx_recv(port->rx, &packet) : EOPNOTSUPP;
         if (!error) {
-            dp_netdev_port_input(dp, port, &packet);
+            dp_netdev_port_input(dp, port, &packet, 0, 0, NULL);
         } else if (error != EAGAIN && error != EOPNOTSUPP) {
             static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
             VLOG_ERR_RL(&rl, "error receiving data from %s: %s",

@@ -22,6 +22,7 @@
 
 #include "execute-actions.h"
 #include "netlink.h"
+#include "odp-util.h"
 #include "packets.h"
 #include "util.h"
 
@@ -36,7 +37,17 @@ eth_set_src_and_dst(struct ofpbuf *packet,
 }
 
 static void
-execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
+set_tunnel_action(const struct nlattr *a, struct flow_tnl *tun_key)
+{
+    enum odp_key_fitness fitness = tun_key_from_attr(a, tun_key);
+
+    memset(&tun_key, 0, sizeof tun_key);
+    ovs_assert(fitness != ODP_FIT_ERROR);
+}
+
+static void
+execute_set_action(struct ofpbuf *packet, const struct nlattr *a,
+                   struct flow *flow)
 {
     enum ovs_key_attr type = nl_attr_type(a);
     const struct ovs_key_ipv4 *ipv4_key;
@@ -46,9 +57,15 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
 
     switch (type) {
     case OVS_KEY_ATTR_PRIORITY:
+        flow->skb_priority = nl_attr_get_u32(a);
+        break;
+
     case OVS_KEY_ATTR_TUNNEL:
+        set_tunnel_action(a, &flow->tunnel);
+        break;
+
     case OVS_KEY_ATTR_SKB_MARK:
-        /* not implemented */
+        flow->skb_mark = nl_attr_get_u32(a);
         break;
 
     case OVS_KEY_ATTR_ETHERNET:
@@ -185,7 +202,7 @@ execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
             break;
 
         case OVS_ACTION_ATTR_SET:
-            execute_set_action(packet, nl_attr_get(a));
+            execute_set_action(packet, nl_attr_get(a), key);
             break;
 
         case OVS_ACTION_ATTR_SAMPLE:
