@@ -36,7 +36,8 @@ eth_set_src_and_dst(struct ofpbuf *packet,
 }
 
 static void
-execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
+execute_set_action(struct ofpbuf *packet, const struct nlattr *a,
+                   uint32_t *skb_mark)
 {
     enum ovs_key_attr type = nl_attr_type(a);
     const struct ovs_key_ipv4 *ipv4_key;
@@ -47,8 +48,11 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
     switch (type) {
     case OVS_KEY_ATTR_PRIORITY:
     case OVS_KEY_ATTR_TUNNEL:
-    case OVS_KEY_ATTR_SKB_MARK:
         /* not implemented */
+        break;
+
+    case OVS_KEY_ATTR_SKB_MARK:
+        *skb_mark = nl_attr_get_u32(a);
         break;
 
     case OVS_KEY_ATTR_ETHERNET:
@@ -100,7 +104,7 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a)
 
 static void
 execute_sample(void *dp, struct ofpbuf *packet, struct flow *key,
-               const struct nlattr *action,
+               const struct nlattr *action, uint32_t *skb_mark,
                void (*output)(void *dp, struct ofpbuf *packet,
                               uint32_t out_port),
                void (*userspace)(void *dp, struct ofpbuf *packet,
@@ -132,12 +136,13 @@ execute_sample(void *dp, struct ofpbuf *packet, struct flow *key,
     }
 
     execute_actions(dp, packet, key, nl_attr_get(subactions),
-                    nl_attr_get_size(subactions), output, userspace);
+                    nl_attr_get_size(subactions), skb_mark, output, userspace);
 }
 
 void
 execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
                 const struct nlattr *actions, size_t actions_len,
+                uint32_t *skb_mark,
                 void (*output)(void *dp, struct ofpbuf *packet,
                                uint32_t out_port),
                 void (*userspace)(void *dp, struct ofpbuf *packet,
@@ -181,11 +186,11 @@ execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
             break;
 
         case OVS_ACTION_ATTR_SET:
-            execute_set_action(packet, nl_attr_get(a));
+            execute_set_action(packet, nl_attr_get(a), skb_mark);
             break;
 
         case OVS_ACTION_ATTR_SAMPLE:
-            execute_sample(dp, packet, key, a, output, userspace);
+            execute_sample(dp, packet, key, a, skb_mark, output, userspace);
             break;
 
         case OVS_ACTION_ATTR_UNSPEC:
