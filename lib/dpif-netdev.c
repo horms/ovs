@@ -158,7 +158,7 @@ static int dp_netdev_output_userspace(struct dp_netdev *, const struct ofpbuf *,
 static void dp_netdev_execute_actions(struct dp_netdev *,
                                       struct ofpbuf *, struct flow *,
                                       const struct nlattr *actions,
-                                      size_t actions_len);
+                                      size_t actions_len, uint32_t *skb_mark);
 
 static struct dpif_netdev *
 dpif_netdev_cast(const struct dpif *dpif)
@@ -946,8 +946,11 @@ dpif_netdev_execute(struct dpif *dpif, const struct dpif_execute *execute)
     error = dpif_netdev_flow_from_nlattrs(execute->key, execute->key_len,
                                           &key);
     if (!error) {
+        uint32_t skb_mark = 0;
+
         dp_netdev_execute_actions(dp, &copy, &key,
-                                  execute->actions, execute->actions_len);
+                                  execute->actions, execute->actions_len,
+                                  &skb_mark);
     }
 
     ofpbuf_uninit(&copy);
@@ -1036,6 +1039,7 @@ dp_netdev_port_input(struct dp_netdev *dp, struct dp_netdev_port *port,
 {
     struct dp_netdev_flow *flow;
     struct flow key;
+    uint32_t skb_mark = 0;
 
     if (packet->size < ETH_HEADER_LEN) {
         return;
@@ -1045,7 +1049,7 @@ dp_netdev_port_input(struct dp_netdev *dp, struct dp_netdev_port *port,
     if (flow) {
         dp_netdev_flow_used(flow, packet);
         dp_netdev_execute_actions(dp, packet, &key,
-                                  flow->actions, flow->actions_len);
+                                  flow->actions, flow->actions_len, &skb_mark);
         dp->n_hit++;
     } else {
         dp->n_missed++;
@@ -1168,9 +1172,9 @@ static void
 dp_netdev_execute_actions(struct dp_netdev *dp,
                           struct ofpbuf *packet, struct flow *key,
                           const struct nlattr *actions,
-                          size_t actions_len)
+                          size_t actions_len, uint32_t *skb_mark)
 {
-    execute_actions(dp, packet, key, actions, actions_len,
+    execute_actions(dp, packet, key, actions, actions_len, skb_mark,
                     dp_netdev_output_port, dp_netdev_action_userspace);
 }
 
