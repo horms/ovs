@@ -773,7 +773,7 @@ tunnel_key_attr_len(int type)
     return -1;
 }
 
-static enum odp_key_fitness
+enum odp_key_fitness
 tun_key_from_attr(const struct nlattr *attr, struct flow_tnl *tun)
 {
     unsigned int left;

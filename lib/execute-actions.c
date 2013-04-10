@@ -22,6 +22,7 @@
 
 #include "execute-actions.h"
 #include "netlink.h"
+#include "odp-util.h"
 #include "packets.h"
 #include "util.h"
 
@@ -36,8 +37,18 @@ eth_set_src_and_dst(struct ofpbuf *packet,
 }
 
 static void
+set_tunnel_action(const struct nlattr *a, struct flow_tnl *tun_key)
+{
+    enum odp_key_fitness fitness = tun_key_from_attr(a, tun_key);
+
+    memset(&tun_key, 0, sizeof tun_key);
+    ovs_assert(fitness != ODP_FIT_ERROR);
+}
+
+static void
 execute_set_action(struct ofpbuf *packet, const struct nlattr *a,
-                   uint32_t *skb_priority, uint32_t *skb_mark)
+                   uint32_t *skb_priority, uint32_t *skb_mark,
+                   struct flow_tnl *tun_key)
 {
     enum ovs_key_attr type = nl_attr_type(a);
     const struct ovs_key_ipv4 *ipv4_key;
@@ -47,7 +58,7 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a,
 
     switch (type) {
     case OVS_KEY_ATTR_TUNNEL:
-        /* not implemented */
+        set_tunnel_action(a, tun_key);
         break;
 
     case OVS_KEY_ATTR_PRIORITY:
@@ -108,7 +119,7 @@ execute_set_action(struct ofpbuf *packet, const struct nlattr *a,
 static void
 execute_sample(void *dp, struct ofpbuf *packet, struct flow *key,
                const struct nlattr *action, uint32_t *skb_priority,
-               uint32_t *skb_mark,
+               uint32_t *skb_mark, struct flow_tnl *tun_key,
                void (*output)(void *dp, struct ofpbuf *packet,
                               uint32_t out_port),
                void (*userspace)(void *dp, struct ofpbuf *packet,
@@ -141,13 +152,14 @@ execute_sample(void *dp, struct ofpbuf *packet, struct flow *key,
 
     execute_actions(dp, packet, key, nl_attr_get(subactions),
                     nl_attr_get_size(subactions), skb_priority, skb_mark,
-                    output, userspace);
+                    tun_key, output, userspace);
 }
 
 void
 execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
                 const struct nlattr *actions, size_t actions_len,
                 uint32_t *skb_priority, uint32_t *skb_mark,
+                struct flow_tnl *tun_key,
                 void (*output)(void *dp, struct ofpbuf *packet,
                                uint32_t out_port),
                 void (*userspace)(void *dp, struct ofpbuf *packet,
@@ -191,11 +203,12 @@ execute_actions(void *dp, struct ofpbuf *packet, struct flow *key,
             break;
 
         case OVS_ACTION_ATTR_SET:
-            execute_set_action(packet, nl_attr_get(a), skb_priority, skb_mark);
+            execute_set_action(packet, nl_attr_get(a), skb_priority, skb_mark,
+                               tun_key);
             break;
 
         case OVS_ACTION_ATTR_SAMPLE:
-            execute_sample(dp, packet, key, a, skb_priority, skb_mark,
+            execute_sample(dp, packet, key, a, skb_priority, skb_mark, tun_key,
                            output, userspace);
             break;
 
