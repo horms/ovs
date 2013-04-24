@@ -346,6 +346,12 @@ struct xlate_ctx {
                                  * offset into ofpacts for calls to
                                  * xlate_actions on recirculated packets */
 
+    int mpls_depth_delta;       /* Delta of the mpls stack depth since
+                                 * actions were last committed.
+                                 * Must be between -1 and 1 inclusive.
+                                 * Multiple push/pop actions
+                                 * are handled using recirculation */
+
     int recurse;                /* Recursion level, via xlate_table_action. */
     bool max_resubmit_trigger;  /* Recursed too deeply during translation. */
     uint32_t orig_skb_priority; /* Priority when packet arrived. */
@@ -3818,11 +3824,8 @@ static bool
 flow_miss_should_make_facet(struct ofproto_dpif *ofproto,
                             struct flow_miss *miss, uint32_t hash)
 {
-    /* If the packet is MPLS then recirculation may be used and
-     * this will not be possible with facets if there are no recirculation
-     * ids available */
-    if (eth_type_mpls(miss->flow.dl_type) &&
-        peek_recirculation_id(ofproto) == RECIRCULATION_ID_NONE) {
+    /* A recirculation id needs to be available in case recirculation occurs. */
+    if (peek_recirculation_id(ofproto) == RECIRCULATION_ID_NONE) {
         return false;
     }
 
@@ -6413,7 +6416,7 @@ compose_output_action__(struct xlate_ctx *ctx, uint16_t ofp_port,
 
     /* If 'struct flow' gets additional metadata, we'll need to zero it out
      * before traversing a patch port. */
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 20);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 21);
 
     if (!ofport) {
         xlate_report(ctx, "Nonexistent output port");
@@ -6526,7 +6529,7 @@ compose_output_action__(struct xlate_ctx *ctx, uint16_t ofp_port,
         ctx->xin->flow.skb_mark &= ~IPSEC_MARK;
     }
     commit_odp_actions(&ctx->xin->flow, &ctx->base_flow,
-                       &ctx->xout->odp_actions);
+                       &ctx->mpls_depth_delta, &ctx->xout->odp_actions);
     nl_msg_put_u32(&ctx->xout->odp_actions, OVS_ACTION_ATTR_OUTPUT, out_port);
 
     ctx->sflow_odp_port = odp_port;
@@ -6695,7 +6698,7 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     memset(&key.tunnel, 0, sizeof key.tunnel);
 
     commit_odp_actions(&ctx->xin->flow, &ctx->base_flow,
-                       &ctx->xout->odp_actions);
+                       &ctx->mpls_depth_delta, &ctx->xout->odp_actions);
 
     odp_execute_actions(NULL, packet, &key, ctx->xout->odp_actions.data,
                         ctx->xout->odp_actions.size, NULL, NULL);
@@ -6714,14 +6717,34 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     ofpbuf_delete(packet);
 }
 
-static void
-execute_mpls_push_action(struct xlate_ctx *ctx, ovs_be16 eth_type)
+static bool
+execute_mpls_push_action(struct xlate_ctx *ctx, ovs_be16 eth_type,
+                         ovs_be32 *pre_push_mpls_lse)
 {
     ovs_assert(eth_type_mpls(eth_type));
 
-    if (ctx->base_flow.mpls_depth) {
+    /* If mpls_depth_delta is negative then an MPLS POP action has been
+     * executed and the resulting MPLS label stack is unknown.  This means
+     * an MPLS PUSH action can't be executed as it needs to know either the
+     * top-most MPLS LSE to use as a template for the new MPLS LSE, or that
+     * there is no MPLS label stack present.  Thus, recirculate.
+     *
+     * If mpls_depth_delta is positive then an MPLS PUSH action has been
+     * executed. Recirculate to effect that MPLS PUSH action before adding
+     * another MPLS PUSH action as as there is only one MPLS LSE in the flow.
+     *
+     * If the MPLS LSE of the flow and base_flow differ then the MPLS LSE
+     * has been updated.  Recirculate to effect the updates before adding
+     * an MPLS PUSH action as there is only one MPLS LSE in the flow. */
+    if (ctx->mpls_depth_delta ||
+         ctx->xin->flow.mpls_lse != ctx->base_flow.mpls_lse) {
+         return true;
+    }
+
+    *pre_push_mpls_lse = ctx->xin->flow.mpls_lse;
+
+    if (eth_type_mpls(ctx->xin->flow.dl_type)) {
         ctx->xin->flow.mpls_lse &= ~htonl(MPLS_BOS_MASK);
-        ctx->xin->flow.mpls_depth++;
     } else {
         ovs_be32 label;
         uint8_t tc, ttl;
@@ -6734,24 +6757,35 @@ execute_mpls_push_action(struct xlate_ctx *ctx, ovs_be16 eth_type)
         tc = (ctx->xin->flow.nw_tos & IP_DSCP_MASK) >> 2;
         ttl = ctx->xin->flow.nw_ttl ? ctx->xin->flow.nw_ttl : 0x40;
         ctx->xin->flow.mpls_lse = set_mpls_lse_values(ttl, tc, 1, label);
-        ctx->xin->flow.mpls_depth = 1;
     }
     ctx->xin->flow.dl_type = eth_type;
+    ctx->mpls_depth_delta++;
+
+    return false;
 }
 
-static void
-execute_mpls_pop_action(struct xlate_ctx *ctx, ovs_be16 eth_type)
+static bool
+execute_mpls_pop_action(struct xlate_ctx *ctx, ovs_be16 eth_type,
+                        ovs_be32 pre_push_mpls_lse)
 {
-    ovs_assert(eth_type_mpls(ctx->xin->flow.dl_type));
-    ovs_assert(!eth_type_mpls(eth_type));
-
-    if (ctx->xin->flow.mpls_depth) {
-        ctx->xin->flow.mpls_depth--;
-        ctx->xin->flow.mpls_lse = htonl(0);
-        if (!ctx->xin->flow.mpls_depth) {
-            ctx->xin->flow.dl_type = eth_type;
-        }
+    /* Stop processing if there is no MPLS label stack to pop */
+    if (!eth_type_mpls(ctx->xin->flow.dl_type)) {
+        return true;
     }
+
+    /* If mpls_depth_delta is positive then an MPLS PUSH action has been
+     * executed and the previous MPLS LSE saved in pre_push_mpls_lse. The
+     * flow's MPLS LSE should be restored to that value to allow any
+     * subsequent actions that update of the LSE to be executed correctly.
+     */
+    if (ctx->mpls_depth_delta > 0) {
+        ctx->xin->flow.mpls_lse = pre_push_mpls_lse;
+    }
+
+    ctx->xin->flow.dl_type = eth_type;
+    ctx->mpls_depth_delta--;
+
+    return false;
 }
 
 static bool
@@ -7023,7 +7057,7 @@ xlate_sample_action(struct xlate_ctx *ctx,
   uint32_t probability = (os->probability << 16) | os->probability;
 
   commit_odp_actions(&ctx->xin->flow, &ctx->base_flow,
-                     &ctx->xout->odp_actions);
+                     &ctx->mpls_depth_delta, &ctx->xout->odp_actions);
 
   compose_flow_sample_cookie(os->probability, os->collector_set_id,
                              os->obs_domain_id, os->obs_point_id, &cookie);
@@ -7077,6 +7111,7 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 {
     bool was_evictable = true;
     bool may_xlate_l3_actions = true;
+    ovs_be32 pre_push_mpls_lse = ctx->xin->flow.mpls_lse;
     const struct ofpact *a;
 
     if (ctx->rule) {
@@ -7248,26 +7283,51 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             break;
 
         case OFPACT_PUSH_MPLS:
-            execute_mpls_push_action(ctx, ofpact_get_PUSH_MPLS(a)->ethertype);
+            if (execute_mpls_push_action(ctx,
+                                         ofpact_get_PUSH_MPLS(a)->ethertype,
+                                         &pre_push_mpls_lse)) {
+                execute_recirculate_action(ctx);
+                goto out;
+            }
             may_xlate_l3_actions = true;
             break;
 
         case OFPACT_POP_MPLS:
-            execute_mpls_pop_action(ctx, ofpact_get_POP_MPLS(a)->ethertype);
-            if (ctx->xin->flow.dl_type == htons(ETH_TYPE_IP) ||
-                ctx->xin->flow.dl_type == htons(ETH_TYPE_IPV6)) {
-                may_xlate_l3_actions = false;
+            if (execute_mpls_pop_action(ctx,
+                                        ofpact_get_POP_MPLS(a)->ethertype,
+                                        pre_push_mpls_lse)) {
+                goto out;
             }
+            may_xlate_l3_actions = false;
             break;
 
         case OFPACT_SET_MPLS_TTL:
-            if (execute_set_mpls_ttl_action(ctx,
-                                            ofpact_get_SET_MPLS_TTL(a)->ttl)) {
+            /* If mpls_depth_delta is negative then an MPLS POP action has
+             * been executed and the resulting MPLS label stack is unknown.
+             * This means a push action can't be executed as it needs to
+             * know either the top-most MPLS LSE to use as a template for
+             * the new MPLS LSE, or that there is no MPLS label stack
+             * present.  Thus, recirculate. */
+            if (ctx->mpls_depth_delta < 0) {
+                 execute_recirculate_action(ctx);
+                 goto out;
+            }
+            if (execute_set_mpls_ttl_action(ctx, ofpact_get_SET_MPLS_TTL(a)->ttl)) {
                 goto out;
             }
             break;
 
         case OFPACT_DEC_MPLS_TTL:
+            /* If mpls_depth_delta is negative then an MPLS POP action has
+             * been executed and the resulting MPLS label stack is unknown.
+             * This means a push action can't be executed as it needs to
+             * know either the top-most MPLS LSE to use as a template for
+             * the new MPLS LSE, or that there is no MPLS label stack
+             * present.  Thus, recirculate. */
+            if (ctx->mpls_depth_delta < 0) {
+                 execute_recirculate_action(ctx);
+                 goto out;
+            }
             if (execute_dec_mpls_ttl_action(ctx)) {
                 goto out;
             }
@@ -7491,6 +7551,7 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
     ctx.orig_skb_priority = ctx.xin->flow.skb_priority;
     ctx.table_id = 0;
     ctx.exit = false;
+    ctx.mpls_depth_delta = 0;
 
     if (xin->ofpacts) {
         ofpacts = xin->ofpacts;
@@ -7554,6 +7615,7 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
             do_xlate_actions(ofpacts, ofpacts_len, &ctx);
             if (ctx.xin->recirculated) {
                 commit_odp_actions(&ctx.xin->flow, &ctx.base_flow,
+                                   &ctx.mpls_depth_delta,
                                    &ctx.xout->odp_actions);
                 commit_odp_recirculate_action(&ctx.xout->odp_actions);
                 xin->ofpacts_len = ctx.ofpacts_len;

@@ -212,32 +212,6 @@ eth_pop_vlan(struct ofpbuf *packet)
     }
 }
 
-/* Return depth of mpls stack.
- *
- * 'packet->l2_5' should initially point to 'packet''s outer-most MPLS header
- * or may be NULL if there are no MPLS headers. */
-uint16_t
-eth_mpls_depth(const struct ofpbuf *packet)
-{
-    struct mpls_hdr *mh = packet->l2_5;
-    uint16_t depth;
-
-    if (!mh) {
-        return 0;
-    }
-
-    depth = 0;
-    while (packet->size >= ((char *)mh - (char *)packet->data) + sizeof *mh) {
-        depth++;
-        if (mh->mpls_lse & htonl(MPLS_BOS_MASK)) {
-            break;
-        }
-        mh++;
-    }
-
-    return depth;
-}
-
 /* Set ethertype of the packet. */
 void
 set_ethertype(struct ofpbuf *packet, ovs_be16 eth_type)
@@ -345,13 +319,10 @@ push_mpls(struct ofpbuf *packet, ovs_be16 ethtype, ovs_be32 lse)
 {
     struct mpls_hdr mh;
 
-    if (!eth_type_mpls(ethtype)) {
-        return;
-    }
+    set_ethertype(packet, ethtype);
 
     if (!is_mpls(packet)) {
-        /* Set ethtype and MPLS label stack entry. */
-        set_ethertype(packet, ethtype);
+        /* Set MPLS label stack entry. */
         packet->l2_5 = packet->l3;
     }
 
