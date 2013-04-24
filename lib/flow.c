@@ -97,9 +97,11 @@ static void
 parse_mpls(struct ofpbuf *b, struct flow *flow)
 {
     struct mpls_hdr *mh;
+    bool top = true;
 
     while ((mh = ofpbuf_try_pull(b, sizeof *mh))) {
-        if (flow->mpls_depth++ == 0) {
+        if (top) {
+            top = false;
             flow->mpls_lse = mh->mpls_lse;
         }
         if (mh->mpls_lse & htonl(MPLS_BOS_MASK)) {
@@ -491,7 +493,7 @@ flow_zero_wildcards(struct flow *flow, const struct flow_wildcards *wildcards)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 20);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 21);
 
     fmd->tun_id = flow->tunnel.tun_id;
     fmd->tun_src = flow->tunnel.ip_src;

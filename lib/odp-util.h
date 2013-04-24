@@ -120,6 +120,7 @@ void commit_odp_tunnel_action(const struct flow *, struct flow *base,
                               struct ofpbuf *odp_actions);
 void commit_odp_recirculate_action(struct ofpbuf *odp_actions);
 void commit_odp_actions(const struct flow *, struct flow *base,
+                        int *mpls_depth_delta,
                         struct ofpbuf *odp_actions);
 
 /* ofproto-dpif interface.
