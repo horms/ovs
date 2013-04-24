@@ -935,10 +935,13 @@ allows isn't supported at the moment.)
 A priority of zero and the tag of zero are used for the new tag.
 .
 .IP \fBpush_mpls\fR:\fIethertype\fR
-If the packet does not already contain any MPLS labels, changes the
-packet's Ethertype to \fIethertype\fR, which must be either the MPLS
-unicast Ethertype \fB0x8847\fR or the MPLS multicast Ethertype
-\fB0x8848\fR, and then pushes an initial label stack entry.  The label
+Adds the outermost MPLS label stack entry to the MPLS label stack.
+.
+If a label stack already exists then the new label, traffic control value
+and TTL of the new label stack entry
+are coppied the previouisly outmost label stack entry.
+.
+Otherwise, if a label stack does not already exist, the new label
 stack entry's default label is 2 if the packet contains IPv6 and 0
 otherwise, its default traffic control value is the low 3 bits of the
 packet's DSCP value (0 if the packet is not IP), and its TTL is copied
@@ -953,15 +956,6 @@ followed by another \fBpush_mpls\fR will result in the first
 .
 .IP \fBpop_mpls\fR:\fIethertype\fR
 Strips the outermost MPLS label stack entry.
-Currently the implementation restricts \fIethertype\fR to a non-MPLS Ethertype
-and thus \fBpop_mpls\fR should only be applied to packets with
-an MPLS label stack depth of one.
-.
-.IP
-There are some limitations in the implementation.  \fBpop_mpls\fR
-followed by another \fBpush_mpls\fR without an intermediate
-\fBpush_mpls\fR will result in the first \fBpush_mpls\fR being
-discarded.
 .
 .IP \fBmod_dl_src\fB:\fImac\fR
 Sets the source Ethernet address to \fImac\fR.
