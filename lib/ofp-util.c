@@ -84,7 +84,7 @@ ofputil_netmask_to_wcbits(ovs_be32 netmask)
 void
 ofputil_wildcard_from_ofpfw10(uint32_t ofpfw, struct flow_wildcards *wc)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 20);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 21);
 
     /* Initialize most of wc. */
     flow_wildcards_init_catchall(wc);
@@ -1048,7 +1048,7 @@ ofputil_usable_protocols(const struct match *match)
 {
     const struct flow_wildcards *wc = &match->wc;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 20);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 21);
 
     /* These tunnel params can't be sent in a flow_mod */
     if (wc->masks.tunnel.ip_ttl
@@ -4393,7 +4393,6 @@ ofputil_normalize_match__(struct match *match, bool may_log)
     }
     if (!(may_match & MAY_MPLS)) {
         wc.masks.mpls_lse = htonl(0);
-        wc.masks.mpls_depth = 0;
     }
 
     /* Log any changes. */
