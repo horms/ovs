@@ -419,7 +419,7 @@ parse_sample(struct ofpbuf *b, char *arg)
 
 static void
 parse_named_action(enum ofputil_action_code code, const struct flow *flow,
-                   char *arg, struct ofpbuf *ofpacts)
+                   ovs_be16 *dl_type, char *arg, struct ofpbuf *ofpacts)
 {
     struct ofpact_tunnel *tunnel;
     uint16_t vid;
@@ -578,9 +578,12 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
     case OFPUTIL_NXAST_DEC_TTL_CNT_IDS:
         NOT_REACHED();
 
-    case OFPUTIL_NXAST_LEARN:
-        learn_parse(arg, flow, ofpacts);
+    case OFPUTIL_NXAST_LEARN: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        learn_parse(arg, updated_flow, ofpacts);
         break;
+    }
 
     case OFPUTIL_NXAST_EXIT:
         ofpact_put_EXIT(ofpacts);
@@ -610,13 +613,13 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
 
     case OFPUTIL_OFPAT11_PUSH_MPLS:
     case OFPUTIL_NXAST_PUSH_MPLS:
-        ofpact_put_PUSH_MPLS(ofpacts)->ethertype =
+        *dl_type = ofpact_put_PUSH_MPLS(ofpacts)->ethertype =
             htons(str_to_u16(arg, "push_mpls"));
         break;
 
     case OFPUTIL_OFPAT11_POP_MPLS:
     case OFPUTIL_NXAST_POP_MPLS:
-        ofpact_put_POP_MPLS(ofpacts)->ethertype =
+        *dl_type = ofpact_put_POP_MPLS(ofpacts)->ethertype =
             htons(str_to_u16(arg, "pop_mpls"));
         break;
 
@@ -634,12 +637,12 @@ parse_named_action(enum ofputil_action_code code, const struct flow *flow,
 }
 
 static bool
-str_to_ofpact__(const struct flow *flow, char *pos, char *act, char *arg,
-                struct ofpbuf *ofpacts, int n_actions)
+str_to_ofpact__(const struct flow *flow, ovs_be16 *dl_type, char *pos,
+                char *act, char *arg, struct ofpbuf *ofpacts, int n_actions)
 {
     int code = ofputil_action_code_from_name(act);
     if (code >= 0) {
-        parse_named_action(code, flow, arg, ofpacts);
+        parse_named_action(code, flow, dl_type, arg, ofpacts);
     } else if (!strcasecmp(act, "drop")) {
         if (n_actions) {
             ovs_fatal(0, "Drop actions must not be preceded by other "
@@ -667,11 +670,14 @@ str_to_ofpacts(const struct flow *flow, char *str, struct ofpbuf *ofpacts)
     char *pos, *act, *arg;
     enum ofperr error;
     int n_actions;
+    ovs_be16 dl_type;
 
     pos = str;
     n_actions = 0;
+    dl_type = flow ? flow->dl_type : ntohs(0);
     while (ofputil_parse_key_value(&pos, &act, &arg)) {
-        if (!str_to_ofpact__(flow, pos, act, arg, ofpacts, n_actions)) {
+        if (!str_to_ofpact__(flow, &dl_type, pos, act, arg,
+                             ofpacts, n_actions)) {
             break;
         }
         n_actions++;
@@ -736,12 +742,14 @@ str_to_inst_ofpacts(const struct flow *flow, char *str, struct ofpbuf *ofpacts)
     const char *prev_inst = NULL;
     int prev_type = -1;
     int n_actions = 0;
+    ovs_be16 dl_type = flow->dl_type;
 
     pos = str;
     while (ofputil_parse_key_value(&pos, &inst, &arg)) {
         type = ofpact_instruction_type_from_name(inst);
         if (type < 0) {
-            if (!str_to_ofpact__(flow, pos, inst, arg, ofpacts, n_actions)) {
+            if (!str_to_ofpact__(flow, &dl_type, pos, inst, arg,
+                                 ofpacts, n_actions)) {
                 break;
             }
 

@@ -1136,18 +1136,6 @@ exit:
     return error;
 }
 
-static const struct flow *update_flow(const struct flow *flow,
-                                       struct flow *flow_storage,
-                                       ovs_be16 dl_type)
-{
-    if (flow->dl_type == dl_type) {
-        return flow;
-    }
-    *flow_storage = *flow;
-    flow_storage->dl_type = dl_type;
-    return flow_storage;
-}
-
 static enum ofperr
 ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports,
                ovs_be16 *dl_type)
