@@ -1158,11 +1158,17 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports,
         }
         return 0;
 
-    case OFPACT_OUTPUT_REG:
-        return mf_check_src(&ofpact_get_OUTPUT_REG(a)->src, flow);
+    case OFPACT_OUTPUT_REG: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        return mf_check_src(&ofpact_get_OUTPUT_REG(a)->src, updated_flow);
+    }
 
-    case OFPACT_BUNDLE:
-        return bundle_check(ofpact_get_BUNDLE(a), max_ports, flow);
+    case OFPACT_BUNDLE: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        return bundle_check(ofpact_get_BUNDLE(a), max_ports, updated_flow);
+    }
 
     case OFPACT_SET_VLAN_VID:
     case OFPACT_SET_VLAN_PCP:
@@ -1170,34 +1176,46 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports,
     case OFPACT_PUSH_VLAN:
     case OFPACT_SET_ETH_SRC:
     case OFPACT_SET_ETH_DST:
+        return 0;
+
     case OFPACT_SET_IPV4_SRC:
     case OFPACT_SET_IPV4_DST:
     case OFPACT_SET_IPV4_DSCP:
     case OFPACT_SET_L4_SRC_PORT:
     case OFPACT_SET_L4_DST_PORT:
-        return 0;
+        return eth_type_mpls(*dl_type) ? OFPERR_OFPBAC_BAD_ARGUMENT : 0;
 
-    case OFPACT_REG_MOVE:
-        return nxm_reg_move_check(ofpact_get_REG_MOVE(a), flow);
+    case OFPACT_REG_MOVE: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        return nxm_reg_move_check(ofpact_get_REG_MOVE(a), updated_flow);
+    }
 
-    case OFPACT_REG_LOAD:
-        if (*dl_type != flow->dl_type) {
-            struct flow updated_flow = *flow;
-            updated_flow.dl_type = *dl_type;
-            return nxm_reg_load_check(ofpact_get_REG_LOAD(a), &updated_flow);
-        } else {
-            return nxm_reg_load_check(ofpact_get_REG_LOAD(a), flow);
-        }
+    case OFPACT_REG_LOAD: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        return nxm_reg_load_check(ofpact_get_REG_LOAD(a), updated_flow);
+    }
 
-    case OFPACT_STACK_PUSH:
-        return nxm_stack_push_check(ofpact_get_STACK_PUSH(a), flow);
+    case OFPACT_STACK_PUSH: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        return nxm_stack_push_check(ofpact_get_STACK_PUSH(a), updated_flow);
+    }
 
-    case OFPACT_STACK_POP:
-        return nxm_stack_pop_check(ofpact_get_STACK_POP(a), flow);
+    case OFPACT_STACK_POP: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        return nxm_stack_pop_check(ofpact_get_STACK_POP(a), updated_flow);
+    }
 
     case OFPACT_DEC_TTL:
+        return eth_type_mpls(*dl_type) ? OFPERR_OFPBAC_BAD_ARGUMENT : 0;
+
     case OFPACT_SET_MPLS_TTL:
     case OFPACT_DEC_MPLS_TTL:
+        return eth_type_mpls(*dl_type) ? 0 : OFPERR_OFPBAC_BAD_ARGUMENT;
+
     case OFPACT_SET_TUNNEL:
     case OFPACT_SET_QUEUE:
     case OFPACT_POP_QUEUE:
@@ -1205,11 +1223,17 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports,
     case OFPACT_RESUBMIT:
         return 0;
 
-    case OFPACT_LEARN:
-        return learn_check(ofpact_get_LEARN(a), flow);
+    case OFPACT_LEARN: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        return learn_check(ofpact_get_LEARN(a), updated_flow);
+    }
 
-    case OFPACT_MULTIPATH:
-        return multipath_check(ofpact_get_MULTIPATH(a), flow);
+    case OFPACT_MULTIPATH: {
+        struct flow storage;
+        const struct flow *updated_flow = update_flow(flow, &storage, *dl_type);
+        return multipath_check(ofpact_get_MULTIPATH(a), updated_flow);
+    }
 
     case OFPACT_NOTE:
     case OFPACT_EXIT:
@@ -1220,6 +1244,9 @@ ofpact_check__(const struct ofpact *a, const struct flow *flow, int max_ports,
         return 0;
 
     case OFPACT_POP_MPLS:
+        if (!eth_type_mpls(*dl_type)) {
+            return OFPERR_OFPBAC_BAD_ARGUMENT;
+        }
         *dl_type = ofpact_get_POP_MPLS(a)->ethertype;
         return 0;
 

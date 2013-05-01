@@ -648,4 +648,15 @@ int ofpact_instruction_type_from_name(const char *name);
 void ofpact_set_field_init(struct ofpact_reg_load *load,
                            const struct mf_field *mf, const void *src);
 
+static inline const struct flow *update_flow(const struct flow *flow,
+                                             struct flow *flow_storage,
+                                             ovs_be16 dl_type)
+{
+    if (flow->dl_type == dl_type) {
+        return flow;
+    }
+    *flow_storage = *flow;
+    flow_storage->dl_type = dl_type;
+    return flow_storage;
+}
 #endif /* ofp-actions.h */
