@@ -6346,6 +6346,7 @@ execute_controller_action(struct action_xlate_ctx *ctx, int len,
 {
     struct ofputil_packet_in pin;
     struct ofpbuf *packet;
+    struct flow key;
 
     ctx->slow |= SLOW_CONTROLLER;
     if (!ctx->packet) {
@@ -6354,47 +6355,14 @@ execute_controller_action(struct action_xlate_ctx *ctx, int len,
 
     packet = ofpbuf_clone(ctx->packet);
 
-    if (packet->l2 && packet->l3) {
-        struct eth_header *eh;
-        uint16_t mpls_depth;
+    key.skb_priority = 0;
+    key.skb_mark = 0;
+    memset(&key.tunnel, 0, sizeof key.tunnel);
 
-        eth_pop_vlan(packet);
-        eh = packet->l2;
+    commit_odp_actions(&ctx->flow, &ctx->base_flow, ctx->odp_actions);
 
-        memcpy(eh->eth_src, ctx->flow.dl_src, sizeof eh->eth_src);
-        memcpy(eh->eth_dst, ctx->flow.dl_dst, sizeof eh->eth_dst);
-
-        if (ctx->flow.vlan_tci & htons(VLAN_CFI)) {
-            eth_push_vlan(packet, ctx->flow.vlan_tci);
-        }
-
-        mpls_depth = eth_mpls_depth(packet);
-
-        if (mpls_depth < ctx->flow.mpls_depth) {
-            push_mpls(packet, ctx->flow.dl_type, ctx->flow.mpls_lse);
-        } else if (mpls_depth > ctx->flow.mpls_depth) {
-            pop_mpls(packet, ctx->flow.dl_type);
-        } else if (mpls_depth) {
-            set_mpls_lse(packet, ctx->flow.mpls_lse);
-        }
-
-        if (packet->l4) {
-            if (ctx->flow.dl_type == htons(ETH_TYPE_IP)) {
-                packet_set_ipv4(packet, ctx->flow.nw_src, ctx->flow.nw_dst,
-                                ctx->flow.nw_tos, ctx->flow.nw_ttl);
-            }
-
-            if (packet->l7) {
-                if (ctx->flow.nw_proto == IPPROTO_TCP) {
-                    packet_set_tcp_port(packet, ctx->flow.tp_src,
-                                        ctx->flow.tp_dst);
-                } else if (ctx->flow.nw_proto == IPPROTO_UDP) {
-                    packet_set_udp_port(packet, ctx->flow.tp_src,
-                                        ctx->flow.tp_dst);
-                }
-            }
-        }
-    }
+    odp_execute_actions(NULL, packet, &key, ctx->odp_actions->data,
+                        ctx->odp_actions->size, NULL, NULL);
 
     pin.packet = packet->data;
     pin.packet_len = packet->size;
