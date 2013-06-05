@@ -320,6 +320,7 @@ CHECK_PYFILES = \
 	tests/test-jsonrpc.py \
 	tests/test-ovsdb.py \
 	tests/test-reconnect.py \
+	tests/test-mpls.py \
 	tests/MockXenAPI.py \
 	tests/test-unix-socket.py \
 	tests/test-unixctl.py \
