@@ -1301,6 +1301,159 @@ NXST_FLOW reply:
 OVS_VSWITCHD_STOP
 AT_CLEANUP
 
+AT_SETUP([ofproto-dpif - MPLS recirculation])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy -- \
+   set Open_vSwitch . other_config:force-miss-model=with-facets
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+AT_CHECK([$PYTHON $srcdir/test-mpls.py 1])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS recirculation, no facets])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy -- \
+   set Open_vSwitch . other_config:force-miss-model=without-facets
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+AT_CHECK([$PYTHON $srcdir/test-mpls.py 1])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS recirculation, delete rules between])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+AT_CHECK([$PYTHON $srcdir/test-mpls.py -c 1])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS double-recirculate])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy -- \
+   set Open_vSwitch . other_config:force-miss-model=with-facets
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+
+for i in {0..150..50}; do
+    AT_CHECK([$PYTHON $srcdir/test-mpls.py 2 $i])
+done
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS double-recirculate, no facets])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy -- \
+   set Open_vSwitch . other_config:force-miss-model=without-facets
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+
+for i in {0..150..50}; do
+    AT_CHECK([$PYTHON $srcdir/test-mpls.py 2 $i])
+done
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS double-recirculate, delete rules between])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+
+for i in {0..150..50}; do
+    AT_CHECK([$PYTHON $srcdir/test-mpls.py -c 2 $i])
+done
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS multi-recirculate])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy -- \
+   set Open_vSwitch . other_config:force-miss-model=with-facets
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+
+for i in {0..550..50}; do
+    AT_CHECK([$PYTHON $srcdir/test-mpls.py 3 $i])
+done
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS multi-recirculate, no facets])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy -- \
+   set Open_vSwitch . other_config:force-miss-model=without-facets
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+
+for i in {0..550..50}; do
+    AT_CHECK([$PYTHON $srcdir/test-mpls.py 3 $i])
+done
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS multi-recirculate, delete rules between])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+
+for i in {0..550..50}; do
+    AT_CHECK([$PYTHON $srcdir/test-mpls.py -c 3 $i])
+done
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS multi-recirculate 2])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy -- \
+   set Open_vSwitch . other_config:force-miss-model=with-facets
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+
+for i in {600..1200..50}; do
+    AT_CHECK([$PYTHON $srcdir/test-mpls.py 3 $i])
+done
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto-dpif - MPLS multi-recirculate 2, no facets])
+OVS_VSWITCHD_START([dnl
+   add-port br0 p1 -- set Interface p1 type=dummy -- \
+   set Open_vSwitch . other_config:force-miss-model=without-facets
+])
+
+AT_CAPTURE_FILE([ofctl_monitor.log])
+
+for i in {600..1200..50}; do
+    AT_CHECK([$PYTHON $srcdir/test-mpls.py 3 $i])
+done
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
 AT_SETUP([ofproto-dpif - VLAN handling])
 OVS_VSWITCHD_START(
   [set Bridge br0 fail-mode=standalone -- \
