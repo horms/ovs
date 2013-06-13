@@ -1015,7 +1015,7 @@ int ipv4_tun_from_nlattr(const struct nlattr *attr,
 		switch (type) {
 		case OVS_TUNNEL_KEY_ATTR_ID:
 			tun_key->tun_id = nla_get_be64(a);
-			tun_key->tun_flags |= OVS_TNL_F_KEY;
+			tun_key->tun_flags |= TUNNEL_KEY;
 			break;
 		case OVS_TUNNEL_KEY_ATTR_IPV4_SRC:
 			tun_key->ipv4_src = nla_get_be32(a);
@@ -1031,10 +1031,10 @@ int ipv4_tun_from_nlattr(const struct nlattr *attr,
 			ttl = true;
 			break;
 		case OVS_TUNNEL_KEY_ATTR_DONT_FRAGMENT:
-			tun_key->tun_flags |= OVS_TNL_F_DONT_FRAGMENT;
+			tun_key->tun_flags |= TUNNEL_DONT_FRAGMENT;
 			break;
 		case OVS_TUNNEL_KEY_ATTR_CSUM:
-			tun_key->tun_flags |= OVS_TNL_F_CSUM;
+			tun_key->tun_flags |= TUNNEL_CSUM;
 			break;
 		default:
 			return -EINVAL;
@@ -1062,7 +1062,7 @@ int ipv4_tun_to_nlattr(struct sk_buff *skb,
 	if (!nla)
 		return -EMSGSIZE;
 
-	if (tun_key->tun_flags & OVS_TNL_F_KEY &&
+	if (tun_key->tun_flags & TUNNEL_KEY &&
 	    nla_put_be64(skb, OVS_TUNNEL_KEY_ATTR_ID, tun_key->tun_id))
 		return -EMSGSIZE;
 	if (tun_key->ipv4_src &&
@@ -1075,10 +1075,10 @@ int ipv4_tun_to_nlattr(struct sk_buff *skb,
 		return -EMSGSIZE;
 	if (nla_put_u8(skb, OVS_TUNNEL_KEY_ATTR_TTL, tun_key->ipv4_ttl))
 		return -EMSGSIZE;
-	if ((tun_key->tun_flags & OVS_TNL_F_DONT_FRAGMENT) &&
+	if ((tun_key->tun_flags & TUNNEL_DONT_FRAGMENT) &&
 		nla_put_flag(skb, OVS_TUNNEL_KEY_ATTR_DONT_FRAGMENT))
 		return -EMSGSIZE;
-	if ((tun_key->tun_flags & OVS_TNL_F_CSUM) &&
+	if ((tun_key->tun_flags & TUNNEL_CSUM) &&
 		nla_put_flag(skb, OVS_TUNNEL_KEY_ATTR_CSUM))
 		return -EMSGSIZE;
 

@@ -30,7 +30,9 @@
 #include <linux/jiffies.h>
 #include <linux/time.h>
 #include <linux/flex_array.h>
+
 #include <net/inet_ecn.h>
+#include <net/ip_tunnels.h>
 
 struct sk_buff;
 
@@ -39,11 +41,6 @@ struct sw_flow_actions {
 	u32 actions_len;
 	struct nlattr actions[];
 };
-
-/* Tunnel flow flags. */
-#define OVS_TNL_F_DONT_FRAGMENT		(1 << 0)
-#define OVS_TNL_F_CSUM			(1 << 1)
-#define OVS_TNL_F_KEY			(1 << 2)
 
 /* Used to memset ovs_key_ipv4_tunnel padding. */
 #define OVS_TUNNEL_KEY_SIZE					\
@@ -54,7 +51,7 @@ struct ovs_key_ipv4_tunnel {
 	__be64 tun_id;
 	__be32 ipv4_src;
 	__be32 ipv4_dst;
-	u16  tun_flags;
+	__be16 tun_flags;
 	u8   ipv4_tos;
 	u8   ipv4_ttl;
 };
