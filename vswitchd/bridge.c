@@ -498,6 +498,10 @@ bridge_reconfigure(const struct ovsrec_open_vswitch *ovs_cfg)
         smap_get_int(&ovs_cfg->other_config, "flow-eviction-threshold",
                      OFPROTO_FLOW_EVICTION_THRESHOLD_DEFAULT));
 
+    ofproto_set_flow_miss_model(
+        smap_get_int(&ovs_cfg->other_config, "force-miss-model",
+                     OFPROTO_HANDLE_MISS_AUTO));
+
     /* Destroy "struct bridge"s, "struct port"s, and "struct iface"s according
      * to 'ovs_cfg' while update the "if_cfg_queue", with only very minimal
      * configuration otherwise.

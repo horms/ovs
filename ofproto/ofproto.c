@@ -221,6 +221,7 @@ static size_t n_ofproto_classes;
 static size_t allocated_ofproto_classes;
 
 unsigned flow_eviction_threshold = OFPROTO_FLOW_EVICTION_THRESHOLD_DEFAULT;
+unsigned flow_miss_model = OFPROTO_HANDLE_MISS_AUTO;
 
 /* Map from datapath name to struct ofproto, for use by unixctl commands. */
 static struct hmap all_ofprotos = HMAP_INITIALIZER(&all_ofprotos);
@@ -571,6 +572,22 @@ ofproto_set_flow_eviction_threshold(unsigned threshold)
 {
     flow_eviction_threshold = MAX(OFPROTO_FLOW_EVICTION_THRESHOLD_MIN,
                                   threshold);
+}
+
+/* Sets the path for handling flow misses. */
+void
+ofproto_set_flow_miss_model(unsigned model)
+{
+    switch (model) {
+    case OFPROTO_HANDLE_MISS_WITH_FACET:
+        VLOG_INFO("Handling all misses by creating facets.\n");
+    case OFPROTO_HANDLE_MISS_WITHOUT_FACET:
+        VLOG_INFO("Handling all misses without creating facets.\n");
+    }
+
+    if (OFPROTO_HANDLE_MISS_AUTO <= model && model < OFPROTO_HANDLE_MISS_MAX) {
+        flow_miss_model = model;
+    }
 }
 
 /* If forward_bpdu is true, the NORMAL action will forward frames with

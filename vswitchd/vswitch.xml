@@ -136,6 +136,29 @@
           The default is 1000.  Values below 100 will be rounded up to 100.
         </p>
       </column>
+
+      <column name="other_config" key="force-miss-model"
+              type='{"type": "integer", "minInteger": 0}'>
+        <p>
+          Specify how flow misses are handled in userspace. The following
+          values have specific meaning.
+        </p>
+        <p>
+          <dl>
+            <dt><code>0</code></dt>
+            <dd>Handle automatically based on the flow-eviction-threshold and
+            the flow setup governer (default, recommended).</dd>
+            <dt><code>1</code></dt>
+            <dd>Always create facets. Expensive kernel flow creation and
+            statistics tracking is always performed, even on flows with only
+            a small number of packets.</dd>
+            <dt><code>2</code></dt>
+            <dd>Always handle without facets. Forces flow misses to be handled
+            in userspace. May cause an increase in CPU usage and packet loss
+            on high throughput.</dd>
+          </dl>
+        </p>
+      </column>
     </group>
 
     <group title="Status">
