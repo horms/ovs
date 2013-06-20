@@ -5733,7 +5733,7 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
             } else {
                 ctx->flow.vlan_tci = ctx->base_flow.vlan_tci;
             }
-        } else if (ctx->flow.vlan_tci != htons(0)) {
+        } else {
             ctx->flow.vlan_tpid = vlan_tpid;
             ctx->flow.vlan_qinq_tci = ctx->flow.vlan_tci;
         }
