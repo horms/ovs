@@ -5140,7 +5140,7 @@ compose_dec_ttl(struct action_xlate_ctx *ctx)
     }
 }
 
-static void
+static bool
 commit_dec_mpls_ttl_action(struct action_xlate_ctx *ctx)
 {
     uint8_t ttl = mpls_lse_to_ttl(ctx->flow.mpls_lse);
@@ -5153,8 +5153,13 @@ commit_dec_mpls_ttl_action(struct action_xlate_ctx *ctx)
             flow_set_mpls_lse_ttl(&ctx->base_flow.mpls_lse, ttl);
         }
         nl_msg_put_u8(ctx->odp_actions, OVS_ACTION_ATTR_DEC_MPLS_TTL, ttl);
+
+        return false;
     } else {
         execute_controller_action(ctx, UINT16_MAX, OFPR_INVALID_TTL, 0);
+
+        /* Stop processing for current table. */
+        return true;
     }
 }
 
@@ -5703,7 +5708,9 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         break;
 
     case OFPACT_DEC_MPLS_TTL:
-        commit_dec_mpls_ttl_action(ctx);
+        if (commit_dec_mpls_ttl_action(ctx)) {
+            return false;
+        }
         break;
 
     case OFPACT_COPY_TTL_IN:
