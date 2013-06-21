@@ -208,9 +208,8 @@ set_ethertype(struct ofpbuf *packet, ovs_be16 eth_type)
 
     if (eh->eth_type == htons(ETH_TYPE_VLAN) ||
         eh->eth_type == htons(ETH_TYPE_VLAN_8021AD)) {
-        /* ethtype for VLAN packets is at L3_offset - 2 bytes. */
         ovs_be16 *next_ethtype;
-        next_ethtype = (ovs_be16 *)((char *)packet->l3 - 2);
+        next_ethtype = (ovs_be16 *)((char *)(packet->l2_5 ? packet->l2_5 : packet->l3) - 2);
         *next_ethtype = eth_type;
     } else {
         eh->eth_type = eth_type;
