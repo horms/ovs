@@ -1007,16 +1007,7 @@ static int validate_and_copy_actions__(const struct nlattr *attr,
 				if (!eth_p_mpls(eth_types->types[i]))
 					return -EINVAL;
 
-			/* Disallow subsequent L2.5+ set and mpls_pop actions
-			 * as there is no check here to ensure that the new
-			 * eth_type is valid and thus set actions could
-			 * write off the end of the packet or otherwise
-			 * corrupt it.
-			 *
-			 * Support for these actions is planned using packet
-			 * recirculation.
-			 */
-			eth_types_set(eth_types, htons(0));
+			eth_types_set(eth_types, nla_get_be16(a));
 			break;
 		}
 
