@@ -277,6 +277,10 @@ struct action_xlate_ctx {
     uint16_t user_cookie_offset;/* Used for user_action_cookie fixup. */
     bool exit;                  /* No further actions should be processed. */
     struct flow orig_flow;      /* Copy of original flow. */
+    int mpls_stack_depth_delta; /* Difference in stack depth between
+                                 * current packet and result of translated
+                                 * push and pop MPLS actions. */
+
 };
 
 static void action_xlate_ctx_init(struct action_xlate_ctx *,
@@ -5084,7 +5088,11 @@ execute_controller_action(struct action_xlate_ctx *ctx, int len,
             eth_push_vlan(packet, ctx->flow.vlan_qinq_tci, htons(ETH_TYPE_VLAN));
         }
 
-        if (ctx->flow.mpls_lse) {
+        if (ctx->mpls_stack_depth_delta < 0) {
+            /* N.B: Compresses multiple pops into one! */
+            pop_mpls(packet, ctx->flow.dl_type);
+        } else if (ctx->mpls_stack_depth_delta > 0) {
+            /* N.B: Compresses multiple pushes into one! */
             push_mpls(packet, ctx->flow.dl_type);
             set_mpls_lse(packet, ctx->flow.mpls_lse);
         }
@@ -5671,12 +5679,14 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         commit_mpls_push_action(&ctx->flow, &ctx->base_flow,
                                 ctx->odp_actions,
                                 ofpact_get_PUSH_MPLS(a)->ethertype);
+        ctx->mpls_stack_depth_delta++;
         break;
 
     case OFPACT_POP_MPLS:
         commit_mpls_pop_action(&ctx->flow, &ctx->base_flow,
                                ctx->odp_actions,
                                ofpact_get_POP_MPLS(a)->ethertype);
+        ctx->mpls_stack_depth_delta--;
         if (ctx->flow.mpls_lse != htonl(0)) {
             ctx->flow.mpls_lse = htonl(0);
         }
@@ -5803,6 +5813,7 @@ xlate_actions(struct action_xlate_ctx *ctx, const struct ofpact *ofpacts,
     ctx->orig_skb_priority = ctx->flow.skb_priority;
     ctx->table_id = 0;
     ctx->exit = false;
+    ctx->mpls_stack_depth_delta = 0;
 
     if (ctx->ofproto->has_mirrors || hit_resubmit_limit) {
         /* Do this conditionally because the copy is expensive enough that it
