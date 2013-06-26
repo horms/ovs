@@ -78,5 +78,11 @@ bool list_is_short(const struct list *);
           ? ASSIGN_CONTAINER(NEXT, (ITER)->MEMBER.next, MEMBER) \
           : 0);                                                 \
          (ITER) = (NEXT))
+#define LIST_FOR_EACH_SAFE_REVERSE(ITER, PREV, MEMBER, LIST)    \
+    for (ASSIGN_CONTAINER(ITER, (LIST)->prev, MEMBER);          \
+         (&(ITER)->MEMBER != (LIST)                             \
+          ? ASSIGN_CONTAINER(PREV, (ITER)->MEMBER.prev, MEMBER) \
+          : 0);                                                 \
+         (ITER) = (PREV))
 
 #endif /* list.h */

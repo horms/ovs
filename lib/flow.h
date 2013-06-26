@@ -36,7 +36,7 @@ struct ofpbuf;
 /* This sequence number should be incremented whenever anything involving flows
  * or the wildcarding of flows changes.  This will cause build assertion
  * failures in places which likely need to be updated. */
-#define FLOW_WC_SEQ 20
+#define FLOW_WC_SEQ 21
 
 #define FLOW_N_REGS 8
 BUILD_ASSERT_DECL(FLOW_N_REGS <= NXM_NX_MAX_REGS);
@@ -98,7 +98,6 @@ struct flow {
     union flow_in_port in_port; /* Input port.*/
     uint32_t skb_mark;          /* Packet mark. */
     ovs_be32 mpls_lse;          /* MPLS label stack entry. */
-    uint16_t mpls_depth;        /* Depth of MPLS stack. */
     ovs_be16 vlan_tci;          /* If 802.1Q, TCI | VLAN_CFI; otherwise 0. */
     ovs_be16 dl_type;           /* Ethernet frame type. */
     ovs_be16 tp_src;            /* TCP/UDP source port. */
@@ -111,15 +110,15 @@ struct flow {
     uint8_t arp_tha[6];         /* ARP/ND target hardware address. */
     uint8_t nw_ttl;             /* IP TTL/Hop Limit. */
     uint8_t nw_frag;            /* FLOW_FRAG_* flags. */
-    uint8_t zeros[6];
+    uint8_t zeros[0];
 };
 BUILD_ASSERT_DECL(sizeof(struct flow) % 4 == 0);
 
 #define FLOW_U32S (sizeof(struct flow) / 4)
 
 /* Remember to update FLOW_WC_SEQ when changing 'struct flow'. */
-BUILD_ASSERT_DECL(sizeof(struct flow) == sizeof(struct flow_tnl) + 160 &&
-                  FLOW_WC_SEQ == 20);
+BUILD_ASSERT_DECL(sizeof(struct flow) == sizeof(struct flow_tnl) + 152 &&
+                  FLOW_WC_SEQ == 21);
 
 /* Represents the metadata fields of struct flow. */
 struct flow_metadata {
@@ -363,5 +362,9 @@ uint32_t minimask_hash(const struct minimask *, uint32_t basis);
 
 bool minimask_has_extra(const struct minimask *, const struct minimask *);
 bool minimask_is_catchall(const struct minimask *);
+
+#define MAX_RECIRCULATION_DEPTH 4   /* Completely arbitrary value to
+                                     * guard against infinite loops */
+BUILD_ASSERT_DECL(MAX_RECIRCULATION_DEPTH > 0);
 
 #endif /* flow.h */
