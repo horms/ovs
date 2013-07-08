@@ -118,38 +118,6 @@ AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip], [0], [OFPST11_FLOW reply (OF1
 OVS_VSWITCHD_STOP
 AT_CLEANUP
 
-AT_SETUP([ofproto - mod flow with cookie change (OpenFlow 1.0)])
-OVS_VSWITCHD_START
-AT_CHECK([ovs-ofctl -F openflow10 add-flow br0 cookie=0x1,in_port=1,actions=0])
-AT_CHECK([ovs-ofctl -F openflow10 dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, in_port=1 actions=output:0
-OFPST_FLOW reply:
-])
-
-AT_CHECK([ovs-ofctl -F openflow10 mod-flows br0 cookie=0x2,in_port=1,actions=0])
-AT_CHECK([ovs-ofctl -F openflow10 dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x2, in_port=1 actions=output:0
-OFPST_FLOW reply:
-])
-OVS_VSWITCHD_STOP
-AT_CLEANUP
-
-AT_SETUP([ofproto - mod flow with cookie change (NXM)])
-OVS_VSWITCHD_START
-AT_CHECK([ovs-ofctl -F nxm add-flow br0 cookie=0x1,in_port=1,actions=0])
-AT_CHECK([ovs-ofctl -F nxm dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, in_port=1 actions=output:0
-NXST_FLOW reply:
-])
-
-AT_CHECK([ovs-ofctl -F nxm mod-flows br0 cookie=0x2,in_port=1,actions=0])
-AT_CHECK([ovs-ofctl -F nxm dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x2, in_port=1 actions=output:0
-NXST_FLOW reply:
-])
-OVS_VSWITCHD_STOP
-AT_CLEANUP
-
 AT_SETUP([ofproto - mod flows based on cookie mask])
 OVS_VSWITCHD_START
 AT_CHECK([ovs-ofctl add-flow br0 cookie=0x1,in_port=1,actions=0])
