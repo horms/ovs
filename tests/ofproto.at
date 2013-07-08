@@ -10,15 +10,15 @@ AT_SETUP([ofproto - feature request, config request])
 OVS_VSWITCHD_START
 AT_CHECK([ovs-ofctl -vwarn show br0], [0], [stdout])
 AT_CHECK([STRIP_XIDS stdout], [0], [dnl
-OFPT_FEATURES_REPLY: dpid:fedcba9876543210
+OFPT_FEATURES_REPLY (OF1.2): dpid:fedcba9876543210
 n_tables:255, n_buffers:256
-capabilities: FLOW_STATS TABLE_STATS PORT_STATS QUEUE_STATS ARP_MATCH_IP
-actions: OUTPUT SET_VLAN_VID SET_VLAN_PCP STRIP_VLAN SET_DL_SRC SET_DL_DST SET_NW_SRC SET_NW_DST SET_NW_TOS SET_TP_SRC SET_TP_DST ENQUEUE
+capabilities: FLOW_STATS TABLE_STATS PORT_STATS QUEUE_STATS
+actions: OUTPUT COPY_TTL_OUT COPY_TTL_IN SET_MPLS_TTL DEC_MPLS_TTL PUSH_VLAN POP_VLAN PUSH_MPLS POP_MPLS SET_QUEUE GROUP SET_NW_TTL DEC_NW_TTL SET_FIELD
  LOCAL(br0): addr:aa:55:aa:55:00:00
      config:     PORT_DOWN
      state:      LINK_DOWN
-     speed: 100 Mbps now, 100 Mbps max
-OFPT_GET_CONFIG_REPLY: frags=normal miss_send_len=0
+     speed: 100000 Mbps now, 100000 Mbps max
+OFPT_GET_CONFIG_REPLY (OF1.2): frags=normal miss_send_len=0
 ])
 OVS_VSWITCHD_STOP
 AT_CLEANUP
