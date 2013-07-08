@@ -137,46 +137,6 @@ NXST_FLOW reply:
 OVS_VSWITCHD_STOP
 AT_CLEANUP
 
-AT_SETUP([ofproto - del flows based on cookie])
-OVS_VSWITCHD_START
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x1,in_port=1,actions=0])
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x2,in_port=2,actions=0])
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x3,in_port=3,actions=0])
-AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, in_port=1 actions=output:0
- cookie=0x2, in_port=2 actions=output:0
- cookie=0x3, in_port=3 actions=output:0
-NXST_FLOW reply:
-])
-
-AT_CHECK([ovs-ofctl del-flows br0 cookie=0x3/-1])
-AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, in_port=1 actions=output:0
- cookie=0x2, in_port=2 actions=output:0
-NXST_FLOW reply:
-])
-OVS_VSWITCHD_STOP
-AT_CLEANUP
-
-AT_SETUP([ofproto - del flows based on cookie mask])
-OVS_VSWITCHD_START
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x1,in_port=1,actions=0])
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x2,in_port=2,actions=0])
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x3,in_port=3,actions=0])
-AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, in_port=1 actions=output:0
- cookie=0x2, in_port=2 actions=output:0
- cookie=0x3, in_port=3 actions=output:0
-NXST_FLOW reply:
-])
-AT_CHECK([ovs-ofctl del-flows br0 cookie=0x3/0x1])
-AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x2, in_port=2 actions=output:0
-NXST_FLOW reply:
-])
-OVS_VSWITCHD_STOP
-AT_CLEANUP
-
 AT_SETUP([ofproto - flow table configuration])
 OVS_VSWITCHD_START
 # Check the default configuration.
