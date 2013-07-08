@@ -236,13 +236,13 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-OFPT_PACKET_IN (xid=0x0): total_len=60 in_port=1 (via no_match) data_len=60 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via no_match) data_len=60 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
 dnl
-OFPT_PACKET_IN (xid=0x0): total_len=60 in_port=1 (via no_match) data_len=60 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via no_match) data_len=60 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
 dnl
-OFPT_PACKET_IN (xid=0x0): total_len=60 in_port=1 (via no_match) data_len=60 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via no_match) data_len=60 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->9) tcp_csum:0
 ])
 
@@ -255,13 +255,13 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-OFPT_PACKET_IN (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
-OFPT_PACKET_IN (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
-OFPT_PACKET_IN (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(10:11:11:11:11:11->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 ])
 
@@ -274,14 +274,14 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-OFPT_PACKET_IN (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:15,pcp:0),qinq_tci(0) mac(30:33:33:33:33:33->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(30:33:33:33:33:33->50:54:00:00:00:07) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-OFPT_PACKET_IN (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:15,pcp:0),qinq_tci(0) mac(30:33:33:33:33:33->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(30:33:33:33:33:33->50:54:00:00:00:07) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-OFPT_PACKET_IN (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:15,pcp:0),qinq_tci(0) mac(30:33:33:33:33:33->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(30:33:33:33:33:33->50:54:00:00:00:07) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 ])
 
 dnl Modified vlan qinq controller action.
@@ -293,14 +293,14 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xe total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:5) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 (via action) data_len=68 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xe total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:5) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 (via action) data_len=68 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xe total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:5) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 (via action) data_len=68 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(vlan:101,pcp:5),qinq_tci(vlan:201,pcp:0) mac(90:99:99:99:99:99->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 ])
 
 dnl Modified vlan qinq controller action.
@@ -312,13 +312,13 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xd total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 (via action) data_len=68 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xd total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 (via action) data_len=68 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xd total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=68 in_port=1 (via action) data_len=68 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(vlan:100,pcp:3),qinq_tci(vlan:200,pcp:4) mac(80:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 ])
 
@@ -331,14 +331,14 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=48 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:64,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=48 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:64,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:64,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(40:44:44:44:44:44->50:54:00:00:00:07) type:8847,mpls(label:10,tc:3,ttl:63,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 ])
 
 dnl Modified mpls ttl action.
@@ -350,14 +350,14 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xb total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:1000,tc:7,ttl:200,bos:1),ipv4(src=192.168.0.1,dst=192.168.0.2,proto=6,tos=0,ttl=64,frag=no)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xb total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:1000,tc:7,ttl:200,bos:1),ipv4(src=192.168.0.1,dst=192.168.0.2,proto=6,tos=0,ttl=64,frag=no)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xb total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:1000,tc:7,ttl:200,bos:1),ipv4(src=192.168.0.1,dst=192.168.0.2,proto=6,tos=0,ttl=64,frag=no)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(50:55:55:55:55:55->50:54:00:00:00:07) type:8847,mpls(label:100,tc:7,ttl:64,bos:1) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 ])
 
 dnl Modified mpls ipv6 controller action.
@@ -369,14 +369,14 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xc total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(70:77:77:77:77:77->50:54:00:00:00:07) type:8848,mpls(label:1000,tc:7,ttl:250,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(70:77:77:77:77:77->50:54:00:00:00:07) type:8848,mpls(label:250,tc:7,ttl:66,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xc total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(70:77:77:77:77:77->50:54:00:00:00:07) type:8848,mpls(label:1000,tc:7,ttl:250,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(70:77:77:77:77:77->50:54:00:00:00:07) type:8848,mpls(label:250,tc:7,ttl:66,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xc total_len=68 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(70:77:77:77:77:77->50:54:00:00:00:07) type:8848,mpls(label:1000,tc:7,ttl:250,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(70:77:77:77:77:77->50:54:00:00:00:07) type:8848,mpls(label:250,tc:7,ttl:66,bos:1) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 ])
 
 dnl Modified mpls pop action.
@@ -388,14 +388,14 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xd total_len=60 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=56 in_port=1 (via action) data_len=56 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xd total_len=60 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=56 in_port=1 (via action) data_len=56 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): cookie=0xd total_len=60 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=68 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=56 in_port=1 (via action) data_len=56 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(60:66:66:66:66:66->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) tcp_csum:0
 ])
 
 dnl Checksum TCP.
@@ -407,32 +407,32 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-NXT_PACKET_IN (xid=0x0): cookie=0x1 total_len=60 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=60 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) tcp_csum:0
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=1 cookie=0x3 total_len=64 in_port=1 tun_id=0x0 reg0=0x1 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=1 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=2 cookie=0x4 total_len=64 in_port=1 tun_id=0x0 reg0=0x1 reg1=0x2 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=2 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->50:54:00:00:00:07) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=3 cookie=0x5 total_len=64 in_port=1 tun_id=0x0 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) tcp_csum:0
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=3 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=4 cookie=0x6 total_len=64 in_port=1 tun_id=0x0 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(83.83.83.83->192.168.0.2) port(8->11) tcp_csum:1a03
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=4 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=5 cookie=0x7 total_len=64 in_port=1 tun_id=0x6 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x5 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(83.83.83.83->84.84.84.84) port(8->11) tcp_csum:3205
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=5 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=6 cookie=0x8 total_len=64 in_port=1 tun_id=0x6 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x5 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(83.83.83.83->84.84.84.84) port(85->11) tcp_csum:31b8
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=6 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=7 cookie=0x9 total_len=64 in_port=1 tun_id=0x6 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x5 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(83.83.83.83->84.84.84.84) port(85->86) tcp_csum:316d
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=7 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=7 cookie=0x9 total_len=64 in_port=1 tun_id=0x6 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x5 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(83.83.83.83->84.84.84.84) port(85->86) tcp_csum:316d
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=7 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 ])
 
 dnl Checksum UDP.
@@ -444,52 +444,52 @@ done
 
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
-NXT_PACKET_IN (xid=0x0): cookie=0x1 total_len=60 in_port=1 tun_id=0x0 reg0=0x0 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=60 (unbuffered)
+OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
 priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) udp_csum:1234
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=1 cookie=0x3 total_len=64 in_port=1 tun_id=0x0 reg0=0x1 reg1=0x0 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) udp_csum:1234
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=1 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(20:22:22:22:22:22->50:54:00:00:00:07) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=2 cookie=0x4 total_len=64 in_port=1 tun_id=0x0 reg0=0x1 reg1=0x2 reg2=0x0 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->50:54:00:00:00:07) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) udp_csum:1234
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=2 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->50:54:00:00:00:07) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=3 cookie=0x5 total_len=64 in_port=1 tun_id=0x0 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x0 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->11) udp_csum:1234
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=3 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=4 cookie=0x6 total_len=64 in_port=1 tun_id=0x0 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x0 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(83.83.83.83->192.168.0.2) port(8->11) udp_csum:2c37
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=4 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=5 cookie=0x7 total_len=64 in_port=1 tun_id=0x6 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x5 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(83.83.83.83->84.84.84.84) port(8->11) udp_csum:4439
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=5 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=6 cookie=0x8 total_len=64 in_port=1 tun_id=0x6 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x5 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(83.83.83.83->84.84.84.84) port(85->11) udp_csum:43ec
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=6 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=7 cookie=0x9 total_len=64 in_port=1 tun_id=0x6 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x5 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(83.83.83.83->84.84.84.84) port(85->86) udp_csum:43a1
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=7 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 dnl
-NXT_PACKET_IN (xid=0x0): table_id=7 cookie=0x9 total_len=64 in_port=1 tun_id=0x6 reg0=0x1 reg1=0x2 reg2=0x3 reg3=0x4 reg4=0x5 reg5=0x0 reg6=0x0 reg7=0x0 (via action) data_len=64 (unbuffered)
-priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:0800,mpls(0) proto:17 tos:0 ttl:0 ip(83.83.83.83->84.84.84.84) port(85->86) udp_csum:43a1
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=7 total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
+priority:0,tunnel:0,in_port:0000,tci(0),qinq_tci(0) mac(80:81:81:81:81:81->82:82:82:82:82:82) type:05ff,mpls(0) proto:0 tos:0 ttl:0 ip(0.0.0.0->0.0.0.0)
 ])
 
 AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, n_packets=2, n_bytes=120, dl_src=20:22:22:22:22:22 actions=CONTROLLER:65535,resubmit(80,1)
- cookie=0x2, n_packets=3, n_bytes=180, dl_src=30:33:33:33:33:33 actions=set_field:15->dl_vlan,CONTROLLER:65535
- cookie=0x3, table=1, n_packets=2, n_bytes=120, in_port=80 actions=load:0x1->NXM_NX_REG0[[]],set_field:80->dl_vlan,CONTROLLER:65535,resubmit(81,2)
- cookie=0x4, table=2, n_packets=2, n_bytes=120, in_port=81 actions=load:0x2->NXM_NX_REG1[[]],set_field:80:81:81:81:81:81->eth_src,CONTROLLER:65535,resubmit(82,3)
- cookie=0x5, table=3, n_packets=2, n_bytes=120, in_port=82 actions=load:0x3->NXM_NX_REG2[[]],set_field:82:82:82:82:82:82->eth_dst,CONTROLLER:65535,resubmit(83,4)
- cookie=0x6, table=4, n_packets=2, n_bytes=120, in_port=83 actions=load:0x4->NXM_NX_REG3[[]],set_field:83.83.83.83->ip_src,CONTROLLER:65535,resubmit(84,5)
- cookie=0x7, table=5, n_packets=2, n_bytes=120, in_port=84 actions=load:0x5->NXM_NX_REG4[[]],load:0x6->NXM_NX_TUN_ID[[]],set_field:84.84.84.84->ip_dst,CONTROLLER:65535,resubmit(85,6)
- cookie=0x8, table=6, n_packets=2, n_bytes=120, in_port=85 actions=set_field:85->tcp_src,CONTROLLER:65535,resubmit(86,7)
- cookie=0x9, table=7, n_packets=2, n_bytes=120, in_port=86 actions=set_field:86->tcp_dst,CONTROLLER:65535,CONTROLLER:65535
- cookie=0xa, n_packets=3, n_bytes=180, dl_src=40:44:44:44:44:44 actions=push_mpls:0x8847,set_field:10->mpls_label,set_field:3->mpls_tc,set_mpls_ttl:64,dec_mpls_ttl,CONTROLLER:65535
- cookie=0xb, n_packets=3, n_bytes=180, dl_src=50:55:55:55:55:55 actions=set_field:1000->mpls_label,set_mpls_ttl:200,copy_ttl_out,CONTROLLER:65535
- cookie=0xd, n_packets=3, n_bytes=180, dl_src=60:66:66:66:66:66 actions=pop_mpls:0x0800,CONTROLLER:65535
- cookie=0xc, n_packets=3, n_bytes=180, dl_src=70:77:77:77:77:77 actions=push_mpls:0x8848,set_field:1000->mpls_label,set_field:7->mpls_tc,set_mpls_ttl:250,dec_mpls_ttl,CONTROLLER:65535
- cookie=0xd, n_packets=3, n_bytes=180, dl_src=80:88:88:88:88:88 actions=set_action:100->dl_vlan,set_action:3->dl_vlan_pcp,push_vlan:0x8100,set_action:200->dl_vlan,set_action:4->dl_vlan_pcp,CONTROLLER:65535
- cookie=0xe, n_packets=3, n_bytes=180, dl_src=90:99:99:99:99:99 actions=set_action:101->dl_vlan,set_action:5->dl_vlan_pcp,push_vlan:0x88a8,set_action:201->dl_vlan,CONTROLLER:65535
- n_packets=3, n_bytes=180, dl_src=10:11:11:11:11:11 actions=CONTROLLER:65535
-NXST_FLOW reply:
+ cookie=0x1, n_packets=2, n_bytes=120, dl_src=20:22:22:22:22:22 actions=apply_actions(CONTROLLER:65535,resubmit(80,1))
+ cookie=0x2, n_packets=3, n_bytes=180, dl_src=30:33:33:33:33:33 actions=apply_actions(set_field:15->dl_vlan,CONTROLLER:65535)
+ cookie=0x3, table=1, n_packets=2, n_bytes=120, in_port=80 actions=apply_actions(load:0x1->NXM_NX_REG0[[]],set_field:80->dl_vlan,CONTROLLER:65535,resubmit(81,2))
+ cookie=0x4, table=2, n_packets=2, n_bytes=120, in_port=81 actions=apply_actions(load:0x2->NXM_NX_REG1[[]],set_field:80:81:81:81:81:81->eth_src,CONTROLLER:65535,resubmit(82,3))
+ cookie=0x5, table=3, n_packets=2, n_bytes=120, in_port=82 actions=apply_actions(load:0x3->NXM_NX_REG2[[]],set_field:82:82:82:82:82:82->eth_dst,CONTROLLER:65535,resubmit(83,4))
+ cookie=0x6, table=4, n_packets=2, n_bytes=120, in_port=83 actions=apply_actions(load:0x4->NXM_NX_REG3[[]],set_field:83.83.83.83->ip_src,CONTROLLER:65535,resubmit(84,5))
+ cookie=0x7, table=5, n_packets=2, n_bytes=120, in_port=84 actions=apply_actions(load:0x5->NXM_NX_REG4[[]],load:0x6->NXM_NX_TUN_ID[[]],set_field:84.84.84.84->ip_dst,CONTROLLER:65535,resubmit(85,6))
+ cookie=0x8, table=6, n_packets=2, n_bytes=120, in_port=85 actions=apply_actions(set_field:85->tcp_src,CONTROLLER:65535,resubmit(86,7))
+ cookie=0x9, table=7, n_packets=2, n_bytes=120, in_port=86 actions=apply_actions(set_field:86->tcp_dst,CONTROLLER:65535,CONTROLLER:65535)
+ cookie=0xa, n_packets=3, n_bytes=180, dl_src=40:44:44:44:44:44 actions=apply_actions(push_mpls:0x8847,set_field:10->mpls_label,set_field:3->mpls_tc,set_mpls_ttl:64,dec_mpls_ttl,CONTROLLER:65535)
+ cookie=0xb, n_packets=3, n_bytes=180, dl_src=50:55:55:55:55:55 actions=apply_actions(set_field:1000->mpls_label,set_mpls_ttl:200,copy_ttl_out,CONTROLLER:65535)
+ cookie=0xc, n_packets=3, n_bytes=180, dl_src=70:77:77:77:77:77 actions=apply_actions(push_mpls:0x8848,set_field:1000->mpls_label,set_field:7->mpls_tc,set_field:250->mpls_label,CONTROLLER:65535)
+ cookie=0xd, n_packets=3, n_bytes=180, dl_src=60:66:66:66:66:66 actions=apply_actions(pop_mpls:0x800,CONTROLLER:65535)
+ cookie=0xd, n_packets=3, n_bytes=180, dl_src=80:88:88:88:88:88 actions=apply_actions(set_field:100->dl_vlan,set_field:3->dl_vlan_pcp,push_vlan:0x8100,set_field:200->dl_vlan,set_field:4->dl_vlan_pcp,CONTROLLER:65535)
+ cookie=0xe, n_packets=3, n_bytes=180, dl_src=90:99:99:99:99:99 actions=apply_actions(set_field:101->dl_vlan,set_field:5->dl_vlan_pcp,push_vlan:0x88a8,set_field:201->dl_vlan,CONTROLLER:65535)
+ n_packets=3, n_bytes=180, dl_src=10:11:11:11:11:11 actions=apply_actions(CONTROLLER:65535)
+OFPST11_FLOW reply (OF1.2):
 ])
 
 OVS_VSWITCHD_STOP
