@@ -142,7 +142,6 @@ in_port=4 actions=enqueue:65534:1,enqueue:1:1,enqueue:2:1,enqueue:3:2,enqueue:4:
 ])
 AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
 AT_CHECK([ovs-ofctl mod-port br0 5 noforward])
-AT_CHECK([ovs-ofctl mod-port br0 6 noflood])
 
 AT_CHECK([ovs-appctl ofproto/trace br0 'in_port(0),eth(src=00:00:00:00:00:01,dst=00:00:00:00:00:02),eth_type(0x0900)'], [0], [stdout])
 AT_CHECK([tail -1 stdout \
@@ -151,6 +150,7 @@ AT_CHECK([tail -1 stdout \
 2
 3
 4
+6
 7
 ])
 
@@ -161,6 +161,7 @@ AT_CHECK([tail -1 stdout \
 2
 3
 4
+6
 7
 ])
 
