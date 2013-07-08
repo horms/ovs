@@ -856,7 +856,7 @@ ff ff ff ff ff ff 00 00 00 14 00 00 00 00 00 00 \
 00 00 00 7b 00 00 00 00 ff ff 00 18 00 00 23 20 \
 00 07 00 1f 00 01 00 04 00 00 00 00 00 00 00 05 \
 " 3], [0], [dnl
-NXT_FLOW_MOD (xid=0x2): ADD NXM_NX_TUN_ID(00000000000001c8), NXM_NX_REG0(0000007b) actions=load:0x5->NXM_NX_REG0[[]]
+NXT_FLOW_MOD (xid=0x2): ADD reg0=0x7b,tun_id=0x1c8 actions=load:0x5->NXM_NX_REG0[[]]
 ])
 AT_CLEANUP
 
