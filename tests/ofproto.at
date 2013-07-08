@@ -118,50 +118,6 @@ AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip], [0], [OFPST11_FLOW reply (OF1
 OVS_VSWITCHD_STOP
 AT_CLEANUP
 
-AT_SETUP([ofproto - mod flows based on cookie mask])
-OVS_VSWITCHD_START
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x1,in_port=1,actions=0])
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x1,in_port=2,actions=0])
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x2,in_port=3,actions=0])
-AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, in_port=1 actions=output:0
- cookie=0x1, in_port=2 actions=output:0
- cookie=0x2, in_port=3 actions=output:0
-NXST_FLOW reply:
-])
-
-AT_CHECK([ovs-ofctl -F nxm mod-flows br0 cookie=0x1/0xff,actions=4])
-AT_CHECK([ovs-ofctl -F nxm dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, in_port=1 actions=output:4
- cookie=0x1, in_port=2 actions=output:4
- cookie=0x2, in_port=3 actions=output:0
-NXST_FLOW reply:
-])
-OVS_VSWITCHD_STOP
-AT_CLEANUP
-
-AT_SETUP([ofproto - mod flows based on cookie mask with cookie change])
-OVS_VSWITCHD_START
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x1,in_port=1,actions=0])
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x1,in_port=2,actions=0])
-AT_CHECK([ovs-ofctl add-flow br0 cookie=0x2,in_port=3,actions=0])
-AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x1, in_port=1 actions=output:0
- cookie=0x1, in_port=2 actions=output:0
- cookie=0x2, in_port=3 actions=output:0
-NXST_FLOW reply:
-])
-
-AT_CHECK([ovs-ofctl -F nxm mod-flows br0 cookie=1/-1,cookie=4,actions=4])
-AT_CHECK([ovs-ofctl -F nxm dump-flows br0 | ofctl_strip | sort], [0], [dnl
- cookie=0x2, in_port=3 actions=output:0
- cookie=0x4, in_port=1 actions=output:4
- cookie=0x4, in_port=2 actions=output:4
-NXST_FLOW reply:
-])
-OVS_VSWITCHD_STOP
-AT_CLEANUP
-
 AT_SETUP([ofproto - mod flow with cookie miss (mask==0)])
 OVS_VSWITCHD_START
 AT_CHECK([ovs-ofctl -F nxm mod-flows br0 in_port=1,actions=0])
