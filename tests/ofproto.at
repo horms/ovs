@@ -57,7 +57,7 @@ AT_SETUP([ofproto - queue stats])
 OVS_VSWITCHD_START
 AT_CHECK([ovs-ofctl -vwarn queue-stats br0], [0], [stdout])
 AT_CHECK([STRIP_XIDS stdout], [0], [dnl
-OFPST_QUEUE reply: 0 queues
+OFPST_QUEUE reply (OF1.2): 0 queues
 ])
 OVS_VSWITCHD_STOP
 AT_CLEANUP
