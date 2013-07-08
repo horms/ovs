@@ -205,31 +205,36 @@ for in_port in 1 2 3 4; do
     ovs-ofctl add-flow br0 in_port=$in_port,actions=drop
 done
 AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- in_port=1 actions=drop
- in_port=2 actions=drop
- in_port=3 actions=drop
- in_port=4 actions=drop
-NXST_FLOW reply:
+ in_port=1 actions=apply_actions(drop)
+ in_port=2 actions=apply_actions(drop)
+ in_port=3 actions=apply_actions(drop)
+ in_port=4 actions=apply_actions(drop)
+OFPST11_FLOW reply (OF1.2):
 ])
 # Adding another flow will be refused.
 AT_CHECK([ovs-ofctl add-flow br0 in_port=5,actions=drop], [1], [], [stderr])
 AT_CHECK([head -n 1 stderr | ofctl_strip], [0],
-  [OFPT_ERROR: OFPFMFC_TABLE_FULL
+  [OFPT_ERROR (OF1.2): OFPFMFC_TABLE_FULL
 ])
-# Also a mod-flow that would add a flow will be refused.
-AT_CHECK([ovs-ofctl mod-flows br0 in_port=5,actions=drop], [1], [], [stderr])
-AT_CHECK([head -n 1 stderr | ofctl_strip], [0],
-  [OFPT_ERROR: OFPFMFC_TABLE_FULL
+# In Open Flow 1.2 a mod-flow does not ever add a flow and thus
+# has no effect on eviction
+AT_CHECK([ovs-ofctl mod-flows br0 in_port=5,actions=drop], [0], [], [])
+AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
+ in_port=1 actions=apply_actions(drop)
+ in_port=2 actions=apply_actions(drop)
+ in_port=3 actions=apply_actions(drop)
+ in_port=4 actions=apply_actions(drop)
+OFPST11_FLOW reply (OF1.2):
 ])
 # Replacing or modifying an existing flow is allowed.
 AT_CHECK([ovs-ofctl add-flow br0 in_port=4,actions=normal])
 AT_CHECK([ovs-ofctl mod-flows br0 in_port=3,actions=output:1])
 AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
- in_port=1 actions=drop
- in_port=2 actions=drop
- in_port=3 actions=output:1
- in_port=4 actions=NORMAL
-NXST_FLOW reply:
+ in_port=1 actions=apply_actions(drop)
+ in_port=2 actions=apply_actions(drop)
+ in_port=3 actions=apply_actions(output:1)
+ in_port=4 actions=apply_actions(NORMAL)
+OFPST11_FLOW reply (OF1.2):
 ])
 OVS_VSWITCHD_STOP
 AT_CLEANUP
