@@ -140,18 +140,26 @@ AT_CLEANUP
 AT_SETUP([ofproto - flow table configuration])
 OVS_VSWITCHD_START
 # Check the default configuration.
-(echo "OFPST_TABLE reply (xid=0x1): 255 tables
-  0: classifier: wild=0x3fffff, max=1000000, active=0
-               lookup=0, matched=0"
+(head="wild=0x003ff, max=1000000,"
+ tail="               lookup=0, matched=0
+               match=000003ff, instructions=00000007, config=00000000
+               write_actions=00000000, apply_actions=00000000
+               write_setfields=0000003f00000000
+               apply_setfields=0000003f00000000
+               metadata_match=0000000000000000
+               metadata_write=0000000000000000"
+ echo "OFPST_TABLE reply (OF1.2) (xid=0x2): 255 tables
+  0: classifier: $head active=0
+$tail"
  x=1
  while test $x -lt 254; do
-   printf "  %d: %-8s: wild=0x3fffff, max=1000000, active=0
-               lookup=0, matched=0
+   printf "  %d: %-8s: $head active=0
+$tail
 " $x table$x
    x=`expr $x + 1`
  done
- echo "  254: table254: wild=0x3fffff, max=1000000, active=2
-               lookup=0, matched=0") > expout
+ echo "  254: table254: $head active=2
+$tail") > expout
 AT_CHECK([ovs-ofctl dump-tables br0], [0], [expout])
 # Change the configuration.
 AT_CHECK(
@@ -165,12 +173,19 @@ AT_CHECK(
 ])
 # Check that the configuration was updated.
 mv expout orig-expout
-(echo "OFPST_TABLE reply (xid=0x1): 255 tables
-  0: main    : wild=0x3fffff, max=1000000, active=0
-               lookup=0, matched=0
-  1: table1  : wild=0x3fffff, max=  1024, active=0
-               lookup=0, matched=0"
- tail -n +6 orig-expout) > expout
+(tail="               lookup=0, matched=0
+               match=000003ff, instructions=00000007, config=00000000
+               write_actions=00000000, apply_actions=00000000
+               write_setfields=0000003f00000000
+               apply_setfields=0000003f00000000
+               metadata_match=0000000000000000
+               metadata_write=0000000000000000"
+ echo "OFPST_TABLE reply (OF1.2) (xid=0x2): 255 tables
+  0: main    : wild=0x003ff, max=1000000, active=0
+$tail
+  1: table1  : wild=0x003ff, max=  1024, active=0
+$tail"
+ tail -n +18 orig-expout) > expout
 AT_CHECK([ovs-ofctl dump-tables br0], [0], [expout])
 OVS_VSWITCHD_STOP
 AT_CLEANUP
