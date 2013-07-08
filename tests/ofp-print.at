@@ -572,7 +572,7 @@ ff fe 00 00 00 00 00 00 00 00 00 00 00 00 00 00 \
 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 \
 00 00 00 00 ff 00 ff ff \
 "], [0], [dnl
-OFPST_AGGREGATE request (xid=0x4): @&t@
+OFPST10_AGGREGATE request (xid=0x4): @&t@
 ])
 AT_CLEANUP
 
@@ -583,7 +583,7 @@ AT_CHECK([ovs-ofctl ofp-print "\
 00 00 01 82 00 00 00 00 00 00 93 78 00 00 00 04 \
 00 00 00 00 \
 "], [0], [dnl
-OFPST_AGGREGATE reply (xid=0x4): packet_count=386 byte_count=37752 flow_count=4
+OFPST10_AGGREGATE reply (xid=0x4): packet_count=386 byte_count=37752 flow_count=4
 ])
 AT_CLEANUP
 
