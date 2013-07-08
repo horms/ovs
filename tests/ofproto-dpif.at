@@ -209,9 +209,9 @@ AT_CAPTURE_FILE([ofctl_monitor.log])
 AT_DATA([flows.txt], [dnl
 cookie=0x0 dl_src=10:11:11:11:11:11 actions=controller
 cookie=0x1 dl_src=20:22:22:22:22:22 actions=controller,resubmit(80,1)
-cookie=0x2 dl_src=30:33:33:33:33:33 actions=mod_vlan_vid:15,controller
+cookie=0x2 dl_src=30:33:33:33:33:33 actions=set_field:15->OXM_OF_VLAN_VID[[]],controller
 
-cookie=0x3 table=1 in_port=80 actions=load:1->NXM_NX_REG0[[]],mod_vlan_vid:80,controller,resubmit(81,2)
+cookie=0x3 table=1 in_port=80 actions=load:1->NXM_NX_REG0[[]],set_field:80->OXM_OF_VLAN_VID[[]],controller,resubmit(81,2)
 cookie=0x4 table=2 in_port=81 actions=load:2->NXM_NX_REG1[[]],mod_dl_src:80:81:81:81:81:81,controller,resubmit(82,3)
 cookie=0x5 table=3 in_port=82 actions=load:3->NXM_NX_REG2[[]],mod_dl_dst:82:82:82:82:82:82,controller,resubmit(83,4)
 cookie=0x6 table=4 in_port=83 actions=load:4->NXM_NX_REG3[[]],mod_nw_src:83.83.83.83,controller,resubmit(84,5)
@@ -222,8 +222,8 @@ cookie=0xa dl_src=40:44:44:44:44:44 actions=push_mpls:0x8847,set_field:10->OXM_O
 cookie=0xb dl_src=50:55:55:55:55:55 actions=set_field:1000->OXM_OF_MPLS_LABEL[[]],set_mpls_ttl:200,copy_ttl_out,controller
 cookie=0xd dl_src=60:66:66:66:66:66 actions=pop_mpls:0x0800,controller
 cookie=0xc dl_src=70:77:77:77:77:77 actions=push_mpls:0x8848,set_field:1000->OXM_OF_MPLS_LABEL[[]],set_field:7->OXM_OF_MPLS_TC[[]],set_field:250->OXM_OF_MPLS_LABEL[[]],controller
-cookie=0xe dl_src=90:99:99:99:99:99 actions=mod_vlan_vid:101,mod_vlan_pcp:5,push_vlan:0x88a8,mod_vlan_vid:201,controller
-cookie=0xd dl_src=80:88:88:88:88:88 actions=mod_vlan_vid:100,mod_vlan_pcp:3,push_vlan:0x8100,mod_vlan_vid:200,mod_vlan_pcp:4,controller
+cookie=0xe dl_src=90:99:99:99:99:99 actions=set_field:101->OXM_OF_VLAN_VID[[]],set_field:5->OXM_OF_VLAN_PCP[[]],push_vlan:0x88a8,set_field:201->OXM_OF_VLAN_VID[[]],controller
+cookie=0xd dl_src=80:88:88:88:88:88 actions=set_field:100->OXM_OF_VLAN_VID[[]],set_field:3->OXM_OF_VLAN_PCP[[]],push_vlan:0x8100,set_field:200->OXM_OF_VLAN_VID[[]],set_field:4->OXM_OF_VLAN_PCP[[]],controller
 ])
 AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
 
@@ -474,8 +474,8 @@ priority:0,tunnel:0,in_port:0000,tci(vlan:80,pcp:0),qinq_tci(0) mac(80:81:81:81:
 
 AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
  cookie=0x1, n_packets=2, n_bytes=120, dl_src=20:22:22:22:22:22 actions=CONTROLLER:65535,resubmit(80,1)
- cookie=0x2, n_packets=3, n_bytes=180, dl_src=30:33:33:33:33:33 actions=mod_vlan_vid:15,CONTROLLER:65535
- cookie=0x3, table=1, n_packets=2, n_bytes=120, in_port=80 actions=load:0x1->NXM_NX_REG0[[]],mod_vlan_vid:80,CONTROLLER:65535,resubmit(81,2)
+ cookie=0x2, n_packets=3, n_bytes=180, dl_src=30:33:33:33:33:33 actions=set_field:15->dl_vlan,CONTROLLER:65535
+ cookie=0x3, table=1, n_packets=2, n_bytes=120, in_port=80 actions=load:0x1->NXM_NX_REG0[[]],set_field:80->dl_vlan,CONTROLLER:65535,resubmit(81,2)
  cookie=0x4, table=2, n_packets=2, n_bytes=120, in_port=81 actions=load:0x2->NXM_NX_REG1[[]],mod_dl_src:80:81:81:81:81:81,CONTROLLER:65535,resubmit(82,3)
  cookie=0x5, table=3, n_packets=2, n_bytes=120, in_port=82 actions=load:0x3->NXM_NX_REG2[[]],mod_dl_dst:82:82:82:82:82:82,CONTROLLER:65535,resubmit(83,4)
  cookie=0x6, table=4, n_packets=2, n_bytes=120, in_port=83 actions=load:0x4->NXM_NX_REG3[[]],mod_nw_src:83.83.83.83,CONTROLLER:65535,resubmit(84,5)
@@ -486,8 +486,8 @@ AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
  cookie=0xb, n_packets=3, n_bytes=180, dl_src=50:55:55:55:55:55 actions=set_field:1000->mpls_label,set_mpls_ttl:200,copy_ttl_out,CONTROLLER:65535
  cookie=0xd, n_packets=3, n_bytes=180, dl_src=60:66:66:66:66:66 actions=pop_mpls:0x0800,CONTROLLER:65535
  cookie=0xc, n_packets=3, n_bytes=180, dl_src=70:77:77:77:77:77 actions=push_mpls:0x8848,set_field:1000->mpls_label,set_field:7->mpls_tc,set_mpls_ttl:250,dec_mpls_ttl,CONTROLLER:65535
- cookie=0xd, n_packets=3, n_bytes=180, dl_src=80:88:88:88:88:88 actions=mod_vlan_vid:100,mod_vlan_pcp:3,push_vlan:0x8100,mod_vlan_vid:200,mod_vlan_pcp:4,CONTROLLER:65535
- cookie=0xe, n_packets=3, n_bytes=180, dl_src=90:99:99:99:99:99 actions=mod_vlan_vid:101,mod_vlan_pcp:5,push_vlan:0x88a8,mod_vlan_vid:201,CONTROLLER:65535
+ cookie=0xd, n_packets=3, n_bytes=180, dl_src=80:88:88:88:88:88 actions=set_action:100->dl_vlan,set_action:3->dl_vlan_pcp,push_vlan:0x8100,set_action:200->dl_vlan,set_action:4->dl_vlan_pcp,CONTROLLER:65535
+ cookie=0xe, n_packets=3, n_bytes=180, dl_src=90:99:99:99:99:99 actions=set_action:101->dl_vlan,set_action:5->dl_vlan_pcp,push_vlan:0x88a8,set_action:201->dl_vlan,CONTROLLER:65535
  n_packets=3, n_bytes=180, dl_src=10:11:11:11:11:11 actions=CONTROLLER:65535
 NXST_FLOW reply:
 ])
@@ -823,7 +823,7 @@ OVS_VSWITCHD_START(
 ])
 
 AT_DATA([flows.txt], [dnl
-in_port=1 actions=mod_vlan_vid:17,output:2
+in_port=1 actions=set_field:17->OXM_OF_VLAN_VID[[]],output:2
 in_port=2 actions=output:1
 ])
 AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
@@ -854,7 +854,7 @@ OVS_VSWITCHD_START(
 
 AT_DATA([flows.txt], [dnl
 in_port=1 actions=output:2
-in_port=2 actions=mod_vlan_vid:17,output:1
+in_port=2 actions=set_field:17->OXM_OF_VLAN_VID[[]],output:1
 ])
 AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
 
@@ -1206,7 +1206,7 @@ AT_SETUP([ofproto-dpif - fin_timeout])
 OVS_VSWITCHD_START
 AT_DATA([flows.txt], [dnl
 in_port=1 actions=output:2
-in_port=2 actions=mod_vlan_vid:17,output:1
+in_port=2 actions=set_field:17->OXM_OF_VLAN_VID[[]],output:1
 ])
 AT_CHECK([ovs-ofctl add-flow br0 'idle_timeout=60,actions=fin_timeout(idle_timeout=5)'])
 AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip], [0],
