@@ -1315,6 +1315,8 @@ do_packet_out(int argc, char *argv[])
     ofpbuf_init(&ofpacts, 64);
     parse_ofpacts(argv[3], &ofpacts);
 
+    protocol = open_vconn(argv[1], &vconn);
+
     po.buffer_id = UINT32_MAX;
     po.in_port = (!strcasecmp(argv[2], "none") ? OFPP_NONE
                   : !strcasecmp(argv[2], "local") ? OFPP_LOCAL
@@ -1322,7 +1324,6 @@ do_packet_out(int argc, char *argv[])
     po.ofpacts = ofpacts.data;
     po.ofpacts_len = ofpacts.size;
 
-    protocol = open_vconn(argv[1], &vconn);
     for (i = 4; i < argc; i++) {
         struct ofpbuf *packet, *opo;
         const char *error_msg;
