@@ -66,8 +66,7 @@ AT_SETUP([ofproto - mod-port])
 OVS_VSWITCHD_START
 for command_config_state in \
     'up 0 0' \
-    'noflood NO_FLOOD 0' \
-    'down PORT_DOWN,NO_FLOOD LINK_DOWN' \
+    'down PORT_DOWN LINK_DOWN' \
     'flood PORT_DOWN LINK_DOWN' \
     'no-receive PORT_DOWN,NO_RECV LINK_DOWN' \
     'no-forward PORT_DOWN,NO_RECV,NO_FWD LINK_DOWN' \
