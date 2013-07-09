@@ -485,6 +485,9 @@ enum ofperr ofpacts_check(const struct ofpact[],
 
 /* Converting ofpacts to OpenFlow. */
 void ofpacts_to_openflow10(const struct ofpact[], struct ofpbuf *openflow);
+size_t ofpacts_put_openflow11_actions(uint8_t ofp_version,
+                                      const struct ofpact ofpacts[],
+                                      struct ofpbuf *openflow);
 void ofpacts_insts_to_openflow11(uint8_t ofp_version,
                                  const struct ofpact ofpacts[],
                                  struct ofpbuf *openflow);

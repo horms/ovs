@@ -1916,6 +1916,33 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     }
 }
 
+/* Converts the ofpacts in 'ofpacts' (terminated by OFPACT_END) into OpenFlow
+ * 1.1 actions in 'openflow', appending the actions to any existing data in
+ * 'openflow'. */
+size_t
+ofpacts_put_openflow11_actions(uint8_t ofp_version,
+                               const struct ofpact ofpacts[],
+                               struct ofpbuf *openflow)
+{
+    const struct ofpact *a;
+    size_t start_size = openflow->size;
+    void (*ofpact_to_openflow)(const struct ofpact *a, struct ofpbuf *out);
+
+    if (ofp_version == OFP11_VERSION) {
+        ofpact_to_openflow = ofpact_to_openflow11;
+    } else if (ofp_version == OFP12_VERSION) {
+        ofpact_to_openflow = ofpact_to_openflow12;
+    } else {
+        NOT_REACHED();
+    }
+
+    OFPACT_FOR_EACH (a, ofpacts) {
+        ofpact_to_openflow(a, openflow);
+    }
+
+    return openflow->size - start_size;
+}
+
 static void
 ofpacts_to_inst_actions(const struct ofpact ofpacts[],
                         struct ofpbuf *openflow,
