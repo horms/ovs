@@ -1170,7 +1170,9 @@ monitor_vconn(struct vconn *vconn)
             ofp_print(stderr, b->data, b->size, verbosity + 2);
             ofpbuf_delete(b);
 
-            if (barrier_aux.conn && msg_type == OFPT10_BARRIER_REPLY) {
+            if (barrier_aux.conn &&
+                (msg_type == OFPT10_BARRIER_REPLY ||
+                 msg_type == OFPT11_BARRIER_REPLY)) {
                 unixctl_command_reply(barrier_aux.conn, NULL);
                 barrier_aux.conn = NULL;
             }
