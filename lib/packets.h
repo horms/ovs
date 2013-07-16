@@ -145,7 +145,7 @@ void eth_pop_vlan(struct ofpbuf *);
 
 uint16_t eth_mpls_depth(const struct ofpbuf *packet);
 
-void set_ethertype(struct ofpbuf *packet, ovs_be16 eth_type);
+void set_ethertype(struct ofpbuf *packet, ovs_be16 eth_type, bool inner);
 
 const char *eth_from_hex(const char *hex, struct ofpbuf **packetp);
 void eth_format_masked(const uint8_t eth[ETH_ADDR_LEN],
