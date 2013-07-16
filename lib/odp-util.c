@@ -3639,11 +3639,15 @@ commit_set_pkt_mark_action(const struct flow *flow, struct flow *base,
  * used as part of the action.
  *
  * Returns a reason to force processing the flow's packets into the userspace
- * slow path, if there is one, otherwise 0. */
+ * slow path, if there is one, otherwise 0.
+ *
+ * VLAN actions may be committed twice; If vlan_tci in 'flow' differs from the
+ * one in 'base', then it is committed before MPLS actions. If 'final_vlan_tci'
+ * differs from 'flow->vlan_tci', it is committed afterwards. */
 enum slow_path_reason
 commit_odp_actions(const struct flow *flow, struct flow *base,
                    struct ofpbuf *odp_actions, struct flow_wildcards *wc,
-                   int *mpls_depth_delta)
+                   int *mpls_depth_delta, ovs_be16 final_vlan_tci)
 {
     enum slow_path_reason slow;
 
@@ -3656,6 +3660,7 @@ commit_odp_actions(const struct flow *flow, struct flow *base,
      * that it is no longer IP and thus nw and port actions are no longer valid.
      */
     commit_mpls_action(flow, base, odp_actions, wc, mpls_depth_delta);
+    commit_vlan_action(final_vlan_tci, base, odp_actions, wc);
     commit_set_priority_action(flow, base, odp_actions, wc);
     commit_set_pkt_mark_action(flow, base, odp_actions, wc);
 

@@ -175,7 +175,8 @@ enum slow_path_reason commit_odp_actions(const struct flow *,
                                          struct flow *base,
                                          struct ofpbuf *odp_actions,
                                          struct flow_wildcards *wc,
-                                         int *mpls_depth_delta);
+                                         int *mpls_depth_delta,
+                                         ovs_be16 final_vlan_tci);
 
 /* ofproto-dpif interface.
  *
