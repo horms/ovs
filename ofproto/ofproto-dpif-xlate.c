@@ -2494,24 +2494,27 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             break;
         }
 
-        case OFPACT_PUSH_MPLS:
-            if (compose_mpls_push_action(ctx,
-                                         ofpact_get_PUSH_MPLS(a)->ethertype)) {
+        case OFPACT_PUSH_MPLS: {
+            struct ofpact_push_mpls *oam = ofpact_get_PUSH_MPLS(a);
+
+            if (compose_mpls_push_action(ctx, oam->ethertype)) {
                 return;
             }
 
-            /* Save and pop any existing VLAN tags. They will be pushed
-             * back onto the packet after pushing the MPLS LSE. The overall
-             * effect is to push the MPLS LSE after any VLAN tags that may
-             * be present. This is the behaviour described for OpenFlow 1.1
-             * and 1.2. This code needs to be enhanced to make this
-             * conditional to also and support pushing the MPLS LSE before
-             * any VLAN tags that may be present, the behaviour described
-             * for OpenFlow 1.3. */
+            /* Save and pop any existing VLAN tags if the MPLS LSE should
+             * be pushed after VLAN tags.  The overall effect is to push
+             * the MPLS LSE after any VLAN tags that may be present.  This
+             * is the behaviour described for OpenFlow 1.1 and 1.2.
+             * Do not save and therefore pop the VLAN tags if the MPLS LSE
+             * should be pushed before any VLAN tags that are present.
+             * This is the behaviour described for OpenFlow 1.3. */
             ctx->final_vlan_tci = *ctx->next_vlan_tci;
-            flow->vlan_tci = htons(0);
+            if (oam->position == OFPACT_MPLS_AFTER_VLAN) {
+                flow->vlan_tci = htons(0);
+            }
             ctx->next_vlan_tci = &ctx->final_vlan_tci;
             break;
+        }
 
         case OFPACT_POP_MPLS:
             if (compose_mpls_pop_action(ctx,
