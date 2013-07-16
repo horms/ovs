@@ -58,6 +58,11 @@ struct xlate_in {
      * this flow when actions change header fields. */
     struct flow flow;
 
+    /* If MPLS and VLAN actions were both present in the translation, and VLAN
+     * actions should occur after the MPLS actions, then this field is used
+     * to store the final vlan_tci state. */
+    ovs_be16 vlan_tci;
+
     /* The packet corresponding to 'flow', or a null pointer if we are
      * revalidating without a packet to refer to. */
     const struct ofpbuf *packet;

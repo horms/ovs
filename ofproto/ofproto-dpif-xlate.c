@@ -974,10 +974,11 @@ static void
 output_normal(struct xlate_ctx *ctx, const struct xbundle *out_xbundle,
               uint16_t vlan)
 {
-    ovs_be16 *flow_tci = &ctx->xin->flow.vlan_tci;
+    ovs_be16 *flow_tci = &ctx->xin->vlan_tci;
     uint16_t vid;
     ovs_be16 tci, old_tci;
     struct xport *xport;
+    bool flow_tci_equal_to_xin = (*flow_tci == ctx->xin->flow.vlan_tci);
 
     vid = output_vlan_to_vid(out_xbundle, vlan);
     if (list_is_empty(&out_xbundle->xports)) {
@@ -1008,9 +1009,15 @@ output_normal(struct xlate_ctx *ctx, const struct xbundle *out_xbundle,
         }
     }
     *flow_tci = tci;
+    if (flow_tci_equal_to_xin) {
+        ctx->xin->flow.vlan_tci = tci;
+    }
 
     compose_output_action(ctx, xport->ofp_port);
     *flow_tci = old_tci;
+    if (flow_tci_equal_to_xin) {
+        ctx->xin->flow.vlan_tci = old_tci;
+    }
 }
 
 /* A VM broadcasts a gratuitous ARP to indicate that it has resumed after
@@ -1242,7 +1249,7 @@ xlate_normal(struct xlate_ctx *ctx)
 
     /* Drop malformed frames. */
     if (flow->dl_type == htons(ETH_TYPE_VLAN) &&
-        !(flow->vlan_tci & htons(VLAN_CFI))) {
+        !(ctx->xin->vlan_tci & htons(VLAN_CFI))) {
         if (ctx->xin->packet != NULL) {
             static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
             VLOG_WARN_RL(&rl, "bridge %s: dropping packet with partial "
@@ -1266,7 +1273,7 @@ xlate_normal(struct xlate_ctx *ctx)
     }
 
     /* Check VLAN. */
-    vid = vlan_tci_to_vid(flow->vlan_tci);
+    vid = vlan_tci_to_vid(ctx->xin->vlan_tci);
     if (!input_vid_is_valid(vid, in_xbundle, ctx->xin->packet != NULL)) {
         xlate_report(ctx, "disallowed VLAN VID for this input port, dropping");
         return;
@@ -1522,7 +1529,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
     const struct xport *xport = get_ofp_port(ctx->xbridge, ofp_port);
     struct flow_wildcards *wc = &ctx->xout->wc;
     struct flow *flow = &ctx->xin->flow;
-    ovs_be16 flow_vlan_tci;
+    ovs_be16 flow_vlan_tci, xin_vlan_tci;
     uint32_t flow_pkt_mark;
     uint8_t flow_nw_tos;
     odp_port_t out_port, odp_port;
@@ -1591,6 +1598,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
     }
 
     flow_vlan_tci = flow->vlan_tci;
+    xin_vlan_tci = ctx->xin->vlan_tci;
     flow_pkt_mark = flow->pkt_mark;
     flow_nw_tos = flow->nw_tos;
 
@@ -1630,18 +1638,19 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
             wc->masks.vlan_tci |= htons(VLAN_VID_MASK | VLAN_CFI);
         }
         vlandev_port = vsp_realdev_to_vlandev(ctx->xbridge->ofproto, ofp_port,
-                                              flow->vlan_tci);
+                                              ctx->xin->vlan_tci);
         if (vlandev_port == ofp_port) {
             out_port = odp_port;
         } else {
             out_port = ofp_port_to_odp_port(ctx->xbridge, vlandev_port);
             flow->vlan_tci = htons(0);
+            ctx->xin->vlan_tci = htons(0);
         }
     }
 
     if (out_port != ODPP_NONE) {
-        commit_odp_actions(flow, &ctx->base_flow,
-                           &ctx->xout->odp_actions, &ctx->xout->wc);
+        commit_odp_actions(flow, &ctx->base_flow, &ctx->xout->odp_actions,
+                           &ctx->xout->wc, ctx->xin->vlan_tci);
         nl_msg_put_odp_port(&ctx->xout->odp_actions, OVS_ACTION_ATTR_OUTPUT,
                             out_port);
 
@@ -1653,6 +1662,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
  out:
     /* Restore flow */
     flow->vlan_tci = flow_vlan_tci;
+    ctx->xin->vlan_tci = xin_vlan_tci;
     flow->pkt_mark = flow_pkt_mark;
     flow->nw_tos = flow_nw_tos;
 }
@@ -1792,7 +1802,8 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     memset(&key.tunnel, 0, sizeof key.tunnel);
 
     commit_odp_actions(&ctx->xin->flow, &ctx->base_flow,
-                       &ctx->xout->odp_actions, &ctx->xout->wc);
+                       &ctx->xout->odp_actions, &ctx->xout->wc,
+                       ctx->xin->vlan_tci);
 
     odp_execute_actions(NULL, packet, &key, ctx->xout->odp_actions.data,
                         ctx->xout->odp_actions.size, NULL, NULL);
@@ -2145,8 +2156,8 @@ xlate_sample_action(struct xlate_ctx *ctx,
    * the same percentage. */
   uint32_t probability = (os->probability << 16) | os->probability;
 
-  commit_odp_actions(&ctx->xin->flow, &ctx->base_flow,
-                     &ctx->xout->odp_actions, &ctx->xout->wc);
+  commit_odp_actions(&ctx->xin->flow, &ctx->base_flow, &ctx->xout->odp_actions,
+                     &ctx->xout->wc, ctx->xin->vlan_tci);
 
   compose_flow_sample_cookie(os->probability, os->collector_set_id,
                              os->obs_domain_id, os->obs_point_id, &cookie);
@@ -2175,11 +2186,23 @@ may_receive(const struct xport *xport, struct xlate_ctx *ctx)
 }
 
 static void
+vlan_tci_restore(struct xlate_in *xin, ovs_be16 *tci_ptr, ovs_be16 orig_tci)
+{
+    /* If MPLS actions were executed after MPLS, copy the final vlan_tci out
+     * and restore the intermediate VLAN state. */
+    if (xin->flow.vlan_tci != orig_tci && tci_ptr == &xin->vlan_tci) {
+        xin->vlan_tci = xin->flow.vlan_tci;
+        xin->flow.vlan_tci = orig_tci;
+    }
+}
+
+static void
 do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
                  struct xlate_ctx *ctx)
 {
     struct flow_wildcards *wc = &ctx->xout->wc;
     struct flow *flow = &ctx->xin->flow;
+    ovs_be16 *vlan_tci = &ctx->xin->flow.vlan_tci;
     const struct ofpact *a;
 
     OFPACT_FOR_EACH (a, ofpacts, ofpacts_len) {
@@ -2189,6 +2212,15 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
         if (ctx->exit) {
             break;
         }
+
+        /* Update the final vlan state to be equal to the current state.
+         * - If 'vlan_tci' points to 'xin->flow->vlan_tci'. then additional
+         *   VLAN actions will be applied before MPLS actions. 'xin->vlan_tci'
+         *   is updated to reflect the final state of the flow.
+         * - If 'vlan_tci' already points to 'xin->vlan_tci', then additional
+         *   VLAN actions will be applied after MPLS actions. 'xin->vlan_tci'
+         *   is already equal to the current state. */
+        ctx->xin->vlan_tci = *vlan_tci;
 
         switch (a->type) {
         case OFPACT_OUTPUT:
@@ -2209,28 +2241,28 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_SET_VLAN_VID:
             wc->masks.vlan_tci |= htons(VLAN_VID_MASK | VLAN_CFI);
-            flow->vlan_tci &= ~htons(VLAN_VID_MASK);
-            flow->vlan_tci |= (htons(ofpact_get_SET_VLAN_VID(a)->vlan_vid)
-                               | htons(VLAN_CFI));
+            *vlan_tci &= ~htons(VLAN_VID_MASK);
+            *vlan_tci |= (htons(ofpact_get_SET_VLAN_VID(a)->vlan_vid)
+                          | htons(VLAN_CFI));
             break;
 
         case OFPACT_SET_VLAN_PCP:
-            wc->masks.vlan_tci |= htons(VLAN_PCP_MASK | VLAN_CFI);
-            flow->vlan_tci &= ~htons(VLAN_PCP_MASK);
-            flow->vlan_tci |=
+            wc->masks.vlan_tci |= htons(VLAN_VID_MASK | VLAN_CFI);
+            *vlan_tci &= ~htons(VLAN_PCP_MASK);
+            *vlan_tci |=
                 htons((ofpact_get_SET_VLAN_PCP(a)->vlan_pcp << VLAN_PCP_SHIFT)
                       | VLAN_CFI);
             break;
 
         case OFPACT_STRIP_VLAN:
             memset(&wc->masks.vlan_tci, 0xff, sizeof wc->masks.vlan_tci);
-            flow->vlan_tci = htons(0);
+            *vlan_tci = htons(0);
             break;
 
         case OFPACT_PUSH_VLAN:
             /* XXX 802.1AD(QinQ) */
             memset(&wc->masks.vlan_tci, 0xff, sizeof wc->masks.vlan_tci);
-            flow->vlan_tci = htons(VLAN_CFI);
+            *vlan_tci = htons(VLAN_CFI);
             break;
 
         case OFPACT_SET_ETH_SRC:
@@ -2298,26 +2330,44 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             flow->skb_priority = ctx->orig_skb_priority;
             break;
 
-        case OFPACT_REG_MOVE:
+        case OFPACT_REG_MOVE: {
+            ovs_be16 orig_tci = flow->vlan_tci;
             nxm_execute_reg_move(ofpact_get_REG_MOVE(a), flow, wc);
+            vlan_tci_restore(ctx->xin, vlan_tci, orig_tci);
             break;
+        }
 
-        case OFPACT_REG_LOAD:
+        case OFPACT_REG_LOAD: {
+            ovs_be16 orig_tci = flow->vlan_tci;
             nxm_execute_reg_load(ofpact_get_REG_LOAD(a), flow);
+            vlan_tci_restore(ctx->xin, vlan_tci, orig_tci);
             break;
+        }
 
-        case OFPACT_STACK_PUSH:
+        case OFPACT_STACK_PUSH: {
+            ovs_be16 orig_tci = flow->vlan_tci;
+            flow->vlan_tci = *vlan_tci;
             nxm_execute_stack_push(ofpact_get_STACK_PUSH(a), flow, wc,
                                    &ctx->stack);
+            flow->vlan_tci = orig_tci;
             break;
+        }
 
-        case OFPACT_STACK_POP:
+        case OFPACT_STACK_POP: {
+            ovs_be16 orig_tci = flow->vlan_tci;
             nxm_execute_stack_pop(ofpact_get_STACK_POP(a), flow, wc,
                                   &ctx->stack);
+            vlan_tci_restore(ctx->xin, vlan_tci, orig_tci);
             break;
+        }
 
         case OFPACT_PUSH_MPLS:
             compose_mpls_push_action(ctx, ofpact_get_PUSH_MPLS(a)->ethertype);
+
+            /* Save and pop any existing VLAN tags if running in OF1.2 mode. */
+            ctx->xin->vlan_tci = *vlan_tci;
+            flow->vlan_tci = htons(0);
+            vlan_tci = &ctx->xin->vlan_tci;
             break;
 
         case OFPACT_POP_MPLS:
@@ -2416,6 +2466,7 @@ xlate_in_init(struct xlate_in *xin, struct ofproto_dpif *ofproto,
 {
     xin->ofproto = ofproto;
     xin->flow = *flow;
+    xin->vlan_tci = flow->vlan_tci;
     xin->packet = packet;
     xin->may_learn = packet != NULL;
     xin->rule = rule;
