@@ -1387,7 +1387,7 @@ flow_compose(struct ofpbuf *b, const struct flow *flow)
     if (eth_type_mpls(flow->dl_type)) {
         int n;
 
-        b->l2_5 = b->l3;
+        b->l2_5 = (char*)b->l2 + ETH_HEADER_LEN;
         for (n = 1; n < ARRAY_SIZE(flow->mpls_lse); n++) {
             if (flow->mpls_lse[n - 1] & htonl(MPLS_BOS_MASK)) {
                 break;
