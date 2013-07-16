@@ -1912,6 +1912,12 @@ tunnel_ecn_ok(struct xlate_ctx *ctx)
     return true;
 }
 
+static bool
+mpls_compat_behaviour(enum ofputil_action_code compat)
+{
+    return (compat != OFPUTIL_OFPAT13_PUSH_MPLS);
+}
+
 static void
 vlan_tci_restore(struct xlate_in *xin, ovs_be16 *tci_ptr, ovs_be16 orig_tci)
 {
@@ -2089,7 +2095,9 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
             /* Save and pop any existing VLAN tags if running in OF1.2 mode. */
             ctx->xin->vlan_tci = *vlan_tci;
-            flow->vlan_tci = htons(0);
+            if (mpls_compat_behaviour(a->compat)) {
+                flow->vlan_tci = htons(0);
+            }
             vlan_tci = &ctx->xin->vlan_tci;
             break;
 
