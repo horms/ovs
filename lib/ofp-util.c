@@ -1582,18 +1582,8 @@ ofputil_usable_protocols(const struct cls_rule *rule)
         return OFPUTIL_P_NXM_ANY;
     }
 
-    /* Only NXM supports matching mpls label */
-    if (!(wc->wildcards & FWW_MPLS_LABEL)) {
-        return OFPUTIL_P_NXM_ANY;
-    }
-
     /* Only NXM supports matching mpls tc */
     if (!(wc->wildcards & FWW_MPLS_TC)) {
-        return OFPUTIL_P_NXM_ANY;
-    }
-
-    /* Only NXM supports matching mpls stack */
-    if (!(wc->wildcards & FWW_MPLS_STACK)) {
         return OFPUTIL_P_NXM_ANY;
     }
 
