@@ -1582,11 +1582,6 @@ ofputil_usable_protocols(const struct cls_rule *rule)
         return OFPUTIL_P_NXM_ANY;
     }
 
-    /* Only NXM supports matching mpls tc */
-    if (!(wc->wildcards & FWW_MPLS_TC)) {
-        return OFPUTIL_P_NXM_ANY;
-    }
-
     /* Only NXM supports matching vlan tpid */
     if (!(wc->wildcards & FWW_VLAN_TPID)) {
         return OFPUTIL_P_NXM_ANY;

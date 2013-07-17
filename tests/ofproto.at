@@ -531,3 +531,17 @@ OFPST11_FLOW reply (OF1.2):
 ])
 OVS_VSWITCHD_STOP
 AT_CLEANUP
+
+AT_SETUP([ofproto - dump-flow with mpls_tc match (OpenFlow 1.2)])
+OVS_VSWITCHD_START
+ovs-appctl vlog/set dpif,file,dbg
+ovs-appctl vlog/set ofproto,file,dbg
+AT_CHECK([echo 'in_port=1,actions=0' | ovs-ofctl add-flows br0 -])
+AT_CHECK([ovs-ofctl add-flow br0 in_port=0,mpls,mpls_tc=3,actions=1])
+AT_CHECK([ovs-ofctl add-flow br0 in_port=0,mpls,mpls_tc=1,actions=1])
+AT_CHECK([ovs-ofctl dump-flows br0 mpls,mpls_tc=3 | ofctl_strip | sort], [0], [dnl
+ mpls,in_port=0,mpls_tc=3 actions=apply_actions(output:1)
+OFPST11_FLOW reply (OF1.2):
+])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
