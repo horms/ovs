@@ -491,3 +491,43 @@ OFPT_BARRIER_REPLY (OF1.2):
 
 OVS_VSWITCHD_STOP
 AT_CLEANUP
+
+AT_SETUP([ofproto - dump-flow with dl_vlan match (OpenFlow 1.2)])
+OVS_VSWITCHD_START
+AT_CHECK([echo 'in_port=1,actions=0' | ovs-ofctl add-flows br0 -])
+AT_CHECK([ovs-ofctl add-flow br0 in_port=0,dl_vlan=30,actions=1])
+AT_CHECK([ovs-ofctl add-flow br0 in_port=0,dl_vlan=31,actions=1])
+AT_CHECK([ovs-ofctl dump-flows br0 dl_vlan=30 | ofctl_strip | sort], [0], [dnl
+ in_port=0,dl_vlan=30 actions=apply_actions(output:1)
+OFPST11_FLOW reply (OF1.2):
+])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto - dump-flow with dl_type match (OpenFlow 1.2)])
+OVS_VSWITCHD_START
+AT_CHECK([ovs-appctl vlog/set dpif,file,warn])
+AT_CHECK([ovs-appctl vlog/set ofproto,file,warn])
+AT_CHECK([echo 'in_port=1,actions=0' | ovs-ofctl add-flows br0 -])
+AT_CHECK([ovs-ofctl add-flow br0 in_port=0,mpls,actions=1])
+AT_CHECK([ovs-ofctl add-flow br0 in_port=0,ip,actions=1])
+AT_CHECK([ovs-ofctl dump-flows br0 mpls | ofctl_strip | sort], [0], [dnl
+ mpls,in_port=0 actions=apply_actions(output:1)
+OFPST11_FLOW reply (OF1.2):
+])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto - dump-flow with mpls_label match (OpenFlow 1.2)])
+OVS_VSWITCHD_START
+ovs-appctl vlog/set dpif,file,dbg
+ovs-appctl vlog/set ofproto,file,dbg
+AT_CHECK([echo 'in_port=1,actions=0' | ovs-ofctl add-flows br0 -])
+AT_CHECK([ovs-ofctl add-flow br0 in_port=0,mpls,mpls_label=3000,actions=1])
+AT_CHECK([ovs-ofctl add-flow br0 in_port=0,mpls,mpls_label=3001,actions=1])
+AT_CHECK([ovs-ofctl dump-flows br0 mpls,mpls_label=3000 | ofctl_strip | sort], [0], [dnl
+ mpls,in_port=0,mpls_label=3000 actions=apply_actions(output:1)
+OFPST11_FLOW reply (OF1.2):
+])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
