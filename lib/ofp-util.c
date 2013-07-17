@@ -4764,6 +4764,9 @@ ofputil_put_action(enum ofputil_action_code code, struct ofpbuf *buf)
     case OFPUTIL_ACTION_INVALID:
         NOT_REACHED();
 
+    case OFPUTIL_OFPAT13_PUSH_MPLS:
+        return ofputil_put_OFPAT11_PUSH_MPLS(buf);
+
 #define OFPAT10_ACTION(ENUM, STRUCT, NAME)                  \
     case OFPUTIL_##ENUM: return ofputil_put_##ENUM(buf);
 #define OFPAT11_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME)      \
