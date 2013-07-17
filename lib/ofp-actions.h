@@ -332,6 +332,13 @@ struct ofpact_reg_load {
 struct ofpact_push_mpls {
     struct ofpact ofpact;
     ovs_be16 ethertype;
+    bool mpls_before_vlan;  /* If true then the MPLS LSE will be added
+                             * immediately after the ethernet header
+                             * and before any VLAN tags that are present.
+                             * This is the behaviour for OpenFlow 1.3+.
+                             * Otherwise the MPLS LSE will be added after
+                             * any VLAN tags that are present.  This is the
+                             * behaviour for OpenFlow 1.1 and 1.2. */
 };
 
 /* OFPACT_POP_MPLS
@@ -504,9 +511,11 @@ enum ofperr ofpacts_pull_openflow10(struct ofpbuf *openflow,
                                     unsigned int actions_len,
                                     struct ofpbuf *ofpacts);
 enum ofperr ofpacts_pull_openflow11_actions(struct ofpbuf *openflow,
+                                            enum ofp_version version,
                                             unsigned int actions_len,
                                             struct ofpbuf *ofpacts);
 enum ofperr ofpacts_pull_openflow11_instructions(struct ofpbuf *openflow,
+                                                 enum ofp_version version,
                                                  unsigned int instructions_len,
                                                  struct ofpbuf *ofpacts);
 enum ofperr ofpacts_check(const struct ofpact[], size_t ofpacts_len,

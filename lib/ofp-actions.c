@@ -881,6 +881,40 @@ ofpacts_from_openflow11(const union ofp_action *in, size_t n_in,
     return ofpacts_from_openflow(in, n_in, out, ofpact_from_openflow11);
 }
 
+static enum ofperr
+ofpact_from_openflow13(const union ofp_action *a, struct ofpbuf *out)
+{
+    enum ofputil_action_code code;
+    enum ofperr error;
+
+    error = decode_openflow11_action(a, &code);
+    if (error) {
+        return error;
+    }
+
+    if (code == OFPUTIL_OFPAT11_PUSH_MPLS) {
+        struct ofpact_push_mpls *oam;
+        struct ofp11_action_push *oap = (struct ofp11_action_push *)a;
+        if (!eth_type_mpls(oap->ethertype)) {
+            return OFPERR_OFPBAC_BAD_ARGUMENT;
+        }
+        oam = ofpact_put_PUSH_MPLS(out);
+        oam->ethertype = oap->ethertype;
+        oam->mpls_before_vlan = true;
+    } else {
+        return ofpact_from_openflow11(a, out);
+    }
+
+    return error;
+}
+
+static enum ofperr
+ofpacts_from_openflow13(const union ofp_action *in, size_t n_in,
+                        struct ofpbuf *out)
+{
+    return ofpacts_from_openflow(in, n_in, out, ofpact_from_openflow13);
+}
+
 /* OpenFlow 1.1 instructions. */
 
 #define DEFINE_INST(ENUM, STRUCT, EXTENSIBLE, NAME)             \
@@ -1085,10 +1119,13 @@ get_actions_from_instruction(const struct ofp11_instruction *inst,
     *n_actions = (ntohs(inst->len) - sizeof *inst) / OFP11_INSTRUCTION_ALIGN;
 }
 
-/* Attempts to convert 'actions_len' bytes of OpenFlow 1.1 actions from the
+/* Attempts to convert 'actions_len' bytes of OpenFlow actions from the
  * front of 'openflow' into ofpacts.  On success, replaces any existing content
  * in 'ofpacts' by the converted ofpacts; on failure, clears 'ofpacts'.
  * Returns 0 if successful, otherwise an OpenFlow error.
+ *
+ * Actions are processed according to their OpenFlow version which
+ * is provided in the 'version' parameter.
  *
  * In most places in OpenFlow 1.1 and 1.2, actions appear encapsulated in
  * instructions, so you should call ofpacts_pull_openflow11_instructions()
@@ -1101,15 +1138,27 @@ get_actions_from_instruction(const struct ofp11_instruction *inst,
  * valid in a specific context. */
 enum ofperr
 ofpacts_pull_openflow11_actions(struct ofpbuf *openflow,
+                                enum ofp_version version,
                                 unsigned int actions_len,
                                 struct ofpbuf *ofpacts)
 {
-    return ofpacts_pull_actions(openflow, actions_len, ofpacts,
-                                ofpacts_from_openflow11);
+    switch (version) {
+    case OFP10_VERSION:
+    case OFP11_VERSION:
+    case OFP12_VERSION:
+        return ofpacts_pull_actions(openflow, actions_len, ofpacts,
+                                    ofpacts_from_openflow11);
+    case OFP13_VERSION:
+        return ofpacts_pull_actions(openflow, actions_len, ofpacts,
+                                    ofpacts_from_openflow13);
+    default:
+        NOT_REACHED();
+    }
 }
 
 enum ofperr
 ofpacts_pull_openflow11_instructions(struct ofpbuf *openflow,
+                                     enum ofp_version version,
                                      unsigned int instructions_len,
                                      struct ofpbuf *ofpacts)
 {
@@ -1160,7 +1209,18 @@ ofpacts_pull_openflow11_instructions(struct ofpbuf *openflow,
 
         get_actions_from_instruction(insts[OVSINST_OFPIT11_APPLY_ACTIONS],
                                      &actions, &n_actions);
-        error = ofpacts_from_openflow11(actions, n_actions, ofpacts);
+        switch (version) {
+        case OFP10_VERSION:
+        case OFP11_VERSION:
+        case OFP12_VERSION:
+            error = ofpacts_from_openflow11(actions, n_actions, ofpacts);
+            break;
+        case OFP13_VERSION:
+            error = ofpacts_from_openflow13(actions, n_actions, ofpacts);
+            break;
+        default:
+            NOT_REACHED();
+        }
         if (error) {
             goto exit;
         }
