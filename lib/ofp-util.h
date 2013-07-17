@@ -787,6 +787,7 @@ enum OVS_PACKED_ENUM ofputil_action_code {
 #define OFPAT11_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME) OFPUTIL_##ENUM,
 #define NXAST_ACTION(ENUM, STRUCT, EXTENSIBLE, NAME)   OFPUTIL_##ENUM,
 #include "ofp-util.def"
+    OFPUTIL_OFPAT13_PUSH_MPLS
 };
 
 /* The number of values of "enum ofputil_action_code". */
