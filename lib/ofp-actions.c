@@ -1874,6 +1874,11 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
         ofputil_put_OFPAT11_POP_VLAN(out);
         break;
 
+    case OFPACT_SET_QUEUE:
+        ofputil_put_OFPAT11_SET_QUEUE(out)->queue_id
+            = htonl(ofpact_get_SET_QUEUE(a)->queue_id);
+        break;
+
     case OFPACT_SET_MPLS_TTL:
         ofputil_put_OFPAT11_SET_MPLS_TTL(out)->mpls_ttl =
             ofpact_get_SET_MPLS_TTL(a)->mpls_ttl;
@@ -1933,7 +1938,6 @@ ofpact_to_openflow11_common(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_SET_MPLS_TC:
     case OFPACT_SET_TUNNEL:
     case OFPACT_WRITE_METADATA:
-    case OFPACT_SET_QUEUE:
     case OFPACT_POP_QUEUE:
     case OFPACT_FIN_TIMEOUT:
     case OFPACT_RESUBMIT:
@@ -1966,6 +1970,7 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_DEC_MPLS_TTL:
     case OFPACT_PUSH_VLAN:
     case OFPACT_POP_VLAN:
+    case OFPACT_SET_QUEUE:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
     case OFPACT_COPY_TTL_OUT:
@@ -1989,11 +1994,6 @@ ofpact_to_openflow11(const struct ofpact *a, struct ofpbuf *out)
 
     case OFPACT_WRITE_METADATA:
         /* OpenFlow 1.1 uses OFPIT_WRITE_METADATA to express this action. */
-        break;
-
-    case OFPACT_SET_QUEUE:
-        ofputil_put_OFPAT11_SET_QUEUE(out)->queue_id
-            = htonl(ofpact_get_SET_QUEUE(a)->queue_id);
         break;
 
     case OFPACT_SET_ETH_SRC:
@@ -2078,6 +2078,7 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_DEC_MPLS_TTL:
     case OFPACT_PUSH_VLAN:
     case OFPACT_POP_VLAN:
+    case OFPACT_SET_QUEUE:
     case OFPACT_PUSH_MPLS:
     case OFPACT_POP_MPLS:
     case OFPACT_COPY_TTL_OUT:
@@ -2092,7 +2093,6 @@ ofpact_to_openflow12(const struct ofpact *a, struct ofpbuf *out)
     case OFPACT_REG_LOAD:
     case OFPACT_SET_TUNNEL:
     case OFPACT_WRITE_METADATA:
-    case OFPACT_SET_QUEUE:
     case OFPACT_POP_QUEUE:
     case OFPACT_FIN_TIMEOUT:
     case OFPACT_RESUBMIT:
