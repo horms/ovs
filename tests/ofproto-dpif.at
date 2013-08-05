@@ -227,6 +227,9 @@ cookie=0xd dl_src=80:88:88:88:88:88 actions=set_field:100->OXM_OF_VLAN_VID[[]],s
 
 cookie=0xd dl_src=81:88:88:88:88:88 actions=controller,write_metadata:100,goto_table:1
 cookie=0xd table=1 metadata=100 actions=controller
+
+cookie=0xd dl_src=81:88:88:88:88:89 actions=apply_actions(dec_ttl),goto_table:89
+cookie=0xd table=89 actions=controller
 ])
 AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
 
@@ -348,6 +351,25 @@ OFPT_PACKET_IN (OF1.2) (xid=0x0): total_len=60 in_port=1 metadata=0x0 (via actio
 priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=1 total_len=60 in_port=1 metadata=0x64 (via action) data_len=60 (unbuffered)
 priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:88->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+])
+
+dnl goto table instruction.
+AT_CHECK([ovs-ofctl monitor br0 65534 -P nxm --detach --pidfile 2> ofctl_monitor.log])
+
+for i in 1 2 3; do
+    ovs-appctl netdev-dummy/receive p1 'in_port(1),eth(src=81:88:88:88:88:89,dst=50:54:00:00:00:07),eth_type(0x0800),ipv4(src=192.168.0.1,dst=192.168.0.2,proto=6,tos=0,ttl=64,frag=no),tcp(src=8,dst=10)'
+done
+
+OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
+AT_CHECK([cat ofctl_monitor.log], [0], [dnl
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=89 total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+dnl
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=89 total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
+dnl
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=89 total_len=60 in_port=1 metadata=0x0 (via action) data_len=60 (unbuffered)
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(81:88:88:88:88:89->50:54:00:00:00:07) type:0800,mpls(0) proto:6 tos:0 ttl:0 ip(192.168.0.1->192.168.0.2) port(8->10) tcp_csum:0
 ])
 
 dnl Modified mpls controller action.
@@ -515,8 +537,10 @@ AT_CHECK([ovs-ofctl dump-flows br0 | ofctl_strip | sort], [0], [dnl
  cookie=0xc, n_packets=3, n_bytes=180, dl_src=70:77:77:77:77:77 actions=apply_actions(push_mpls:0x8848,set_field:1000->mpls_label,set_field:7->mpls_tc,set_field:250->mpls_label,CONTROLLER:65535)
  cookie=0xd, n_packets=3, n_bytes=180, dl_src=60:66:66:66:66:66 actions=apply_actions(pop_mpls:0x800,CONTROLLER:65535)
  cookie=0xd, n_packets=3, n_bytes=180, dl_src=80:88:88:88:88:88 actions=apply_actions(set_field:100->dl_vlan,set_field:3->dl_vlan_pcp,push_vlan:0x8100,set_field:200->dl_vlan,set_field:4->dl_vlan_pcp,CONTROLLER:65535)
- cookie=0xd, n_packets=3, n_bytes=180, dl_src=81:88:88:88:88:88 actions=apply_actions(CONTROLLER:65535)
+ cookie=0xd, n_packets=3, n_bytes=180, dl_src=81:88:88:88:88:88 actions=apply_actions(CONTROLLER:65535),write_metadata:0x64,goto_table:1
+ cookie=0xd, n_packets=3, n_bytes=180, dl_src=81:88:88:88:88:89 actions=apply_actions(dec_ttl),goto_table:89
  cookie=0xd, table=1, n_packets=3, n_bytes=180, metadata=0x64 actions=apply_actions(CONTROLLER:65535)
+ cookie=0xd, table=89, n_packets=3, n_bytes=180, actions=apply_actions(CONTROLLER:65535)
  cookie=0xe, n_packets=3, n_bytes=180, dl_src=90:99:99:99:99:99 actions=apply_actions(set_field:101->dl_vlan,set_field:5->dl_vlan_pcp,push_vlan:0x88a8,set_field:201->dl_vlan,CONTROLLER:65535)
  n_packets=3, n_bytes=180, dl_src=10:11:11:11:11:11 actions=apply_actions(CONTROLLER:65535)
 OFPST11_FLOW reply (OF1.2):

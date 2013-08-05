@@ -2168,7 +2168,7 @@ ofpacts_to_inst_actions(const struct ofpact ofpacts[],
 /* Converts the ofpacts in 'ofpacts' (terminated by OFPACT_END) into OpenFlow
  * 1.1 actions in 'openflow', appending the actions to any existing data in
  * 'openflow'. */
-static const struct ofpact *
+static void
 ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
                               struct ofpbuf *openflow,
                               void (*ofpact_to_openflow)(
@@ -2176,7 +2176,6 @@ ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
 {
     size_t start_len = openflow->size;
     struct ofp11_instruction_actions *oia;
-    const struct ofpact *processed = ofpacts;
 
     switch (ofpacts[0].type) {
     case OFPACT_END:
@@ -2210,8 +2209,8 @@ ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
             inst_actions = ofpact_get_APPLY_ACTIONS(ofpacts);
             type = OFPIT11_APPLY_ACTIONS;
         }
-        processed = ofpacts_to_inst_actions(inst_actions->ofpacts, openflow,
-                                            type, ofpact_to_openflow);
+        ofpacts_to_inst_actions(inst_actions->ofpacts, openflow,
+                                type, ofpact_to_openflow);
         break;
     }
 
@@ -2278,8 +2277,6 @@ ofpacts_insts_to_openflow11__(const struct ofpact *ofpacts,
     default:
         NOT_REACHED();
     }
-
-    return processed;
 }
 
 void
@@ -2306,7 +2303,7 @@ ofpacts_insts_to_openflow11(uint8_t ofp_version,
 
     OFPACT_FOR_EACH(a, ofpacts) {
         assert(ofpact_is_instruction(a) || a->type == OFPACT_END);
-        a = ofpacts_insts_to_openflow11__(a, openflow, ofpact_to_openflow);
+        ofpacts_insts_to_openflow11__(a, openflow, ofpact_to_openflow);
     }
 }
 
