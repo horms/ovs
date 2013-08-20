@@ -103,6 +103,31 @@ OVS_VSWITCHD_STOP
 AT_CLEANUP
 
 
+AT_SETUP([ofproto-dpif - dec_ttl with goto_table])
+OVS_VSWITCHD_START
+AT_DATA([flows.txt], [dnl
+table=0 in_port=1 action=dec_ttl,output:2,goto_table:1
+table=1 in_port=1 action=dec_ttl,output:3
+])
+AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
+AT_CHECK([ovs-appctl ofproto/trace br0 'in_port(1),eth(src=50:54:00:00:00:05,dst=50:54:00:00:00:07),eth_type(0x0800),ipv4(src=192.168.0.1,dst=192.168.0.2,proto=1,tos=0,ttl=2,frag=no)' -generate], [0], [stdout])
+AT_CHECK([tail -3 stdout], [0],
+  [Datapath actions: set(ipv4(src=192.168.0.1,dst=192.168.0.2,proto=1,tos=0,ttl=1,frag=no)),2
+This flow is handled by the userspace slow path because it:
+	- Sends "packet-in" messages to the OpenFlow controller.
+])
+
+AT_CHECK([ovs-ofctl monitor br0 65534 invalid_ttl --detach --pidfile 2> ofctl_monitor.log])
+AT_CHECK([ovs-appctl ofproto/trace br0 'in_port(1),eth(src=50:54:00:00:00:05,dst=50:54:00:00:00:07),eth_type(0x0800),ipv4(src=192.168.0.1,dst=192.168.0.2,proto=1,tos=0,ttl=2,frag=no)' -generate], [0], [stdout])
+OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
+AT_CHECK([cat ofctl_monitor.log], [0], [dnl
+OFPT_PACKET_IN (OF1.2) (xid=0x0): table_id=1 total_len=42 in_port=1 metadata=0x0 (via invalid_ttl) data_len=42 (unbuffered)
+priority:0,tunnel:0,metadata:0,in_port:0000,tci(0),qinq_tci(0) mac(50:54:00:00:00:05->50:54:00:00:00:07) type:0800,mpls(0) proto:1 tos:0 ttl:1 ip(192.168.0.1->192.168.0.2)
+])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+
 AT_SETUP([ofproto-dpif - output, OFPP_NONE ingress port])
 OVS_VSWITCHD_START(
        [add-port br0 p1 -- set Interface p1 type=dummy --\

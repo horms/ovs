@@ -276,6 +276,8 @@ struct action_xlate_ctx {
     uint16_t sflow_odp_port;    /* Output port for composing sFlow action. */
     uint16_t user_cookie_offset;/* Used for user_action_cookie fixup. */
     bool exit;                  /* No further actions should be processed. */
+    bool table_exit;            /* No further actions should be processed
+                                 * for the current table. */
     struct flow orig_flow;      /* Copy of original flow. */
     int mpls_stack_depth_delta; /* Difference in stack depth between
                                  * current packet and result of translated
@@ -4960,6 +4962,12 @@ xlate_table_action(struct action_xlate_ctx *ctx,
         old_table_id = ctx->table_id;
         ctx->table_id = table_id;
 
+        /* There is no need to save and restore this value
+         * as this function is never entered when it is false.
+         * Rather, assert that is the case and reset it to false
+         * just before leaving this function. */
+        assert(!ctx->table_exit);
+
         /* Look up a flow with 'in_port' as the input port. */
         old_in_port = ctx->flow.in_port;
         ctx->flow.in_port = in_port;
@@ -5000,6 +5008,7 @@ xlate_table_action(struct action_xlate_ctx *ctx,
         }
 
         ctx->table_id = old_table_id;
+        ctx->table_exit = false;
     } else {
         static struct vlog_rate_limit recurse_rl = VLOG_RATE_LIMIT_INIT(1, 1);
 
@@ -5499,7 +5508,7 @@ do_xlate_actions__(const struct ofpact *ofpacts, struct action_xlate_ctx *ctx)
     const struct ofpact *a;
 
     OFPACT_FOR_EACH (a, ofpacts) {
-        if (ctx->exit) {
+        if (ctx->exit || ctx->table_exit) {
             break;
         }
         if (!do_xlate_action(a, ctx)) {
@@ -5606,7 +5615,8 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
         struct ofpact_resubmit *resubmit = ofpact_get_RESUBMIT(a);
         xlate_ofpact_resubmit(ctx, resubmit);
         if (resubmit->ofpact.compat == OFPUTIL_OFPIT11_GOTO_TABLE) {
-            return false;
+            /* No further processing of the table should occur */
+            ctx->table_exit = true;
         }
         break;
     }
@@ -5640,7 +5650,8 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
 
     case OFPACT_DEC_TTL:
         if (compose_dec_ttl(ctx, ofpact_get_DEC_TTL(a))) {
-            return false;
+            /* No further processing of the table should occur */
+            ctx->table_exit = true;
         }
         break;
 
@@ -5725,6 +5736,8 @@ do_xlate_action(const struct ofpact *a, struct action_xlate_ctx *ctx)
 
     case OFPACT_DEC_MPLS_TTL:
         if (commit_dec_mpls_ttl_action(ctx)) {
+            /* No further processing of the table should occur */
+            ctx->table_exit = true;
             return false;
         }
         break;
@@ -5826,6 +5839,7 @@ xlate_actions(struct action_xlate_ctx *ctx, const struct ofpact *ofpacts,
     ctx->orig_skb_priority = ctx->flow.skb_priority;
     ctx->table_id = 0;
     ctx->exit = false;
+    ctx->table_exit = false;
     ctx->mpls_stack_depth_delta = 0;
 
     if (ctx->ofproto->has_mirrors || hit_resubmit_limit) {
