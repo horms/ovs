@@ -4956,7 +4956,7 @@ xlate_table_action(struct action_xlate_ctx *ctx,
     if (ctx->recurse < MAX_RESUBMIT_RECURSION) {
         struct ofproto_dpif *ofproto = ctx->ofproto;
         struct rule_dpif *rule;
-        uint16_t old_in_port;
+        uint16_t old_in_port, old_encap_dl_type;
         uint8_t old_table_id;
 
         old_table_id = ctx->table_id;
@@ -4967,6 +4967,9 @@ xlate_table_action(struct action_xlate_ctx *ctx,
          * Rather, assert that is the case and reset it to false
          * just before leaving this function. */
         assert(!ctx->table_exit);
+
+        old_encap_dl_type = ctx->flow.encap_dl_type;
+        ctx->flow.encap_dl_type = htons(0);
 
         /* Look up a flow with 'in_port' as the input port. */
         old_in_port = ctx->flow.in_port;
@@ -5008,6 +5011,7 @@ xlate_table_action(struct action_xlate_ctx *ctx,
         }
 
         ctx->table_id = old_table_id;
+        ctx->flow.encap_dl_type = ctx->flow.encap_dl_type;
         ctx->table_exit = false;
     } else {
         static struct vlog_rate_limit recurse_rl = VLOG_RATE_LIMIT_INIT(1, 1);
