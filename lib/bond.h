@@ -53,6 +53,7 @@ struct bond_settings {
 
     /* Legacy compatibility. */
     bool fake_iface;            /* Update fake stats for netdev 'name'? */
+    bool lacp_fallback_ab_cfg;  /* fallback to active-backup on lacp failure */
 };
 
 /* Program startup. */

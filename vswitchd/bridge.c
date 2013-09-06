@@ -235,6 +235,7 @@ static struct lacp_settings *port_configure_lacp(struct port *,
                                                  struct lacp_settings *);
 static void port_configure_bond(struct port *, struct bond_settings *);
 static bool port_is_synthetic(const struct port *);
+static bool set_lacp_fallback_ab_cfg(struct port *);
 
 static void reconfigure_system_stats(const struct ovsrec_open_vswitch *);
 static void run_system_stats(void);
@@ -3285,6 +3286,18 @@ enable_lacp(struct port *port, bool *activep)
     }
 }
 
+static bool
+set_lacp_fallback_ab_cfg(struct port *port)
+{
+    const char *lacp_fallback_s;
+
+    lacp_fallback_s = smap_get(&port->cfg->other_config, "lacp-fallback-ab");
+    if (lacp_fallback_s && !strcmp(lacp_fallback_s, "true"))
+        return true;
+
+    return false;
+}
+
 static struct lacp_settings *
 port_configure_lacp(struct port *port, struct lacp_settings *s)
 {
@@ -3323,6 +3336,9 @@ port_configure_lacp(struct port *port, struct lacp_settings *s)
 
     lacp_time = smap_get(&port->cfg->other_config, "lacp-time");
     s->fast = lacp_time && !strcasecmp(lacp_time, "fast");
+
+    s->fallback_ab_cfg = set_lacp_fallback_ab_cfg(port);
+
     return s;
 }
 
@@ -3410,6 +3426,8 @@ port_configure_bond(struct port *port, struct bond_settings *s)
     }
 
     s->fake_iface = port->cfg->bond_fake_iface;
+
+    s->lacp_fallback_ab_cfg = set_lacp_fallback_ab_cfg(port);
 
     LIST_FOR_EACH (iface, port_elem, &port->ifaces) {
         netdev_set_miimon_interval(iface->netdev, miimon_interval);
