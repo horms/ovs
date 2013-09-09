@@ -105,22 +105,29 @@ static int pop_vlan(struct sk_buff *skb)
 	return 0;
 }
 
+/* push down current VLAN tag */
+static struct sk_buff *put_vlan(struct sk_buff *skb)
+{
+	u16 current_tag = vlan_tx_tag_get(skb);
+
+	if (!__vlan_put_tag(skb, skb->vlan_proto, current_tag))
+		return ERR_PTR(-ENOMEM);
+
+	if (skb->ip_summed == CHECKSUM_COMPLETE)
+		skb->csum = csum_add(skb->csum, csum_partial(skb->data
+				+ (2 * ETH_ALEN), VLAN_HLEN, 0));
+
+	return skb;
+}
+
 static int push_vlan(struct sk_buff *skb, const struct ovs_action_push_vlan *vlan)
 {
 	if (unlikely(vlan_tx_tag_present(skb))) {
-		u16 current_tag;
-
-		/* push down current VLAN tag */
-		current_tag = vlan_tx_tag_get(skb);
-
-		if (!__vlan_put_tag(skb, skb->vlan_proto, current_tag))
-			return -ENOMEM;
-
-		if (skb->ip_summed == CHECKSUM_COMPLETE)
-			skb->csum = csum_add(skb->csum, csum_partial(skb->data
-					+ (2 * ETH_ALEN), VLAN_HLEN, 0));
-
+		skb = put_vlan(skb);
+		if (IS_ERR(skb))
+			return PTR_ERR(skb);
 	}
+
 	__vlan_hwaccel_put_tag(skb, vlan->vlan_tpid, ntohs(vlan->vlan_tci) & ~VLAN_TAG_PRESENT);
 	return 0;
 }
