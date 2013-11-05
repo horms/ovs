@@ -292,18 +292,16 @@ parse_push_mpls(struct ofpbuf *ofpacts, char *arg)
 
     position_s = strsep(&arg, ",");
     if (position_s && position_s[0]) {
-        /* XXX: Pase "before_vlan" as OFPACT_MPLS_BEFORE_VLAN
-         * once pushing MPLS LSEs before VLAN tags is supported */
-        if (!strcmp(position_s, "after_vlan")) {
+        if (!strcmp(position_s, "before_vlan")) {
+            push_mpls->position = OFPACT_MPLS_BEFORE_VLAN;
+        } else if (!strcmp(position_s, "after_vlan")) {
             push_mpls->position = OFPACT_MPLS_AFTER_VLAN;
         } else {
             return xasprintf("invalid tag_prder '%s' in 'push_mpls' argument",
                              position_s);
         }
     } else {
-        /* XXX: Use OFPACT_MPLS_BEFORE_VLAN as the default
-         * once pushing MPLS LSEs before VLAN tags is supported */
-        push_mpls->position = OFPACT_MPLS_AFTER_VLAN;
+        push_mpls->position = OFPACT_MPLS_BEFORE_VLAN;
     }
 
     return NULL;
