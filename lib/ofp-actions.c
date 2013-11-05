@@ -2257,14 +2257,6 @@ ofpacts_check__(struct ofpact ofpacts[], size_t ofpacts_len,
         if (error) {
             break;
         }
-        /* XXX
-         * OF1.3 tag order is not currently implemented.
-         * The following line effectively disables the
-         * use of 'of13_vlan_tci' to check OF1.3+ tag order
-         * consistency. This means that pre-OF1.3+ is always used.
-         * This line should be removed by a subequent
-         * patch which enables the use of OF1.3+ tag order */
-        *of13_vlan_tci = flow->vlan_tci;
     }
     /* Restore fields that may have been modified. */
     flow->dl_type = dl_type;
