@@ -606,10 +606,19 @@ enum ofperr ofpacts_pull_openflow_instructions(struct ofpbuf *openflow,
                                                unsigned int instructions_len,
                                                enum ofp_version version,
                                                struct ofpbuf *ofpacts);
-enum ofperr ofpacts_check(struct ofpact[], size_t ofpacts_len,
+enum ofperr ofpacts_check(enum ofp_version ofp_version,
+                          struct ofpact[], size_t ofpacts_len,
                           struct flow *, bool enforce_consistency,
                           ofp_port_t max_ports,
                           uint8_t table_id, uint8_t n_tables);
+enum ofperr ofpacts_check_usable_protocols(enum ofputil_protocol *usable_protocols,
+                                           struct ofpact ofpacts[],
+                                           size_t ofpacts_len,
+                                           struct flow *flow,
+                                           bool enforce_consistency,
+                                           ofp_port_t max_ports,
+                                           uint8_t table_id,
+                                           uint8_t n_tables);
 enum ofperr ofpacts_verify(const struct ofpact ofpacts[], size_t ofpacts_len);
 enum ofperr ofpact_check_output_port(ofp_port_t port, ofp_port_t max_ports);
 

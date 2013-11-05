@@ -1875,9 +1875,9 @@ ofpact_check_output_port(ofp_port_t port, ofp_port_t max_ports)
  * Modifies some actions, filling in fields that could not be properly set
  * without context. */
 static enum ofperr
-ofpact_check__(struct ofpact *a, struct flow *flow,
-               bool enforce_consistency, ofp_port_t max_ports,
-               uint8_t table_id, uint8_t n_tables)
+ofpact_check__(enum ofp_version ofp_version, struct ofpact *a,
+               struct flow *flow, bool enforce_consistency,
+               ofp_port_t max_ports, uint8_t table_id, uint8_t n_tables)
 {
     const struct ofpact_enqueue *enqueue;
     const struct mf_field *mf;
@@ -1911,7 +1911,7 @@ ofpact_check__(struct ofpact *a, struct flow *flow,
         ofpact_get_SET_VLAN_VID(a)->flow_has_vlan =
             (flow->vlan_tci & htons(VLAN_CFI)) == htons(VLAN_CFI);
         if (!(flow->vlan_tci & htons(VLAN_CFI)) &&
-            !ofpact_get_SET_VLAN_VID(a)->push_vlan_if_needed) {
+            ofp_version >= OFP11_VERSION) {
             goto inconsistent;
         }
         /* Temporary mark that we have a vlan tag. */
@@ -1924,7 +1924,7 @@ ofpact_check__(struct ofpact *a, struct flow *flow,
         ofpact_get_SET_VLAN_PCP(a)->flow_has_vlan =
             (flow->vlan_tci & htons(VLAN_CFI)) == htons(VLAN_CFI);
         if (!(flow->vlan_tci & htons(VLAN_CFI)) &&
-            !ofpact_get_SET_VLAN_PCP(a)->push_vlan_if_needed) {
+            ofp_version >= OFP11_VERSION) {
             goto inconsistent;
         }
         /* Temporary mark that we have a vlan tag. */
@@ -2078,8 +2078,9 @@ ofpact_check__(struct ofpact *a, struct flow *flow,
 
     case OFPACT_WRITE_ACTIONS: {
         struct ofpact_nest *on = ofpact_get_WRITE_ACTIONS(a);
-        return ofpacts_check(on->actions, ofpact_nest_get_action_len(on),
-                             flow, false, max_ports, table_id, n_tables);
+        return ofpacts_check(ofp_version, on->actions,
+                             ofpact_nest_get_action_len(on), flow, false,
+                             max_ports, table_id, n_tables);
     }
 
     case OFPACT_WRITE_METADATA:
@@ -2124,7 +2125,8 @@ ofpact_check__(struct ofpact *a, struct flow *flow,
  *
  * May temporarily modify 'flow', but restores the changes before returning. */
 enum ofperr
-ofpacts_check(struct ofpact ofpacts[], size_t ofpacts_len,
+ofpacts_check(enum ofp_version ofp_version,
+              struct ofpact ofpacts[], size_t ofpacts_len,
               struct flow *flow, bool enforce_consistency,
               ofp_port_t max_ports,
               uint8_t table_id, uint8_t n_tables)
@@ -2136,7 +2138,7 @@ ofpacts_check(struct ofpact ofpacts[], size_t ofpacts_len,
     enum ofperr error = 0;
 
     OFPACT_FOR_EACH (a, ofpacts, ofpacts_len) {
-        error = ofpact_check__(a, flow, enforce_consistency,
+        error = ofpact_check__(ofp_version, a, flow, enforce_consistency,
                                max_ports, table_id, n_tables);
         if (error) {
             break;
@@ -2147,6 +2149,47 @@ ofpacts_check(struct ofpact ofpacts[], size_t ofpacts_len,
     flow->vlan_tci = vlan_tci;
     flow->nw_proto = nw_proto;
     return error;
+}
+
+enum ofperr
+ofpacts_check_usable_protocols(enum ofputil_protocol *usable_protocols,
+                               struct ofpact ofpacts[], size_t ofpacts_len,
+                               struct flow *flow, bool enforce_consistency,
+                               ofp_port_t max_ports, uint8_t table_id,
+                               uint8_t n_tables)
+{
+    enum ofperr err;
+    enum ofperr last_err = 0;
+
+    /* XXX: As a side effect of multiple calls to ofpacts_check
+     * logging may be duplicated. */
+    if (*usable_protocols & OFPUTIL_P_OF10_ANY) {
+        err = ofpacts_check(OFP10_VERSION, ofpacts, ofpacts_len, flow,
+                            true, max_ports, table_id, n_tables);
+        if (!enforce_consistency &&
+            err == OFPERR_OFPBAC_MATCH_INCONSISTENT) {
+            /* Try again, allowing for inconsistency. */
+            err = ofpacts_check(OFP10_VERSION, ofpacts, ofpacts_len, flow,
+                                false, max_ports, table_id, n_tables);
+        }
+        if (err) {
+            *usable_protocols &= ~OFPUTIL_P_OF10_ANY;
+            last_err = err;
+        }
+    }
+    if (*usable_protocols & (OFPUTIL_P_OF11_UP)) {
+        err = ofpacts_check(OFP11_VERSION, ofpacts, ofpacts_len, flow,
+                            true, max_ports, table_id, n_tables);
+        if (err) {
+            *usable_protocols &= ~(OFPUTIL_P_OF11_UP);
+            last_err = err;
+        }
+    }
+    if (!*usable_protocols && last_err) {
+        return last_err;
+    }
+
+    return 0;
 }
 
 /* Verifies that the 'ofpacts_len' bytes of actions in 'ofpacts' are

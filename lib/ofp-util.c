@@ -1672,9 +1672,9 @@ ofputil_decode_flow_mod(struct ofputil_flow_mod *fm,
                 : OFPERR_OFPFMFC_TABLE_FULL);
     }
 
-    return ofpacts_check(fm->ofpacts, fm->ofpacts_len, &fm->match.flow,
-                         oh->version > OFP10_VERSION, max_port,
-                         fm->table_id, max_table);
+    return ofpacts_check(oh->version, fm->ofpacts, fm->ofpacts_len,
+                         &fm->match.flow, oh->version > OFP10_VERSION,
+                         max_port, fm->table_id, max_table);
 }
 
 static enum ofperr

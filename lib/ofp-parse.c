@@ -1414,24 +1414,16 @@ parse_ofp_str__(struct ofputil_flow_mod *fm, int command, char *string,
         if (!error) {
             enum ofperr err;
 
-            err = ofpacts_check(ofpacts.data, ofpacts.size, &fm->match.flow,
-                                true, OFPP_MAX, fm->table_id, 255);
+            err = ofpacts_check_usable_protocols(usable_protocols,
+                                                 ofpacts.data, ofpacts.size,
+                                                 &fm->match.flow,
+                                                 enforce_consistency, OFPP_MAX,
+                                                 fm->table_id, 255);
             if (err) {
-                if (!enforce_consistency &&
-                    err == OFPERR_OFPBAC_MATCH_INCONSISTENT) {
-                    /* Allow inconsistent actions to be used with OF 1.0. */
-                    *usable_protocols &= OFPUTIL_P_OF10_ANY;
-                    /* Try again, allowing for inconsistency.
-                     * XXX: As a side effect, logging may be duplicated. */
-                    err = ofpacts_check(ofpacts.data, ofpacts.size,
-                                        &fm->match.flow, false,
-                                        OFPP_MAX, fm->table_id, 255);
-                }
-                if (err) {
-                    error = xasprintf("actions are invalid with specified match "
-                                      "(%s)", ofperr_to_string(err));
-                }
+                error = xasprintf("actions are invalid with specified match "
+                                  "(%s)", ofperr_to_string(err));
             }
+
         }
         if (error) {
             ofpbuf_uninit(&ofpacts);

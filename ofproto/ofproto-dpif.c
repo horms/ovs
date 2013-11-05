@@ -5490,9 +5490,11 @@ ofproto_unixctl_trace_actions(struct unixctl_conn *conn, int argc,
         unixctl_command_reply_error(conn, "invalid in_port");
         goto exit;
     }
-    retval = ofpacts_check(ofpacts.data, ofpacts.size, &flow,
-                           enforce_consistency,
-                           u16_to_ofp(ofproto->up.max_ports), 0, 0);
+    retval = ofpacts_check_usable_protocols(&usable_protocols, ofpacts.data,
+                                            ofpacts.size, &flow,
+                                            enforce_consistency,
+                                            u16_to_ofp(ofproto->up.max_ports),
+                                            0, 0);
     if (retval) {
         ds_clear(&result);
         ds_put_format(&result, "Bad actions: %s", ofperr_to_string(retval));
