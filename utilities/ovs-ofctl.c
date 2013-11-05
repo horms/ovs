@@ -3077,8 +3077,8 @@ ofctl_parse_ofp11_instructions(int argc OVS_UNUSED, char *argv[] OVS_UNUSED)
             /* Verify actions, enforce consistency. */
             struct flow flow;
             memset(&flow, 0, sizeof flow);
-            error = ofpacts_check(ofpacts.data, ofpacts.size, &flow,
-                                  true, OFPP_MAX,
+            error = ofpacts_check(OFP11_VERSION, ofpacts.data, ofpacts.size,
+                                  &flow, true, OFPP_MAX,
                                   table_id ? atoi(table_id) : 0, 255);
         }
         if (error) {
