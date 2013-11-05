@@ -2055,13 +2055,23 @@ ofpact_check__(enum ofp_version ofp_version, struct ofpact *a,
     case OFPACT_EXIT:
         return 0;
 
-    case OFPACT_PUSH_MPLS:
-        flow->dl_type = ofpact_get_PUSH_MPLS(a)->ethertype;
+    case OFPACT_PUSH_MPLS: {
+        struct ofpact_push_mpls *oam = ofpact_get_PUSH_MPLS(a);
+
+        flow->dl_type = oam->ethertype;
+        if (ofp_version >= OFP13_VERSION) {
+            /* Any VLAN tags that were present after the ethernet header
+             * are now present after the an MPLS LSE and thus part of
+             * the MPLS payload which is opaque.
+             * Temporarily mark that we have no vlan tag. */
+            flow->vlan_tci = htons(0);
+        }
         /* The packet is now MPLS and the MPLS payload is opaque.
          * Thus nothing can be assumed about the network protocol.
          * Temporarily mark that we have no nw_proto. */
         flow->nw_proto = 0;
         return 0;
+    }
 
     case OFPACT_POP_MPLS:
         flow->dl_type = ofpact_get_POP_MPLS(a)->ethertype;
@@ -2177,11 +2187,20 @@ ofpacts_check_usable_protocols(enum ofputil_protocol *usable_protocols,
             last_err = err;
         }
     }
-    if (*usable_protocols & (OFPUTIL_P_OF11_UP)) {
+    if (*usable_protocols & (OFPUTIL_P_OF11_STD|OFPUTIL_P_OF12_OXM)) {
         err = ofpacts_check(OFP11_VERSION, ofpacts, ofpacts_len, flow,
                             true, max_ports, table_id, n_tables);
         if (err) {
-            *usable_protocols &= ~(OFPUTIL_P_OF11_UP);
+            *usable_protocols &= ~(OFPUTIL_P_OF11_STD|
+                                   OFPUTIL_P_OF12_OXM);
+            last_err = err;
+        }
+    }
+    if (*usable_protocols & OFPUTIL_P_OF13_UP) {
+        err = ofpacts_check(OFP13_VERSION, ofpacts, ofpacts_len, flow,
+                            true, max_ports, table_id, n_tables);
+        if (err) {
+            *usable_protocols &= ~OFPUTIL_P_OF13_UP;
             last_err = err;
         }
     }
