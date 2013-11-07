@@ -5776,9 +5776,31 @@ handle_group_mod(struct ofconn *ofconn, const struct ofp_header *oh)
     }
 }
 
+static void
+table_set_config(struct oftable *table, uint32_t config)
+{
+    ovs_rwlock_wrlock(&table->config_rwlock);
+    table->config = config;
+    ovs_rwlock_unlock(&table->config_rwlock);
+}
+
+static void
+table_mod(struct ofproto *ofproto, const struct ofputil_table_mod *tm)
+{
+    if (tm->table_id == OFPTT_ALL) {
+        int i;
+        for (i = 0; i < ofproto->n_tables; i++) {
+            table_set_config(&ofproto->tables[i], tm->config);
+        }
+    } else {
+        table_set_config(&ofproto->tables[tm->table_id], tm->config);
+    }
+}
+
 static enum ofperr
 handle_table_mod(struct ofconn *ofconn, const struct ofp_header *oh)
 {
+    struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
     struct ofputil_table_mod tm;
     enum ofperr error;
 
@@ -5792,7 +5814,7 @@ handle_table_mod(struct ofconn *ofconn, const struct ofp_header *oh)
         return error;
     }
 
-    /* XXX Actual table mod support is not implemented yet. */
+    table_mod(ofproto, &tm);
     return 0;
 }
 
@@ -6626,6 +6648,8 @@ oftable_init(struct oftable *table)
     memset(table, 0, sizeof *table);
     classifier_init(&table->cls);
     table->max_flows = UINT_MAX;
+    ovs_rwlock_init(&table->config_rwlock);
+    table_set_config(table, OFPTC_TABLE_MISS_CONTROLLER);
 }
 
 /* Destroys 'table', including its classifier and eviction groups.
@@ -6639,6 +6663,7 @@ oftable_destroy(struct oftable *table)
     ovs_rwlock_unlock(&table->cls.rwlock);
     oftable_disable_eviction(table);
     classifier_destroy(&table->cls);
+    ovs_rwlock_destroy(&table->config_rwlock);
     free(table->name);
 }
 
