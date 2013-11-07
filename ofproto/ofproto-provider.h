@@ -213,6 +213,8 @@ enum oftable_flags {
  * Thread-safety
  * =============
  *
+ * cls
+ * ---
  * A cls->rwlock read-lock holder prevents rules from being added or deleted.
  *
  * Adding or removing rules requires holding ofproto_mutex AND the cls->rwlock
@@ -229,7 +231,12 @@ enum oftable_flags {
  * removing the rule from the classifier, release a ref_count from the rule
  * ('cls''s reference to the rule).
  *
- * Refer to the thread-safety notes on struct rule for more information.*/
+ * Refer to the thread-safety notes on struct rule for more information.
+ *
+ * config
+ * ------
+ * config is guarded by config_rwlock.
+ */
 struct oftable {
     enum oftable_flags flags;
     struct classifier cls;      /* Contains "struct rule"s. */
@@ -260,7 +267,13 @@ struct oftable {
     uint32_t eviction_group_id_basis;
     struct hmap eviction_groups_by_id;
     struct heap eviction_groups_by_size;
+
+    /* Table config: contains enum ofp_table_config; accessed atomically. */
+    atomic_uint config;
 };
+
+BUILD_ASSERT_DECL(sizeof(unsigned int) >= sizeof(enum ofp_table_config));
+
 
 /* Assigns TABLE to each oftable, in turn, in OFPROTO.
  *
