@@ -225,8 +225,9 @@ static void xlate_actions__(struct xlate_in *, struct xlate_out *)
     OVS_REQ_RDLOCK(xlate_rwlock);
     static void xlate_normal(struct xlate_ctx *);
     static void xlate_report(struct xlate_ctx *, const char *);
-    static void xlate_table_action(struct xlate_ctx *, ofp_port_t in_port,
-                                   uint8_t table_id, bool may_packet_in);
+static void xlate_table_action(struct xlate_ctx *, ofp_port_t in_port,
+                               uint8_t table_id, bool may_packet_in,
+                               bool force_controller_on_miss);
 static bool input_vid_is_valid(uint16_t vid, struct xbundle *, bool warn);
 static uint16_t input_vid_to_vlan(const struct xbundle *, uint16_t vid);
 static void output_normal(struct xlate_ctx *, const struct xbundle *,
@@ -1719,14 +1720,14 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
             ctx->xout->slow |= special;
         } else if (may_receive(peer, ctx)) {
             if (xport_stp_forward_state(peer)) {
-                xlate_table_action(ctx, flow->in_port.ofp_port, 0, true);
+                xlate_table_action(ctx, flow->in_port.ofp_port, 0, true, false);
             } else {
                 /* Forwarding is disabled by STP.  Let OFPP_NORMAL and the
                  * learning action look at the packet, then drop it. */
                 struct flow old_base_flow = ctx->base_flow;
                 size_t old_size = ctx->xout->odp_actions.size;
                 mirror_mask_t old_mirrors = ctx->xout->mirrors;
-                xlate_table_action(ctx, flow->in_port.ofp_port, 0, true);
+                xlate_table_action(ctx, flow->in_port.ofp_port, 0, true, false);
                 ctx->xout->mirrors = old_mirrors;
                 ctx->base_flow = old_base_flow;
                 ctx->xout->odp_actions.size = old_size;
@@ -1861,15 +1862,43 @@ xlate_resubmit_resource_check(struct xlate_ctx *ctx)
     return false;
 }
 
+struct get_ofp_port_config_cb_data {
+    const struct xbridge *xbridge;
+    ofp_port_t ofp_port;
+    bool may_packet_in;
+};
+
+static enum ofputil_port_config
+get_ofp_port_config_cb(const void *data_)
+{
+    const struct get_ofp_port_config_cb_data *data;
+
+    data = (struct get_ofp_port_config_cb_data *)data_;
+
+    if (data->may_packet_in) {
+        struct xport *xport;
+
+        xport = get_ofp_port(data->xbridge, data->ofp_port);
+        return xport->config;
+    } else {
+        return OFPUTIL_PC_NO_PACKET_IN;
+    }
+}
+
 static void
-xlate_table_action(struct xlate_ctx *ctx,
-                   ofp_port_t in_port, uint8_t table_id, bool may_packet_in)
+xlate_table_action(struct xlate_ctx *ctx, ofp_port_t in_port, uint8_t table_id,
+                   bool may_packet_in, bool force_controller_on_miss)
 {
     if (xlate_resubmit_resource_check(ctx)) {
         ofp_port_t old_in_port = ctx->xin->flow.in_port.ofp_port;
         bool skip_wildcards = ctx->xin->skip_wildcards;
         uint8_t old_table_id = ctx->table_id;
         struct rule_dpif *rule;
+        struct get_ofp_port_config_cb_data get_ofp_port_config_cb_data = {
+            .xbridge = ctx->xbridge,
+            .ofp_port = ctx->xin->flow.in_port.ofp_port,
+            .may_packet_in = may_packet_in,
+        };
 
         ctx->table_id = table_id;
 
@@ -1877,29 +1906,20 @@ xlate_table_action(struct xlate_ctx *ctx,
          * original input port (otherwise OFPP_NORMAL and OFPP_IN_PORT will
          * have surprising behavior). */
         ctx->xin->flow.in_port.ofp_port = in_port;
-        rule_dpif_lookup_in_table(ctx->xbridge->ofproto, &ctx->xin->flow,
-                                  !skip_wildcards ? &ctx->xout->wc : NULL,
-                                  table_id, &rule);
+        rule_dpif_lookup_from_table(ctx->xbridge->ofproto, &ctx->xin->flow,
+                                    !skip_wildcards ? &ctx->xout->wc : NULL,
+                                    ctx->xbridge->miss_rule,
+                                    ctx->xbridge->no_packet_in_rule,
+                                    get_ofp_port_config_cb,
+                                    &get_ofp_port_config_cb_data,
+                                    force_controller_on_miss,
+                                    &ctx->table_id, &rule);
         ctx->xin->flow.in_port.ofp_port = old_in_port;
 
         if (ctx->xin->resubmit_hook) {
             ctx->xin->resubmit_hook(ctx->xin, rule, ctx->recurse);
         }
 
-        if (!rule && may_packet_in) {
-            struct xport *xport;
-
-            /* XXX
-             * check if table configuration flags
-             * OFPTC11_TABLE_MISS_CONTROLLER, default.
-             * OFPTC11_TABLE_MISS_CONTINUE,
-             * OFPTC11_TABLE_MISS_DROP
-             * When OF1.0, OFPTC11_TABLE_MISS_CONTINUE is used. What to do? */
-            xport = get_ofp_port(ctx->xbridge, ctx->xin->flow.in_port.ofp_port);
-            choose_miss_rule(xport ? xport->config : 0,
-                             ctx->xbridge->miss_rule,
-                             ctx->xbridge->no_packet_in_rule, &rule);
-        }
         if (rule) {
             xlate_recursively(ctx, rule);
             rule_dpif_unref(rule);
@@ -2032,7 +2052,7 @@ xlate_ofpact_resubmit(struct xlate_ctx *ctx,
         table_id = ctx->table_id;
     }
 
-    xlate_table_action(ctx, in_port, table_id, false);
+    xlate_table_action(ctx, in_port, table_id, false, true);
 }
 
 static void
@@ -2240,7 +2260,7 @@ xlate_output_action(struct xlate_ctx *ctx,
         break;
     case OFPP_TABLE:
         xlate_table_action(ctx, ctx->xin->flow.in_port.ofp_port,
-                           0, may_packet_in);
+                           0, may_packet_in, false);
         break;
     case OFPP_NORMAL:
         xlate_normal(ctx);
@@ -2753,7 +2773,7 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
             ovs_assert(ctx->table_id < ogt->table_id);
             xlate_table_action(ctx, ctx->xin->flow.in_port.ofp_port,
-                               ogt->table_id, true);
+                               ogt->table_id, true, false);
             break;
         }
 
@@ -2979,8 +2999,9 @@ xlate_actions__(struct xlate_in *xin, struct xlate_out *xout)
     ctx.exit = false;
 
     if (!xin->ofpacts && !ctx.rule) {
-        rule_dpif_lookup(ctx.xbridge->ofproto, flow,
-                         !xin->skip_wildcards ? wc : NULL, &rule);
+        ctx.table_id = rule_dpif_lookup(ctx.xbridge->ofproto, flow,
+                                        !xin->skip_wildcards ? wc : NULL,
+                                        &rule);
         if (ctx.xin->resubmit_stats) {
             rule_dpif_credit_stats(rule, ctx.xin->resubmit_stats);
         }
