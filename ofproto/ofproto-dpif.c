@@ -3051,25 +3051,48 @@ rule_dpif_get_actions(const struct rule_dpif *rule)
     return rule_get_actions(&rule->up);
 }
 
-/* Lookup 'flow' in 'ofproto''s classifier.  If 'wc' is non-null, sets
- * the fields that were relevant as part of the lookup. */
-void
+/* Lookup 'flow' in table 0 of 'ofproto''s classifier.
+ * If 'wc' is non-null, sets the fields that were relevant as part of
+ * the lookup. Returns the table_id where a match or miss occurred.
+ *
+ * The return value will be zero unless there was a miss and
+ * OFPTC_TABLE_MISS_CONTINUE is in effect for the sequence of tables
+ * where misses occur. */
+uint8_t
 rule_dpif_lookup(struct ofproto_dpif *ofproto, const struct flow *flow,
                  struct flow_wildcards *wc, struct rule_dpif **rule)
 {
-    struct ofport_dpif *port;
+    enum rule_dpif_lookup_verdict verdict;
+    enum ofputil_port_config config = 0;
+    uint8_t table_id = 0;
 
-    if (rule_dpif_lookup_in_table(ofproto, flow, wc, 0, rule)) {
-        return;
+    verdict = rule_dpif_lookup_from_table(ofproto, flow, wc, false,
+                                          &table_id, rule);
+
+    switch (verdict) {
+    case RULE_DPIF_LOOKUP_VERDICT_MATCH:
+        return table_id;
+    case RULE_DPIF_LOOKUP_VERDICT_CONTROLLER: {
+        struct ofport_dpif *port;
+
+        port = get_ofp_port(ofproto, flow->in_port.ofp_port);
+        if (!port) {
+            VLOG_WARN_RL(&rl, "packet-in on unknown OpenFlow port %"PRIu16,
+                         flow->in_port.ofp_port);
+        }
+        config = port->up.pp.config;
+        break;
     }
-    port = get_ofp_port(ofproto, flow->in_port.ofp_port);
-    if (!port) {
-        VLOG_WARN_RL(&rl, "packet-in on unknown OpenFlow port %"PRIu16,
-                     flow->in_port.ofp_port);
+    case RULE_DPIF_LOOKUP_VERDICT_DROP:
+        config = OFPUTIL_PC_NO_PACKET_IN;
+        break;
+    default:
+        OVS_NOT_REACHED();
     }
 
-    choose_miss_rule(port ? port->up.pp.config : 0, ofproto->miss_rule,
+    choose_miss_rule(config, ofproto->miss_rule,
                      ofproto->no_packet_in_rule, rule);
+    return table_id;
 }
 
 bool
@@ -3114,6 +3137,80 @@ rule_dpif_lookup_in_table(struct ofproto_dpif *ofproto,
     fat_rwlock_unlock(&cls->rwlock);
 
     return *rule != NULL;
+}
+
+/* Lookup 'flow' in 'ofproto''s classifier starting at 'table_id'.
+ *
+ * If 'wc' is non-null, sets the fields that were relevant as part
+ * of the lookup.
+ *
+ * 'table_id' is set to the table where a match or miss occurred.
+ * This value will be the input value of 'table_id' unless there was
+ * a miss and OFPTC_TABLE_MISS_CONTINUE is in effect for the sequence of
+ * tables where misses occur.
+ *
+ * If 'force_controller_on_miss' is true then if a miss occurs
+ * then RULE_OFPTC_TABLE_MISS_CONTROLLER will be returned regarless
+ * of which OFPTC_TABLE_* setting is in effect.
+ *
+ * The return value is:
+ * RULE_DPIF_LOOKUP_VERDICT_MATCH:      If a match occurred
+ * RULE_OFPTC_TABLE_MISS_CONTROLLER:    If a miss occurred and the packet
+ *                                      should be forwarded to the controller.
+ * RULE_OFPTC_TABLE_MISS_DROP:          If a miss occurred and the packet
+ *                                      should be dropped. */
+enum rule_dpif_lookup_verdict
+rule_dpif_lookup_from_table(struct ofproto_dpif *ofproto,
+                            const struct flow *flow,
+                            struct flow_wildcards *wc,
+                            bool force_controller_on_miss,
+                            uint8_t *table_id, struct rule_dpif **rule)
+{
+    uint8_t next_id = *table_id;
+
+    while (next_id < ofproto->up.n_tables) {
+        enum ofp_table_config config;
+
+        *table_id = next_id;
+
+        if (rule_dpif_lookup_in_table(ofproto, flow, wc, *table_id, rule)) {
+            return RULE_DPIF_LOOKUP_VERDICT_MATCH;
+        }
+
+        if (force_controller_on_miss) {
+            break;
+        }
+
+        /* XXX
+         * This does not take into account different
+         * behaviour for different OpenFlow versions
+         *
+         * OFPTC11_TABLE_MISS_CONTINUE:   Behaviour of OpenFlow1.0
+         * OFPTC11_TABLE_MISS_CONTROLLER: Default for OpenFlow1.1+
+         * OFPTC11_TABLE_MISS_DROP:       Default for OpenFlow1.3+
+         *
+         * Instead the global default is OFPTC_TABLE_MISS_CONTROLLER
+         * which may be configured globally using Table Mod. */
+        config = table_get_config(&ofproto->up, *table_id);
+        switch (config & OFPTC11_TABLE_MISS_MASK) {
+        case OFPTC11_TABLE_MISS_CONTINUE:
+            break;
+        case OFPTC11_TABLE_MISS_CONTROLLER:
+            return RULE_DPIF_LOOKUP_VERDICT_CONTROLLER;
+        case OFPTC11_TABLE_MISS_DROP:
+            return RULE_DPIF_LOOKUP_VERDICT_DROP;
+        }
+
+        /* Go on to next table. */
+        ++next_id;
+        if (next_id == TBL_INTERNAL) {
+            ++next_id;
+        }
+    }
+
+    /* Either we fell off the end or
+     * a miss occured with force_controller_on_miss set */
+    return RULE_DPIF_LOOKUP_VERDICT_CONTROLLER;
 }
 
 /* Given a port configuration (specified as zero if there's no port), chooses
