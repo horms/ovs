@@ -61,11 +61,6 @@ probably incomplete.
       just fix it as the same as in_port.
       [required for OF1.1; optional for OF1.2+]
 
-    * OFPT_TABLE_MOD message.  This is new in OF1.1, so we need to
-      implement it.  It should be implemented so that the default OVS
-      behavior does not change.
-      [required for OF1.1 and OF1.2]
-
     * MPLS.  Simon Horman maintains a patch series that adds this
       feature.  This is partially merged.
       [optional for OF1.1+]

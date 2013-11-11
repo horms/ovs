@@ -4604,31 +4604,53 @@ subfacet_update_stats(struct subfacet *subfacet,
 
 /* Rules. */
 
-/* Lookup 'flow' in 'ofproto''s classifier.  If 'wc' is non-null, sets
- * the fields that were relevant as part of the lookup. */
-void
+/* Lookup 'flow' in table 0 of 'ofproto''s classifier.
+ * If 'wc' is non-null, sets * the fields that were relevant as part of
+ * the lookup. Returns the table_id where a match or miss occurred.
+ *
+ * The return value will be zero unless there was a miss and
+ * OFPTC_TABLE_MISS_CONTINUE is in effect for the sequence of tables
+ * where misses occur. */
+uint8_t
 rule_dpif_lookup(struct ofproto_dpif *ofproto, const struct flow *flow,
                  struct flow_wildcards *wc, struct rule_dpif **rule)
 {
-    struct ofport_dpif *port;
+    enum rule_dpif_lookup_verdict verdict;
+    uint8_t table_id = 0;
 
-    if (rule_dpif_lookup_in_table(ofproto, flow, wc, 0, rule)) {
-        return;
+    verdict = rule_dpif_lookup_from_table(ofproto, flow, wc, &table_id, rule);
+    switch (verdict) {
+    case RULE_DPIF_LOOKUP_VERDICT_MATCH:
+        break;
+    case RULE_DPIF_LOOKUP_VERDICT_CONTROLLER: {
+        struct ofport_dpif *port;
+
+        port = get_ofp_port(ofproto, flow->in_port.ofp_port);
+        if (!port) {
+            VLOG_WARN_RL(&rl, "packet-in on unknown OpenFlow port %"PRIu16,
+                         flow->in_port.ofp_port);
+        }
+        choose_miss_rule(port ? port->up.pp.config : 0, ofproto->miss_rule,
+                         ofproto->no_packet_in_rule, rule);
+
+        break;
     }
-    port = get_ofp_port(ofproto, flow->in_port.ofp_port);
-    if (!port) {
-        VLOG_WARN_RL(&rl, "packet-in on unknown OpenFlow port %"PRIu16,
-                     flow->in_port.ofp_port);
+    case RULE_DPIF_LOOKUP_VERDICT_DROP:
+        choose_miss_rule(OFPUTIL_PC_NO_PACKET_IN, NULL,
+                         ofproto->no_packet_in_rule, rule);
+        break;
+    default:
+        NOT_REACHED();
     }
 
-    choose_miss_rule(port ? port->up.pp.config : 0, ofproto->miss_rule,
-                     ofproto->no_packet_in_rule, rule);
+    return table_id;
 }
 
-bool
-rule_dpif_lookup_in_table(struct ofproto_dpif *ofproto,
-                          const struct flow *flow, struct flow_wildcards *wc,
-                          uint8_t table_id, struct rule_dpif **rule)
+static bool
+rule_dpif_lookup_in_table__(struct ofproto_dpif *ofproto,
+                            const struct flow *flow, struct flow_wildcards *wc,
+                            uint8_t table_id, bool *is_empty,
+                            struct rule_dpif **rule)
 {
     const struct cls_rule *cls_rule;
     struct classifier *cls;
@@ -4662,9 +4684,106 @@ rule_dpif_lookup_in_table(struct ofproto_dpif *ofproto,
 
     *rule = rule_dpif_cast(rule_from_cls_rule(cls_rule));
     rule_dpif_ref(*rule);
+    if (is_empty) {
+        *is_empty = classifier_is_empty(cls);
+    }
     ovs_rwlock_unlock(&cls->rwlock);
 
     return *rule != NULL;
+}
+
+bool
+rule_dpif_lookup_in_table(struct ofproto_dpif *ofproto,
+                          const struct flow *flow, struct flow_wildcards *wc,
+                          uint8_t table_id, struct rule_dpif **rule)
+{
+    return rule_dpif_lookup_in_table__(ofproto, flow, wc, table_id,
+                                       NULL, rule);
+}
+
+#define OFPTC_TABLE_MISS_MAX OFPTC_TABLE_MISS_DROP
+
+/* Lookup 'flow' in 'ofproto''s classifier starting at 'table_id'.
+ *
+ * If 'wc' is non-null, sets the fields that were relevant as part
+ * of the lookup.
+ *
+ * 'table_id' is set to the table where a match or miss occurred.
+ * This value will be the input value of 'table_id' unless there was
+ * a miss and OFPTC_TABLE_MISS_CONTINUE is in effect for the sequence of
+ * tables where misses occur.
+ *
+ * The return value is:
+ * RULE_DPIF_LOOKUP_VERDICT_MATCH:      If a match occurred
+ * RULE_OFPTC_TABLE_MISS_CONTROLLER:    If a miss occurred and the packet
+ *                                      should be forwarded to the controller.
+ * RULE_OFPTC_TABLE_MISS_DROP:          If a miss occurred and the packet
+ *                                      should be dropped. */
+enum rule_dpif_lookup_verdict
+rule_dpif_lookup_from_table(struct ofproto_dpif *ofproto,
+                            const struct flow *flow, struct flow_wildcards *wc,
+                            uint8_t *table_id, struct rule_dpif **rule)
+{
+    enum ofp_table_config config = OFPTC_TABLE_MISS_MAX;
+    uint8_t id = *table_id;
+
+    while (1) {
+        bool is_empty;
+
+        if (rule_dpif_lookup_in_table__(ofproto, flow, wc, id,
+                                        &is_empty, rule)) {
+            return RULE_DPIF_LOOKUP_VERDICT_MATCH;
+        }
+
+        if (!is_empty) {
+            *table_id = id;
+        }
+
+        if (config >= OFPTC_TABLE_MISS_MAX) {
+            config = table_get_config(&ofproto->up, id);
+            config &= OFPTC_TABLE_MISS_MASK;
+        }
+
+        /* XXX
+         * This does not take into account different
+         * behaviour for different OpenFlow versions
+         *
+         * OFPTC_TABLE_MISS_CONTINUE:   Behaviour of OpenFlow1.0
+         * OFPTC_TABLE_MISS_CONTROLLER: Default for OpenFlow1.1+
+         * OFPTC_TABLE_MISS_DROP:       Default for OpenFlow1.3+
+         *
+         * Instead the global default is OFPTC_TABLE_MISS_CONTROLLER
+         * which may be configured globally using Table Mod. */
+        switch (config) {
+        case OFPTC_TABLE_MISS_CONTINUE: {
+            id++;
+
+            if (id == TBL_INTERNAL) {
+                id++;
+            }
+
+            if (id < N_TABLES) {
+                /* XXX This may get very expensive as
+                 * each call to rule_dpif_lookup_in_table() is expensive
+                 * and this may occur up to approximately N_TABLES times.  */
+                continue;
+            }
+            /* Fall through to OFPTC_TABLE_MISS_CONTROLLER
+             * as this is the last table in the pipeline */
+        }
+        case OFPTC_TABLE_MISS_CONTROLLER:
+            return RULE_DPIF_LOOKUP_VERDICT_CONTROLLER;
+            /* Fall through to OFPTC_TABLE_MISS_DROP if
+             * PACKET_IN is not allowed */
+        case OFPTC_TABLE_MISS_DROP:
+            return RULE_DPIF_LOOKUP_VERDICT_DROP;
+        case OFPTC_TABLE_MISS_MASK:
+        default:
+            NOT_REACHED();
+        }
+    }
+
+    NOT_REACHED();
 }
 
 /* Given a port configuration (specified as zero if there's no port), chooses

@@ -5776,8 +5776,28 @@ handle_group_mod(struct ofconn *ofconn, const struct ofp_header *oh)
     }
 }
 
+static enum ofp_table_config
+table_get_config__(const struct oftable *table)
+    OVS_EXCLUDED(table->config_rwlock)
+{
+    enum ofp_table_config config;
+
+    ovs_rwlock_rdlock(&table->config_rwlock);
+    config = table->config;
+    ovs_rwlock_unlock(&table->config_rwlock);
+
+    return config;
+}
+
+enum ofp_table_config
+table_get_config(const struct ofproto *ofproto, uint8_t table_id)
+{
+    return table_get_config__(&ofproto->tables[table_id]);
+}
+
 static void
 table_set_config(struct oftable *table, uint32_t config)
+    OVS_EXCLUDED(table->config_rwlock)
 {
     ovs_rwlock_wrlock(&table->config_rwlock);
     table->config = config;

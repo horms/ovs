@@ -436,6 +436,8 @@ bool ofproto_has_vlan_usage_changed(const struct ofproto *);
 int ofproto_port_set_realdev(struct ofproto *, ofp_port_t vlandev_ofp_port,
                              ofp_port_t realdev_ofp_port, int vid);
 
+enum ofp_table_config table_get_config(const struct ofproto *ofproto,
+                                       uint8_t table_id);
 #ifdef  __cplusplus
 }
 #endif
