@@ -67,8 +67,16 @@ extern struct ovs_rwlock xlate_rwlock;
 
 size_t ofproto_dpif_get_max_mpls_depth(const struct ofproto_dpif *);
 
-void rule_dpif_lookup(struct ofproto_dpif *, const struct flow *,
-                      struct flow_wildcards *, struct rule_dpif **rule);
+uint8_t rule_dpif_lookup(struct ofproto_dpif *, const struct flow *,
+                         struct flow_wildcards *, struct rule_dpif **rule);
+
+void rule_dpif_lookup_from_table(struct ofproto_dpif *, const struct flow *,
+                                 struct flow_wildcards *,
+                                 struct rule_dpif *miss_rule,
+                                 struct rule_dpif *no_packet_in_rule,
+                                 enum ofputil_port_config(*)(const void *),
+                                 void *, bool, uint8_t *,
+                                 struct rule_dpif **rule);
 
 bool rule_dpif_lookup_in_table(struct ofproto_dpif *, const struct flow *,
                                struct flow_wildcards *, uint8_t table_id,
