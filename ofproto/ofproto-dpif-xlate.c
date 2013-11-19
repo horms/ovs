@@ -2118,8 +2118,11 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
 
     pin->controller_id = controller_id;
     pin->send_len = len;
+    /* If a rule is internal and has a controller action,
+     * which is implied by the rule being processed here,
+     * then it is the rule to handle a table miss. */
     pin->generated_by_table_miss = (ctx->rule
-                                    && rule_dpif_is_table_miss(ctx->rule));
+                                    && rule_dpif_is_internal(ctx->rule));
     ofproto_dpif_send_packet_in(ctx->xbridge->ofproto, pin);
     ofpbuf_delete(packet);
 }

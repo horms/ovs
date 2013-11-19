@@ -2944,9 +2944,9 @@ rule_dpif_is_fail_open(const struct rule_dpif *rule)
 }
 
 bool
-rule_dpif_is_table_miss(const struct rule_dpif *rule)
+rule_dpif_is_internal(const struct rule_dpif *rule)
 {
-    return rule_is_table_miss(&rule->up);
+    return rule_is_internal(&rule->up);
 }
 
 ovs_be64
@@ -4230,6 +4230,14 @@ ofproto_dpif_unixctl_init(void)
                              NULL);
     unixctl_command_register("dpif/dump-flows", "[-m] bridge", 1, 2,
                              ofproto_unixctl_dpif_dump_flows, NULL);
+}
+
+
+/* Returns true if 'rule' is an internal rule, false otherwise. */
+bool
+rule_is_internal(const struct rule *rule)
+{
+    return rule->table_id == TBL_INTERNAL;
 }
 
 /* Linux VLAN device support (e.g. "eth0.10" for VLAN 10.)
