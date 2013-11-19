@@ -62,6 +62,15 @@ enum ofconn_async_msg_type {
     OAM_N_TYPES
 };
 
+enum ofproto_packet_in_miss_type {
+    OFPROTO_PACKET_IN_NO_MISS,      /* Not a miss */
+    OFPROTO_PACKET_IN_MISS_FLOW,    /* Miss handled by a table-miss flow
+                                     * See OF1.3.3 section 5.4 */
+    OFPROTO_PACKET_IN_MISS_WITHOUT_FLOW,
+                                    /* Miss was not handled by a table-miss
+                                     * flow */
+};
+
 /* A packet_in, with extra members to assist in queuing and routing it. */
 struct ofproto_packet_in {
     struct ofputil_packet_in up;
@@ -72,7 +81,7 @@ struct ofproto_packet_in {
     /* True if the packet_in was generated directly by a table-miss flow, that
      * is, a flow with priority 0 that wildcards all fields.  (Our
      * interpretation of "directly" is "not via groups".) */
-    bool generated_by_table_miss;
+    enum ofproto_packet_in_miss_type miss_type;
 };
 
 /* Basics. */
