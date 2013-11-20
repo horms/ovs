@@ -363,6 +363,18 @@ ofproto_dpif_send_packet_in(struct ofproto_dpif *ofproto,
         free(pin);
     }
 }
+
+/* The default "table-miss" behaviour for OpenFlow1.3+ is to drop the
+ * packet rather than to send the packet to the controller.
+ *
+ * This function returns false to indicate that a packet_in message
+ * for a "table-miss" should be sent to at least one controller.
+ * False otherwise. */
+bool
+ofproto_dpif_wants_packet_in_on_miss(struct ofproto_dpif *ofproto)
+{
+    return connmgr_wants_packet_in_on_miss(ofproto->up.connmgr);
+}
 
 /* Factory functions. */
 
@@ -3092,6 +3104,11 @@ rule_dpif_lookup(struct ofproto_dpif *ofproto, const struct flow *flow,
     case RULE_DPIF_LOOKUP_VERDICT_DROP:
         config = OFPUTIL_PC_NO_PACKET_IN;
         break;
+    case RULE_DPIF_LOOKUP_VERDICT_DEFAULT:
+        if (!connmgr_wants_packet_in_on_miss(ofproto->up.connmgr)) {
+            config = OFPUTIL_PC_NO_PACKET_IN;
+        }
+        break;
     default:
         OVS_NOT_REACHED();
     }
@@ -3164,7 +3181,12 @@ rule_dpif_lookup_in_table(struct ofproto_dpif *ofproto,
  * RULE_OFPTC_TABLE_MISS_CONTROLLER:    If a miss occurred and the packet
  *                                      should be forwarded to the controller.
  * RULE_OFPTC_TABLE_MISS_DROP:          If a miss occurred and the packet
- *                                      should be dropped. */
+ *                                      should be dropped.
+ * RULE_DPIF_LOOKUP_VERDICT_DEFAULT:    A miss occurred and the packet should
+ *                                      handled by the default miss behaviour.
+ *                                      For pre-OF1.3 it should be forwarded
+ *                                      to the controller.
+ *                                      For OF1.3+ it should be dropped. */
 enum rule_dpif_lookup_verdict
 rule_dpif_lookup_from_table(struct ofproto_dpif *ofproto,
                             const struct flow *flow,
@@ -3175,7 +3197,7 @@ rule_dpif_lookup_from_table(struct ofproto_dpif *ofproto,
     uint8_t next_id = *table_id;
 
     while (next_id < ofproto->up.n_tables) {
-        enum ofp_table_config config;
+        enum ofproto_table_config config;
 
         *table_id = next_id;
 
@@ -3187,24 +3209,16 @@ rule_dpif_lookup_from_table(struct ofproto_dpif *ofproto,
             break;
         }
 
-        /* XXX
-         * This does not take into account different
-         * behaviour for different OpenFlow versions
-         *
-         * OFPTC11_TABLE_MISS_CONTINUE:   Behaviour of OpenFlow1.0
-         * OFPTC11_TABLE_MISS_CONTROLLER: Default for OpenFlow1.1+
-         * OFPTC11_TABLE_MISS_DROP:       Default for OpenFlow1.3+
-         *
-         * Instead the global default is OFPTC_TABLE_MISS_CONTROLLER
-         * which may be configured globally using Table Mod. */
-        config = table_get_config(&ofproto->up, *table_id);
-        switch (config & OFPTC11_TABLE_MISS_MASK) {
-        case OFPTC11_TABLE_MISS_CONTINUE:
+        config = ofproto_table_get_config(&ofproto->up, *table_id);
+        switch (config) {
+        case OFPROTO_TABLE_MISS_CONTINUE:
             break;
-        case OFPTC11_TABLE_MISS_CONTROLLER:
+        case OFPROTO_TABLE_MISS_CONTROLLER:
             return RULE_DPIF_LOOKUP_VERDICT_CONTROLLER;
-        case OFPTC11_TABLE_MISS_DROP:
+        case OFPROTO_TABLE_MISS_DROP:
             return RULE_DPIF_LOOKUP_VERDICT_DROP;
+        case OFPROTO_TABLE_MISS_DEFAULT:
+            return RULE_DPIF_LOOKUP_VERDICT_DEFAULT;
         }
 
         /* Go on to next table. */
