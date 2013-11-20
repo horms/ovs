@@ -41,6 +41,13 @@ enum rule_dpif_lookup_verdict {
                                              * the controller. */
     RULE_DPIF_LOOKUP_VERDICT_DROP,          /* A miss occurred and the packet
                                              * should be dropped. */
+    RULE_DPIF_LOOKUP_VERDICT_DEFAULT,       /* A miss occurred and the packet
+                                             * should handled by the default
+                                             * miss behaviour.
+                                             * For pre-OF1.3 it should be
+                                             * forwarded to the controller.
+                                             * For OF1.3+ it should be
+                                             * dropped. */
 };
 
 /* Ofproto-dpif -- DPIF based ofproto implementation.
@@ -125,6 +132,7 @@ int ofproto_dpif_execute_actions(struct ofproto_dpif *, const struct flow *,
                                  size_t ofpacts_len, struct ofpbuf *);
 void ofproto_dpif_send_packet_in(struct ofproto_dpif *,
                                  struct ofproto_packet_in *);
+bool ofproto_dpif_wants_packet_in_on_miss(struct ofproto_dpif *);
 int ofproto_dpif_send_packet(const struct ofport_dpif *, struct ofpbuf *);
 void ofproto_dpif_flow_mod(struct ofproto_dpif *, struct ofputil_flow_mod *);
 

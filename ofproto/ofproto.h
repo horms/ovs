@@ -442,8 +442,26 @@ int ofproto_port_set_realdev(struct ofproto *, ofp_port_t vlandev_ofp_port,
 
 /* Table configuration */
 
-enum ofp_table_config table_get_config(const struct ofproto *,
-                                       uint8_t table_id);
+enum ofproto_table_config {
+    OFPROTO_TABLE_MISS_CONTROLLER = OFPTC11_TABLE_MISS_CONTROLLER,
+                                        /* Send to controller. */
+    OFPROTO_TABLE_MISS_CONTINUE   = OFPTC11_TABLE_MISS_CONTINUE,
+                                        /* Continue to the next table in the
+                                           pipeline (OpenFlow 1.0 behavior). */
+    OFPROTO_TABLE_MISS_DROP       = OFPTC11_TABLE_MISS_DROP,
+                                        /* Drop the packet. */
+
+    OFPROTO_TABLE_MISS_DEFAULT,         /* The default miss behaviour for
+                                         * the OpenFlow version of the
+                                         * controller a packet_in message
+                                         * would be sent to..
+                                         * For pre-OF1.3 controllers,
+                                         * send packet_in to controller.
+                                         * For OF1.3+ controllers, drop. */
+};
+
+enum ofproto_table_config ofproto_table_get_config(const struct ofproto *,
+                                                   uint8_t table_id);
 
 #ifdef  __cplusplus
 }

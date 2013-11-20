@@ -147,6 +147,7 @@ void ofconn_remove_opgroup(struct ofconn *, struct list *,
                            const struct ofp_header *request, int error);
 
 /* Sending asynchronous messages. */
+bool connmgr_wants_packet_in_on_miss(struct connmgr *mgr);
 void connmgr_send_port_status(struct connmgr *,
                               const struct ofputil_phy_port *, uint8_t reason);
 void connmgr_send_flow_removed(struct connmgr *,
