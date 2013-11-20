@@ -124,6 +124,7 @@ int ofproto_dpif_execute_actions(struct ofproto_dpif *, const struct flow *,
     OVS_EXCLUDED(xlate_rwlock);
 void ofproto_dpif_send_packet_in(struct ofproto_dpif *,
                                  struct ofproto_packet_in *);
+bool ofproto_dpif_wants_packet_in_on_miss(struct ofproto_dpif *);
 int ofproto_dpif_send_packet(const struct ofport_dpif *, struct ofpbuf *);
 void ofproto_dpif_flow_mod(struct ofproto_dpif *, struct ofputil_flow_mod *);
 
