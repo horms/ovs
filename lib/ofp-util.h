@@ -918,8 +918,8 @@ void ofputil_append_port_stat(struct list *replies,
                               const struct ofputil_port_stats *ops);
 size_t ofputil_count_port_stats(const struct ofp_header *);
 int ofputil_decode_port_stats(struct ofputil_port_stats *, struct ofpbuf *msg);
-enum ofperr ofputil_decode_port_stats_request(const struct ofp_header *request,
-                                              ofp_port_t *ofp10_port);
+int ofputil_decode_port_stats_request(struct ofpbuf *request,
+                                      ofp_port_t *ofp10_port);
 
 struct ofputil_queue_stats_request {
     ofp_port_t port_no;           /* OFPP_ANY means "all ports". */

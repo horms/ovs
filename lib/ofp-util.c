@@ -5739,23 +5739,58 @@ ofputil_decode_port_stats(struct ofputil_port_stats *ps, struct ofpbuf *msg)
     return OFPERR_OFPBRC_BAD_LEN;
 }
 
-/* Parse a port status request message into a 16 bit OpenFlow 1.0
+/* Converts an OFPST_PORT_DESC 'msg' into a 16 bit OpenFlow 1.0
  * port number and stores the latter in '*ofp10_port'.
- * Returns 0 if successful, otherwise an OFPERR_* number. */
-enum ofperr
-ofputil_decode_port_stats_request(const struct ofp_header *request,
+ *
+ * Multiple OFPST_PORT_DESC requests can be packed into a single
+ * OpenFlow message.  Calling this function multiple times for a single 'msg'
+ * iterates through the replies.  The caller must initially leave 'msg''s layer
+ * pointers null and not modify them between calls.
+ *
+ * Returns 0 if successful, EOF if no replies were left in this 'msg',
+ * otherwise an OFPERR_* number. */
+int
+ofputil_decode_port_stats_request(struct ofpbuf *msg,
                                   ofp_port_t *ofp10_port)
 {
-    switch ((enum ofp_version)request->version) {
+    const struct ofp_header *oh;
+    enum ofperr error;
+    enum ofpraw raw;
+
+    error = (msg->l2
+             ? ofpraw_decode(&raw, msg->l2)
+             : ofpraw_pull(&raw, msg));
+    if (error) {
+        return error;
+    }
+    oh = msg->l2;
+
+    if (!msg->size) {
+        return EOF;
+    }
+
+    switch ((enum ofp_version)oh->version) {
     case OFP13_VERSION:
     case OFP12_VERSION:
     case OFP11_VERSION: {
-        const struct ofp11_port_stats_request *psr11 = ofpmsg_body(request);
+        const struct ofp11_port_stats_request *psr11;
+
+        psr11 = ofpbuf_try_pull(msg, sizeof *psr11);
+        if (!psr11) {
+            goto trailing_garbage;
+        }
+
         return ofputil_port_from_ofp11(psr11->port_no, ofp10_port);
     }
 
     case OFP10_VERSION: {
-        const struct ofp10_port_stats_request *psr10 = ofpmsg_body(request);
+        const struct ofp10_port_stats_request *psr10;
+
+        psr10 = ofpbuf_try_pull(msg, sizeof *psr10);
+        if (!psr10) {
+            goto trailing_garbage;
+        }
+
         *ofp10_port = u16_to_ofp(ntohs(psr10->port_no));
         return 0;
     }
@@ -5763,6 +5798,11 @@ ofputil_decode_port_stats_request(const struct ofp_header *request,
     default:
         NOT_REACHED();
     }
+
+trailing_garbage:
+    VLOG_WARN_RL(&bad_ofmsg_rl, "OFPST_PORT_DESC request has "
+                 "%"PRIuSIZE" leftover bytes at end", msg->size);
+    return OFPERR_OFPBRC_BAD_LEN;
 }
 
 /* Frees all of the "struct ofputil_bucket"s in the 'buckets' list. */

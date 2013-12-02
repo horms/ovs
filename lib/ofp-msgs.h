@@ -281,9 +281,9 @@ enum ofpraw {
     /* OFPST 1.3 (3): struct ofp13_table_stats[]. */
     OFPRAW_OFPST13_TABLE_REPLY,
 
-    /* OFPST 1.0 (4): struct ofp10_port_stats_request. */
+    /* OFPST 1.0 (4): struct ofp10_port_stats_request[]. */
     OFPRAW_OFPST10_PORT_REQUEST,
-    /* OFPST 1.1+ (4): struct ofp11_port_stats_request. */
+    /* OFPST 1.1+ (4): struct ofp11_port_stats_request[]. */
     OFPRAW_OFPST11_PORT_REQUEST,
 
     /* OFPST 1.0 (4): struct ofp10_port_stats[]. */

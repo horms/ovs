@@ -3151,23 +3151,33 @@ handle_port_stats_request(struct ofconn *ofconn,
     struct ofproto *p = ofconn_get_ofproto(ofconn);
     struct ofport *port;
     struct list replies;
-    ofp_port_t port_no;
-    enum ofperr error;
-
-    error = ofputil_decode_port_stats_request(request, &port_no);
-    if (error) {
-        return error;
-    }
+    struct ofpbuf b;
 
     ofpmp_init(&replies, request);
-    if (port_no != OFPP_ANY) {
-        port = ofproto_get_port(p, port_no);
-        if (port) {
-            append_port_stat(port, &replies);
+
+    ofpbuf_use_const(&b, request, ntohs(request->length));
+    for (;;) {
+        ofp_port_t port_no;
+        int error;
+
+        error = ofputil_decode_port_stats_request(&b, &port_no);
+        if (error) {
+            if (error == EOF) {
+                break;
+            } else {
+                return error;
+            }
         }
-    } else {
-        HMAP_FOR_EACH (port, hmap_node, &p->ports) {
-            append_port_stat(port, &replies);
+
+        if (port_no != OFPP_ANY) {
+            port = ofproto_get_port(p, port_no);
+            if (port) {
+                append_port_stat(port, &replies);
+            }
+        } else {
+            HMAP_FOR_EACH (port, hmap_node, &p->ports) {
+                append_port_stat(port, &replies);
+            }
         }
     }
 

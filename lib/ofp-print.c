@@ -1515,16 +1515,23 @@ static void
 ofp_print_ofpst_port_request(struct ds *string, const struct ofp_header *oh)
 {
     ofp_port_t ofp10_port;
-    enum ofperr error;
+    struct ofpbuf b;
 
-    error = ofputil_decode_port_stats_request(oh, &ofp10_port);
-    if (error) {
-        ofp_print_error(string, error);
-        return;
+    ofpbuf_use_const(&b, oh, ntohs(oh->length));
+    for (;;) {
+        int error;
+
+        error = ofputil_decode_port_stats_request(&b, &ofp10_port);
+        if (error) {
+            if (error != EOF) {
+                ofp_print_error(string, error);
+            }
+            return;
+        }
+
+        ds_put_cstr(string, " port_no=");
+        ofputil_format_port(ofp10_port, string);
     }
-
-    ds_put_cstr(string, " port_no=");
-    ofputil_format_port(ofp10_port, string);
 }
 
 static void
