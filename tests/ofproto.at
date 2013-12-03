@@ -2664,3 +2664,112 @@ OFPT_BARRIER_REPLY (OF1.4):
 
 OVS_VSWITCHD_STOP
 AT_CLEANUP
+
+AT_SETUP([ofproto - multipart port stats request (OpenFlow 1.3)])
+AT_KEYWORDS([monitor])
+OVS_VSWITCHD_START
+ADD_OF_PORTS([br0], [1], [2], [3])
+
+# Start a monitor, use the required protocol version
+ovs-ofctl -O OpenFlow13 monitor br0 --detach --no-chdir --pidfile >monitor.log 2>&1
+AT_CAPTURE_FILE([monitor.log])
+
+# Send first part
+# An OpenFlow13 message (04), OFPT_MULTIPART_REQUEST (12), length (0018), xid (0000000a)
+#                             OFPMP_PORT_STATS (0004), OFPMPF_REPLY_MORE (0001), pad (00000000)
+#                             port_no (0001), pad (00000000)
+ovs-appctl -t ovs-ofctl ofctl/send "041200180000000a 0004000100000000 0000000100000000"
+
+# Send second part
+# an OpenFlow13 message (04), OFPT_MULTIPART_REQUEST (12), length (0018), xid (0000000a)
+#                             OFPMP_PORT_STATS (0004), OFPMPF_REPLY_MORE (0001), pad (00000000)
+#                                  port_no (0002), pad (00000000)
+ovs-appctl -t ovs-ofctl ofctl/send "041200180000000a 0004000100000000 0000000200000000"
+
+# Send third part
+# an OpenFlow13 message (04), OFPT_MULTIPART_REQUEST (12), length (0018), xid (0000000a)
+#                             OFPMP_PORT_STATS (0004), no flags (0000), pad (00000000)
+#                                  port_no (0003), pad (00000000)
+ovs-appctl -t ovs-ofctl ofctl/send "041200180000000a 0004000000000000 0000000300000000"
+
+ovs-appctl -t ovs-ofctl ofctl/barrier
+
+# Check default setting
+read -r -d '' expected <<'EOF'
+EOF
+
+AT_CHECK([ofctl_strip < monitor.log | STRIP_DURATION], [], [dnl
+send: OFPST_PORT request (OF1.3): flags=[[more]] port_no=1
+send: OFPST_PORT request (OF1.3): flags=[[more]] port_no=2
+send: OFPST_PORT request (OF1.3): port_no=3
+OFPST_PORT reply (OF1.3): 3 ports
+  port  1: rx pkts=0, bytes=0, drop=0, errs=0, frame=0, over=0, crc=0
+           tx pkts=0, bytes=0, drop=0, errs=0, coll=0
+           duration=?s
+  port  2: rx pkts=0, bytes=0, drop=0, errs=0, frame=0, over=0, crc=0
+           tx pkts=0, bytes=0, drop=0, errs=0, coll=0
+           duration=?s
+  port  3: rx pkts=0, bytes=0, drop=0, errs=0, frame=0, over=0, crc=0
+           tx pkts=0, bytes=0, drop=0, errs=0, coll=0
+           duration=?s
+OFPT_BARRIER_REPLY (OF1.3):
+])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto - multipart port desc stats request (OpenFlow 1.5)])
+AT_KEYWORDS([monitor])
+OVS_VSWITCHD_START
+ADD_OF_PORTS([br0], [1], [2], [3])
+
+# Start a monitor, use the required protocol version
+ovs-ofctl -O OpenFlow15 monitor br0 --detach --no-chdir --pidfile >monitor.log 2>&1
+AT_CAPTURE_FILE([monitor.log])
+
+# Send first part
+# An OpenFlow15 message (06), OFPT_MULTIPART_REQUEST (12), length (0014), xid (0000000a)
+#                             OFPMP_PORT_DESC (000d), OFPMPF_REPLY_MORE (0001), pad (00000000)
+#                             port_no (0001)
+ovs-appctl -t ovs-ofctl ofctl/send "061200140000000a 000d000100000000 00000001"
+
+# Send second part
+# an OpenFlow15 message (06), OFPT_MULTIPART_REQUEST (12), length (0014), xid (0000000a)
+#                             OFPMP_PORT_DESC (000d), OFPMPF_REPLY_MORE (0001), pad (00000000)
+#                                  port_no (0002)
+ovs-appctl -t ovs-ofctl ofctl/send "061200140000000a 000d000100000000 00000002"
+
+# Send third part
+# an OpenFlow15 message (06), OFPT_MULTIPART_REQUEST (12), length (0014), xid (0000000a)
+#                             OFPMP_PORT_DESC (000d), no flags (0000), pad (00000000)
+#                                  port_no (0003)
+ovs-appctl -t ovs-ofctl ofctl/send "061200140000000a 000d000000000000 00000003"
+
+ovs-appctl -t ovs-ofctl ofctl/barrier
+
+# Check default setting
+read -r -d '' expected <<'EOF'
+EOF
+
+AT_CHECK([ofctl_strip < monitor.log | STRIP_DURATION | STRIP_HW_ADDR], [], [dnl
+send: OFPST_PORT_DESC request (OF1.5): flags=[[more]] port=1
+send: OFPST_PORT_DESC request (OF1.5): flags=[[more]] port=2
+send: OFPST_PORT_DESC request (OF1.5): port=3
+OFPST_PORT_DESC reply (OF1.5):
+ 1(p1): addr:??:??:??:??:??:??
+     config:     PORT_DOWN
+     state:      LINK_DOWN
+     speed: 0 Mbps now, 0 Mbps max
+ 2(p2): addr:??:??:??:??:??:??
+     config:     PORT_DOWN
+     state:      LINK_DOWN
+     speed: 0 Mbps now, 0 Mbps max
+ 3(p3): addr:??:??:??:??:??:??
+     config:     PORT_DOWN
+     state:      LINK_DOWN
+     speed: 0 Mbps now, 0 Mbps max
+OFPT_BARRIER_REPLY (OF1.5):
+])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP

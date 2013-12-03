@@ -82,8 +82,10 @@ following additional work.  (This is based on the change log at the
 end of the OF1.3 spec, reusing most of the section titles directly.  I
 didn't compare the specs carefully yet.)
 
-    * Add support for multipart requests.
-      Currently we always report OFPBRC_MULTIPART_BUFFER_OVERFLOW.
+    * Further support for multipart requests.
+      Multipart port stats desc stats requests are supported.
+      OFPBRC_MULTIPART_BUFFER_OVERFLOW is reported for other multipart
+      requests.
       [optional for OF1.3+]
 
     * Add OFPMP_TABLE_FEATURES statistics.  Alexander Wu has posted a

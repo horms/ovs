@@ -3194,51 +3194,75 @@ append_port_stat(struct ofport *port, struct list *replies)
 }
 
 static void
-handle_port_request__(struct ofconn *ofconn,
-                      const struct ofp_header *request, ofp_port_t port_no,
-                      void (*cb)(struct ofport *, struct list *replies))
+append_port_request(struct ofconn *ofconn, ofp_port_t port_no,
+                    struct list *replies,
+                    void (*cb)(struct ofport *, struct list *replies))
 {
     struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
     struct ofport *port;
-    struct list replies;
 
-    ofpmp_init(&replies, request);
     if (port_no != OFPP_ANY) {
         port = ofproto_get_port(ofproto, port_no);
         if (port) {
-            cb(port, &replies);
+            cb(port, replies);
         }
     } else {
         HMAP_FOR_EACH (port, hmap_node, &ofproto->ports) {
-            cb(port, &replies);
+            cb(port, replies);
         }
     }
-
-    ofconn_send_replies(ofconn, &replies);
 }
 
 static enum ofperr
-handle_port_request(struct ofconn *ofconn,
-                    const struct ofp_header *request,
-                    enum ofperr (*decode)(const struct ofp_header *,
-                                          ofp_port_t *),
-                    void (*append)(struct ofport *, struct list *replies))
+handle_one_port_request(struct ofconn *ofconn,
+                        const struct ofp_header *request, struct list *replies,
+                        enum ofperr (*decode)(const struct ofp_header *,
+                                              ofp_port_t *),
+                        void (*append)(struct ofport *, struct list *replies))
 {
     ofp_port_t port_no;
     enum ofperr error;
 
     error = decode(request, &port_no);
-    if (!error) {
-        handle_port_request__(ofconn, request, port_no, append);
+    if (error) {
+      return error;
     }
-    return error;
+
+    append_port_request(ofconn, port_no, replies, append);
+
+    return 0;
 }
 
 static enum ofperr
-handle_port_stats_request(struct ofconn *ofconn,
-                          const struct ofp_header *request)
+handle_port_request(struct ofconn *ofconn, const struct ofpbuf *msg,
+                    enum ofperr (*decode)(const struct ofp_header *,
+                                          ofp_port_t *),
+                    void (*append)(struct ofport *, struct list *replies))
 {
-    return handle_port_request(ofconn, request,
+    const struct ofp_header *request = ofpbuf_data(msg);
+    struct list replies;
+    struct ofpbuf *b;
+
+    ofpmp_init(&replies, request);
+
+    /* First part of multi-part request */
+    handle_one_port_request(ofconn, request, &replies, decode, append);
+
+    /* Any subsequent parts */
+    LIST_FOR_EACH (b, list_node, &msg->list_node) {
+        request = ofpbuf_data(b);
+        handle_one_port_request(ofconn, request, &replies, decode, append);
+    }
+
+    ofconn_send_replies(ofconn, &replies);
+
+    return 0;
+}
+
+static enum ofperr
+handle_port_stats_request(struct ofconn *ofconn, const struct ofpbuf *msg)
+{
+    return handle_port_request(ofconn, msg,
                                ofputil_decode_port_stats_request,
                                append_port_stat);
 }
@@ -3250,10 +3274,9 @@ append_port_desc(struct ofport *port, struct list *replies)
 }
 
 static enum ofperr
-handle_port_desc_stats_request(struct ofconn *ofconn,
-                               const struct ofp_header *request)
+handle_port_desc_stats_request(struct ofconn *ofconn, const struct ofpbuf *msg)
 {
-    return handle_port_request(ofconn, request,
+    return handle_port_request(ofconn, msg,
                                ofputil_decode_port_desc_stats_request,
                                append_port_desc);
 }
@@ -5971,7 +5994,8 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
         return error;
     }
     if (oh->version >= OFP13_VERSION && ofpmsg_is_stat_request(oh)
-        && ofpmp_more(oh)) {
+        && ofpmp_more(oh) && type != OFPTYPE_PORT_STATS_REQUEST
+        && type != OFPTYPE_PORT_DESC_STATS_REQUEST) {
         /* We have no buffer implementation for multipart requests.
          * Report overflow for requests which consists of multiple
          * messages. */
@@ -6060,13 +6084,13 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
         return handle_table_stats_request(ofconn, oh);
 
     case OFPTYPE_PORT_STATS_REQUEST:
-        return handle_port_stats_request(ofconn, oh);
+        return handle_port_stats_request(ofconn, msg);
 
     case OFPTYPE_QUEUE_STATS_REQUEST:
         return handle_queue_stats_request(ofconn, oh);
 
     case OFPTYPE_PORT_DESC_STATS_REQUEST:
-        return handle_port_desc_stats_request(ofconn, oh);
+        return handle_port_desc_stats_request(ofconn, msg);
 
     case OFPTYPE_FLOW_MONITOR_STATS_REQUEST:
         return handle_flow_monitor_request(ofconn, oh);
