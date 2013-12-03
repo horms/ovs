@@ -3146,7 +3146,7 @@ append_port_stat(struct ofport *port, struct list *replies)
 
 static enum ofperr
 handle_port_stats_request(struct ofconn *ofconn,
-                          const struct ofp_header *request)
+                          const struct ofp_header *request, size_t size)
 {
     struct ofproto *p = ofconn_get_ofproto(ofconn);
     struct ofport *port;
@@ -3155,7 +3155,7 @@ handle_port_stats_request(struct ofconn *ofconn,
 
     ofpmp_init(&replies, request);
 
-    ofpbuf_use_const(&b, request, ntohs(request->length));
+    ofpbuf_use_const(&b, request, size);
     for (;;) {
         ofp_port_t port_no;
         int error;
@@ -5832,6 +5832,7 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
     OVS_EXCLUDED(ofproto_mutex)
 {
     const struct ofp_header *oh = msg->data;
+    size_t size = msg->size;
     enum ofptype type;
     enum ofperr error;
 
@@ -5929,7 +5930,7 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
         return handle_table_stats_request(ofconn, oh);
 
     case OFPTYPE_PORT_STATS_REQUEST:
-        return handle_port_stats_request(ofconn, oh);
+        return handle_port_stats_request(ofconn, oh, size);
 
     case OFPTYPE_QUEUE_STATS_REQUEST:
         return handle_queue_stats_request(ofconn, oh);

@@ -385,6 +385,15 @@ struct ofp_port_status {
 };
 OFP_ASSERT(sizeof(struct ofp_port_status) == 8);
 
+/* A multipart request */
+struct ofp_multipart_request {
+    struct ofp_header header;
+    ovs_be16 type;              /* One of the OFPMP_* constants. */
+    ovs_be16 flags;             /* OFPMPF_REQ_* flags. */
+    uint8_t pad[4];
+};
+OFP_ASSERT(sizeof(struct ofp_multipart_request) == 16);
+
 enum ofp_stats_reply_flags {
     OFPSF_REPLY_MORE  = 1 << 0  /* More replies to follow. */
 };

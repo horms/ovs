@@ -630,6 +630,7 @@ void *ofpmp_append(struct list *, size_t len);
 void ofpmp_postappend(struct list *, size_t start_ofs);
 
 /* Decoding multipart replies. */
+ovs_be16 *ofpmp_flags_ptr(const struct ofp_header *oh);
 uint16_t ofpmp_flags(const struct ofp_header *);
 bool ofpmp_more(const struct ofp_header *);
 

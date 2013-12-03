@@ -845,8 +845,6 @@ ofpmsg_is_stat_request(const struct ofp_header *oh)
     return ofp_is_stat_request(oh->version, oh->type);
 }
 
-static ovs_be16 *ofpmp_flags__(const struct ofp_header *);
-
 /* Initializes 'replies' as a new list of stats messages that reply to
  * 'request', which must be a stats request message.  Initially the list will
  * consist of only a single reply part without any body.  The caller should
@@ -892,7 +890,7 @@ ofpmp_reserve(struct list *replies, size_t len)
         next->l3 = ofpbuf_tail(next);
         list_push_back(replies, &next->list_node);
 
-        *ofpmp_flags__(msg->data) |= htons(OFPSF_REPLY_MORE);
+        *ofpmp_flags_ptr(msg->data) |= htons(OFPSF_REPLY_MORE);
 
         return next;
     }
@@ -930,8 +928,8 @@ ofpmp_postappend(struct list *replies, size_t start_ofs)
     }
 }
 
-static ovs_be16 *
-ofpmp_flags__(const struct ofp_header *oh)
+ovs_be16 *
+ofpmp_flags_ptr(const struct ofp_header *oh)
 {
     switch ((enum ofp_version)oh->version) {
     case OFP10_VERSION:
@@ -952,7 +950,7 @@ ofpmp_flags__(const struct ofp_header *oh)
 uint16_t
 ofpmp_flags(const struct ofp_header *oh)
 {
-    return ntohs(*ofpmp_flags__(oh));
+    return ntohs(*ofpmp_flags_ptr(oh));
 }
 
 /* Returns true if the OFPSF_REPLY_MORE flag is set in the OpenFlow stats

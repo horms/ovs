@@ -129,6 +129,8 @@ struct ofconn {
      * contains an update event of type NXFME_ABBREV and false otherwise.. */
     struct list updates OVS_GUARDED_BY(ofproto_mutex);
     bool sent_abbrev_update OVS_GUARDED_BY(ofproto_mutex);
+
+    struct hmap mp_reqs;       /* Contains partial multipart messages */
 };
 
 static struct ofconn *ofconn_create(struct connmgr *, struct rconn *,
@@ -207,6 +209,14 @@ struct connmgr {
     size_t n_extra_remotes;
     int in_band_queue;
 };
+
+/* Buffer for multipart requests */
+struct ofmp_req {
+    struct hmap_node hmap_node;     /* In struct ofconn's 'mp_reqs' hmap. */
+    struct list parts;              /* Parts of the message */
+};
+
+static void ofmp_req_destroy(struct ofmp_req *mp_req);
 
 static void update_in_band_remotes(struct connmgr *);
 static void add_snooper(struct connmgr *, struct vconn *);
@@ -1164,6 +1174,7 @@ ofconn_create(struct connmgr *mgr, struct rconn *rconn, enum ofconn_type type,
 
     hmap_init(&ofconn->monitors);
     list_init(&ofconn->updates);
+    hmap_init(&ofconn->mp_reqs);
 
     ofconn_flush(ofconn);
 
@@ -1177,6 +1188,7 @@ ofconn_flush(struct ofconn *ofconn)
     OVS_REQUIRES(ofproto_mutex)
 {
     struct ofmonitor *monitor, *next_monitor;
+    struct ofmp_req *mp_req, *next_mp_req;
     int i;
 
     ofconn->role = OFPCR12_ROLE_EQUAL;
@@ -1250,6 +1262,9 @@ ofconn_flush(struct ofconn *ofconn)
                         &ofconn->monitors) {
         ofmonitor_destroy(monitor);
     }
+    HMAP_FOR_EACH_SAFE (mp_req, next_mp_req, hmap_node, &ofconn->mp_reqs) {
+        ofmp_req_destroy(mp_req);
+    }
     rconn_packet_counter_destroy(ofconn->monitor_counter);
     ofconn->monitor_counter = rconn_packet_counter_create();
     ofpbuf_list_delete(&ofconn->updates); /* ...but it should be empty. */
@@ -1266,6 +1281,7 @@ ofconn_destroy(struct ofconn *ofconn)
     }
 
     hmap_destroy(&ofconn->monitors);
+    hmap_destroy(&ofconn->mp_reqs);
     list_remove(&ofconn->node);
     rconn_destroy(ofconn->rconn);
     rconn_packet_counter_destroy(ofconn->packet_in_counter);
@@ -1308,6 +1324,145 @@ ofconn_may_recv(const struct ofconn *ofconn)
     return (!ofconn->blocked || ofconn->retry) && count < OFCONN_REPLY_MAX;
 }
 
+static struct ofmp_req *
+ofmp_req_create(void)
+{
+    struct ofmp_req *mp_req;
+
+    mp_req = xmalloc(sizeof *mp_req);
+    list_init(&mp_req->parts);
+
+    return mp_req;
+}
+
+static void
+ofmp_req_destroy(struct ofmp_req *mp_req)
+{
+    ofpbuf_list_delete(&mp_req->parts);
+    free(mp_req);
+}
+
+static struct ofmp_req *
+ofmp_req_find(const struct ofconn *ofconn, struct ofpbuf *part, uint32_t hash)
+{
+    struct ofmp_req *mp_req;
+    const struct ofp_header *part_oh = part->data;
+
+    HMAP_FOR_EACH_WITH_HASH (mp_req, hmap_node, hash, &ofconn->mp_reqs) {
+        const struct ofpbuf *front;
+        const struct ofp_header *front_oh;
+
+        front = ofpbuf_from_list(list_front(&mp_req->parts));
+        front_oh = front->data;
+
+        if (part_oh->xid == front_oh->xid) {
+            return mp_req;
+        }
+    }
+
+    return NULL;
+}
+
+static struct ofmp_req *
+ofmp_req_add(struct ofconn *ofconn, struct ofmp_req *mp_req,
+             struct ofpbuf *part, uint32_t hash)
+{
+    if (!mp_req) {
+        mp_req = ofmp_req_create();
+        hmap_insert(&ofconn->mp_reqs, &mp_req->hmap_node, hash);
+    }
+    list_push_back(&mp_req->parts, &part->list_node);
+
+    return mp_req;
+}
+
+static struct ofpbuf *
+ofmp_req_linearise(struct ofmp_req *mp_req)
+{
+    size_t len = 0;
+    struct ofp_header *oh;
+    size_t hdr_len = sizeof(struct ofp_multipart_request);
+    struct ofpbuf *msg, *part;
+
+    /* Build the miltipart message on the first part */
+    msg = ofpbuf_from_list(list_pop_front(&mp_req->parts));
+
+    /* Calculate the sum of the body lengths of the remaining parts */
+    LIST_FOR_EACH (part, list_node, &mp_req->parts) {
+        const struct ofp_header *oh = part->data;
+
+        len += ntohs(oh->length) - hdr_len;
+    }
+
+    /* Resize the message to accomodate the bodies of the remaining parts */
+    ofpbuf_prealloc_tailroom(msg, len);
+
+    /* Append the bodies the remaining parts to the multipart message */
+    LIST_FOR_EACH (part, list_node, &mp_req->parts) {
+        const struct ofp_header *oh = part->data;
+
+
+        ofpbuf_put(msg, (char *) part->data + hdr_len,
+                   ntohs(oh->length) - hdr_len);
+    }
+
+    /* Everything is in msg now, destroy mp_req */
+    ofmp_req_destroy(mp_req);
+
+    /* Clear more flag in header, it is no longer the case */
+    oh = msg->data;
+    *ofpmp_flags_ptr(oh) &= htons(~OFPSF_REPLY_MORE);
+
+    return msg;
+}
+
+static struct ofpbuf *
+ofmp_req_filter(struct ofconn *ofconn, struct ofpbuf *part)
+{
+    struct ofmp_req *mp_req;
+    const struct ofp_header *oh = part->data;
+    size_t hash;
+    bool more;
+
+    /* If the message is not a multi-part request then
+     * there is nothing to do here. */
+    if (oh->version < OFP13_VERSION || !ofpmsg_is_stat_request(oh)) {
+        return part;
+    }
+
+    /* Find any previous parts of the multi-part message */
+    hash = hash_int(oh->xid, 0);
+    mp_req = ofmp_req_find(ofconn, part, hash);
+
+    /* If the part is too short then destroy its associated
+     * miltipart message and return the part. It will subsequently
+     * result in an error being returned to the controller */
+    if (oh->length < sizeof(struct ofp_multipart_request)) {
+        ofmp_req_destroy(mp_req);
+        return part;
+    }
+
+    more = ofpmp_more(oh);
+
+    if (!mp_req && !more) {
+        /* Singleton part, it can be processed as-is */
+        return part;
+    }
+
+    /* Add this part to the previous parts of the the multi-part message */
+    mp_req = ofmp_req_add(ofconn, mp_req, part, hash);
+
+    /* More to come: leave the part stored in its mp_req
+     * and do no further processing for now */
+    if (more) {
+        return NULL;
+    }
+
+    /* The last part.
+     * Combine it with the existing parts and process the result */
+    return ofmp_req_linearise(mp_req);
+}
+
 static void
 ofconn_run(struct ofconn *ofconn,
            bool (*handle_openflow)(struct ofconn *,
@@ -1335,6 +1490,10 @@ ofconn_run(struct ofconn *ofconn,
                       : rconn_recv(ofconn->rconn));
             if (!of_msg) {
                 break;
+            }
+            of_msg = ofmp_req_filter(ofconn, of_msg);
+            if (!of_msg) {
+                continue;
             }
             if (mgr->fail_open) {
                 fail_open_maybe_recover(mgr->fail_open);
