@@ -20,11 +20,11 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <arpa/inet.h>
 #include <inttypes.h>
 #include <linux/filter.h>
 #include <linux/gen_stats.h>
 #include <linux/if_ether.h>
+#include <linux/if_packet.h>
 #include <linux/if_tun.h>
 #include <linux/types.h>
 #include <linux/ethtool.h>
@@ -37,10 +37,8 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <netpacket/packet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
-#include <net/if_packet.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -767,7 +765,7 @@ netdev_linux_rx_construct(struct netdev_rx *rx_)
         rx->fd = netdev->tap_fd;
     } else {
         struct sockaddr_ll sll;
-        int ifindex;
+        int ifindex, val;
         /* Result of tcpdump -dd inbound */
         static const struct sock_filter filt[] = {
             { 0x28, 0, 0, 0xfffff004 }, /* ldh [0] */
@@ -787,6 +785,16 @@ netdev_linux_rx_construct(struct netdev_rx *rx_)
             goto error;
         }
 
+        val = 1;
+        error = setsockopt(rx->fd, SOL_PACKET, PACKET_AUXDATA,
+                           &val, sizeof val);
+        if (error) {
+            error = errno;
+            VLOG_ERR("%s: failed to mark socket for auxdata (%s)",
+                     netdev_get_name(netdev_), ovs_strerror(error));
+            goto error;
+        }
+
         /* Set non-blocking mode. */
         error = set_nonblocking(rx->fd);
         if (error) {
@@ -803,7 +811,7 @@ netdev_linux_rx_construct(struct netdev_rx *rx_)
         memset(&sll, 0, sizeof sll);
         sll.sll_family = AF_PACKET;
         sll.sll_ifindex = ifindex;
-        sll.sll_protocol = (OVS_FORCE unsigned short int) htons(ETH_P_ALL);
+        sll.sll_protocol = htons(ETH_P_ALL);
         if (bind(rx->fd, (struct sockaddr *) &sll, sizeof sll) < 0) {
             error = errno;
             VLOG_ERR("%s: failed to bind raw socket (%s)",
@@ -852,6 +860,72 @@ netdev_linux_rx_dealloc(struct netdev_rx *rx_)
 }
 
 static int
+netdev_linux_rx_recv_sock(int fd, void *data, size_t size)
+{
+    ssize_t retval;
+    struct cmsghdr *cmsg;
+    union {
+        struct cmsghdr cmsg;
+        char buf[CMSG_SPACE(sizeof(struct tpacket_auxdata))];
+    } cmsg_buf;
+    struct msghdr msg;
+    struct iovec iov;
+
+    iov.iov_base = data;
+    iov.iov_len = size;
+    msg.msg_iov = &iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = &cmsg_buf;
+    msg.msg_controllen = sizeof cmsg_buf;
+    msg.msg_name = NULL;
+
+    do {
+        retval = recvmsg(fd, &msg, MSG_TRUNC);
+    } while (retval < 0 && errno == EINTR);
+
+    if (retval > size || retval < 0) {
+        return retval;
+    }
+
+    for (cmsg = CMSG_FIRSTHDR(&msg); cmsg; cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+        struct tpacket_auxdata *aux;
+
+        if (cmsg->cmsg_len < CMSG_LEN(sizeof(struct tpacket_auxdata))
+            || cmsg->cmsg_level != SOL_PACKET
+            || cmsg->cmsg_type != PACKET_AUXDATA) {
+            continue;
+        }
+
+        aux = (struct tpacket_auxdata *)(void *)CMSG_DATA(cmsg);
+        if (aux->tp_vlan_tci) {
+            struct ofpbuf b;
+
+            VLOG_WARN("vlan tci = %u", aux->tp_vlan_tci);
+
+            if (retval + VLAN_HEADER_LEN > size) {
+                errno = EMSGSIZE;
+                return -errno;
+            }
+            if (size < ETH_ADDR_LEN) {
+                errno = EINVAL;
+                return -errno;
+            }
+
+            /* XXX: This may be quite expensive! */
+            memmove((char *)data + VLAN_HEADER_LEN, data, retval);
+
+            ofpbuf_use_stack(&b, data, size);
+            b.data = (char *)b.data + VLAN_HEADER_LEN;
+            b.size = retval;
+            eth_push_vlan(&b, htons(aux->tp_vlan_tci));
+            retval = b.size;
+        }
+    }
+
+    return retval;
+}
+
+static int
 netdev_linux_rx_recv(struct netdev_rx *rx_, void *data, size_t size)
 {
     struct netdev_rx_linux *rx = netdev_rx_linux_cast(rx_);
@@ -860,7 +934,7 @@ netdev_linux_rx_recv(struct netdev_rx *rx_, void *data, size_t size)
     do {
         retval = (rx->is_tap
                   ? read(rx->fd, data, size)
-                  : recv(rx->fd, data, size, MSG_TRUNC));
+                  : netdev_linux_rx_recv_sock(rx->fd, data, size));
     } while (retval < 0 && errno == EINTR);
 
     if (retval >= 0) {
