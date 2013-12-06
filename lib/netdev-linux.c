@@ -20,11 +20,11 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <arpa/inet.h>
 #include <inttypes.h>
 #include <linux/filter.h>
 #include <linux/gen_stats.h>
 #include <linux/if_ether.h>
+#include <linux/if_packet.h>
 #include <linux/if_tun.h>
 #include <linux/types.h>
 #include <linux/ethtool.h>
@@ -37,10 +37,8 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <netpacket/packet.h>
 #include <net/if.h>
 #include <net/if_arp.h>
-#include <net/if_packet.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <poll.h>
@@ -764,7 +762,7 @@ netdev_linux_rx_construct(struct netdev_rx *rx_)
         rx->fd = netdev->tap_fd;
     } else {
         struct sockaddr_ll sll;
-        int ifindex;
+        int ifindex, val;
         /* Result of tcpdump -dd inbound */
         static const struct sock_filter filt[] = {
             { 0x28, 0, 0, 0xfffff004 }, /* ldh [0] */
@@ -784,6 +782,16 @@ netdev_linux_rx_construct(struct netdev_rx *rx_)
             goto error;
         }
 
+        val = 1;
+        error = setsockopt(rx->fd, SOL_PACKET, PACKET_AUXDATA,
+                           &val, sizeof val);
+        if (error) {
+            error = errno;
+            VLOG_ERR("%s: failed to mark socket for auxdata (%s)",
+                     netdev_get_name(netdev_), ovs_strerror(error));
+            goto error;
+        }
+
         /* Set non-blocking mode. */
         error = set_nonblocking(rx->fd);
         if (error) {
@@ -800,7 +808,7 @@ netdev_linux_rx_construct(struct netdev_rx *rx_)
         memset(&sll, 0, sizeof sll);
         sll.sll_family = AF_PACKET;
         sll.sll_ifindex = ifindex;
-        sll.sll_protocol = (OVS_FORCE unsigned short int) htons(ETH_P_ALL);
+        sll.sll_protocol = htons(ETH_P_ALL);
         if (bind(rx->fd, (struct sockaddr *) &sll, sizeof sll) < 0) {
             error = errno;
             VLOG_ERR("%s: failed to bind raw socket (%s)",
@@ -848,6 +856,85 @@ netdev_linux_rx_dealloc(struct netdev_rx *rx_)
     free(rx);
 }
 
+static ssize_t
+netdev_linux_rx_recv_sock(int fd, struct ofpbuf *buffer)
+{
+    size_t size;
+    ssize_t retval;
+    struct iovec iov;
+    struct cmsghdr *cmsg;
+    union {
+        struct cmsghdr cmsg;
+        char buffer[CMSG_SPACE(sizeof(struct tpacket_auxdata))];
+    } cmsg_buffer;
+    struct msghdr msgh;
+
+    /* Reserve headroom for a single VLAN tag */
+    ofpbuf_reserve(buffer, VLAN_HEADER_LEN);
+    size = ofpbuf_tailroom(buffer);
+
+    iov.iov_base = buffer->data;
+    iov.iov_len = size;
+    msgh.msg_name = NULL;
+    msgh.msg_namelen = 0;
+    msgh.msg_iov = &iov;
+    msgh.msg_iovlen = 1;
+    msgh.msg_control = &cmsg_buffer;
+    msgh.msg_controllen = sizeof cmsg_buffer;
+    msgh.msg_flags = 0;
+
+    do {
+        retval = recvmsg(fd, &msgh, MSG_TRUNC);
+    } while (retval < 0 && errno == EINTR);
+
+    if (retval < 0 || retval > size) {
+        return retval;
+    }
+
+    buffer->size += retval;
+
+    for (cmsg = CMSG_FIRSTHDR(&msgh); cmsg; cmsg = CMSG_NXTHDR(&msgh, cmsg)) {
+        struct tpacket_auxdata *aux;
+
+        if (cmsg->cmsg_level != SOL_PACKET
+            || cmsg->cmsg_type != PACKET_AUXDATA
+            || cmsg->cmsg_len < CMSG_LEN(sizeof(struct tpacket_auxdata))) {
+            continue;
+        }
+
+        aux = (struct tpacket_auxdata *)(void *)CMSG_DATA(cmsg);
+        if (aux->tp_vlan_tci) {
+            if (retval < ETH_ADDR_LEN) {
+                errno = EINVAL;
+                return -1;
+            }
+
+            eth_push_vlan(buffer, htons(aux->tp_vlan_tci));
+            break;
+        }
+    }
+
+    return 0;
+}
+
+static ssize_t
+netdev_linux_rx_recv_tap(int fd, struct ofpbuf *buffer)
+{
+    ssize_t retval;
+    size_t size = ofpbuf_tailroom(buffer);
+
+    do {
+        retval = read(fd, buffer->data, size);
+    } while (retval < 0 && errno == EINTR);
+
+    if (retval < 0 || retval > size) {
+        return retval;
+    }
+
+    buffer->size += retval;
+    return 0;
+}
+
 static int
 netdev_linux_rx_recv(struct netdev_rx *rx_, struct ofpbuf *buffer)
 {
@@ -855,12 +942,9 @@ netdev_linux_rx_recv(struct netdev_rx *rx_, struct ofpbuf *buffer)
     ssize_t retval;
     size_t size = ofpbuf_tailroom(buffer);
 
-    do {
-        retval = (rx->is_tap
-                  ? read(rx->fd, buffer->data, size)
-                  : recv(rx->fd, buffer->data, size, MSG_TRUNC));
-    } while (retval < 0 && errno == EINTR);
-
+    retval = (rx->is_tap
+              ? netdev_linux_rx_recv_tap(rx->fd, buffer)
+              : netdev_linux_rx_recv_sock(rx->fd, buffer));
     if (retval < 0) {
         if (errno != EAGAIN) {
             VLOG_WARN_RL(&rl, "error receiving Ethernet packet on %s: %s",
@@ -870,7 +954,6 @@ netdev_linux_rx_recv(struct netdev_rx *rx_, struct ofpbuf *buffer)
     } else if (retval > size) {
         return -EMSGSIZE;
     } else {
-        buffer->size += retval;
         return 0;
     }
 }

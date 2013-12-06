@@ -581,7 +581,7 @@ netdev_rx_bsd_recv_pcap(struct netdev_rx_bsd *rx, struct ofpbuf *buffer)
         ret = pcap_dispatch(rx->pcap_handle, 1, proc_pkt, (u_char *) &arg);
 
         if (ret > 0) {
-            buffer->size += retval;
+            buffer->size += arg.retval;
             return 0;
         }
         if (ret == -1) {
