@@ -2066,6 +2066,21 @@ ofpact_check__(enum ofputil_protocol *usable_protocols, struct ofpact *a,
         return 0;
 
     case OFPACT_PUSH_MPLS:
+        switch (ofpact_get_PUSH_MPLS(a)->position) {
+        case OFPACT_MPLS_BEFORE_VLAN:
+            *usable_protocols &= OFPUTIL_P_OF13_UP;
+            /* MPLS LSE will be pushed before any existing VLAN tags.
+             * Thus the VLAN tag becomes opaque and for the purposes
+             * of action consistency checking not present */
+            flow->vlan_tci = htons(0);
+            break;
+        case OFPACT_MPLS_AFTER_VLAN:
+            *usable_protocols &= ~OFPUTIL_P_OF13_UP;
+            break;
+        default:
+            OVS_NOT_REACHED();
+        }
+
         flow->dl_type = ofpact_get_PUSH_MPLS(a)->ethertype;
         /* The packet is now MPLS and the MPLS payload is opaque.
          * Thus nothing can be assumed about the network protocol.
@@ -3270,6 +3285,7 @@ ofpact_format(const struct ofpact *a, struct ds *s)
     const struct ofpact_tunnel *tunnel;
     const struct ofpact_sample *sample;
     const struct ofpact_set_field *set_field;
+    const struct ofpact_push_mpls *push_mpls;
     const struct mf_field *mf;
     ofp_port_t port;
 
@@ -3495,8 +3511,20 @@ ofpact_format(const struct ofpact *a, struct ds *s)
         break;
 
     case OFPACT_PUSH_MPLS:
-        ds_put_format(s, "push_mpls:0x%04"PRIx16,
-                      ntohs(ofpact_get_PUSH_MPLS(a)->ethertype));
+        push_mpls = ofpact_get_PUSH_MPLS(a);
+
+        switch (push_mpls->position) {
+        case OFPACT_MPLS_AFTER_VLAN:
+            ds_put_format(s, "push_mpls(0x%04"PRIx16",after_vlan)",
+                          ntohs(push_mpls->ethertype));
+            break;
+        case OFPACT_MPLS_BEFORE_VLAN:
+            ds_put_format(s, "push_mpls:0x%04"PRIx16,
+                          ntohs(push_mpls->ethertype));
+            break;
+        default:
+            OVS_NOT_REACHED();
+        }
         break;
 
     case OFPACT_POP_MPLS:
