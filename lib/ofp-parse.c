@@ -263,6 +263,52 @@ parse_resubmit(char *arg, struct ofpbuf *ofpacts)
     return NULL;
 }
 
+/* Parses 'arg' as the argument to a "push_mpls" action, and appends such an
+ * action to 'ofpacts'.
+ *
+ * Returns NULL if successful, otherwise a malloc()'d string describing the
+ * error.  The caller is responsible for freeing the returned string. */
+static char * WARN_UNUSED_RESULT
+parse_push_mpls(struct ofpbuf *ofpacts, char *arg)
+{
+    struct ofpact_push_mpls *push_mpls;
+    char *ethertype_s, *position_s;
+
+    push_mpls = ofpact_put_PUSH_MPLS(ofpacts);
+
+    ethertype_s = strsep(&arg, ",");
+    if (ethertype_s && ethertype_s[0]) {
+        char *error;
+        uint16_t ethertype;
+
+        error = str_to_u16(ethertype_s, "push_mpls", &ethertype);
+        if (error) {
+            return error;
+        }
+        push_mpls->ethertype = htons(ethertype);
+    } else {
+        return xstrdup("'ethertype' must be spefified for 'push_mpls'");
+    }
+
+    position_s = strsep(&arg, ",");
+    if (position_s && position_s[0]) {
+        /* XXX: Pase "before_vlan" as OFPACT_MPLS_BEFORE_VLAN
+         * once pushing MPLS LSEs before VLAN tags is supported */
+        if (!strcmp(position_s, "after_vlan")) {
+            push_mpls->position = OFPACT_MPLS_AFTER_VLAN;
+        } else {
+            return xasprintf("invalid tag_prder '%s' in 'push_mpls' argument",
+                             position_s);
+        }
+    } else {
+        /* XXX: Use OFPACT_MPLS_BEFORE_VLAN as the default
+         * once pushing MPLS LSEs before VLAN tags is supported */
+        push_mpls->position = OFPACT_MPLS_AFTER_VLAN;
+    }
+
+    return NULL;
+}
+
 /* Parses 'arg' as the argument to a "note" action, and appends such an action
  * to 'ofpacts'.
  *
@@ -877,10 +923,7 @@ parse_named_action(enum ofputil_action_code code,
 
     case OFPUTIL_OFPAT11_PUSH_MPLS:
     case OFPUTIL_NXAST_PUSH_MPLS:
-        error = str_to_u16(arg, "push_mpls", &ethertype);
-        if (!error) {
-            ofpact_put_PUSH_MPLS(ofpacts)->ethertype = htons(ethertype);
-        }
+        error = parse_push_mpls(ofpacts, arg);
         break;
 
     case OFPUTIL_OFPAT11_POP_MPLS:
