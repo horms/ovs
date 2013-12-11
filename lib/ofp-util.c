@@ -5235,20 +5235,12 @@ nx_from_ofp14_flow_monitor_flags(enum ofp14_flow_monitor_flags ofp_flags)
  *
  * Returns 0 if successful, EOF if no requests were left in this 'msg',
  * otherwise an OFPERR_* value. */
-int
-ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
-                                    struct ofpbuf *msg)
+static int
+ofputil_decode_nx_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
+                                       struct ofpbuf *msg)
 {
     struct nx_flow_monitor_request *nfmr;
     enum nx_flow_monitor_flags flags;
-
-    if (!msg->frame) {
-        ofpraw_pull_assert(msg);
-    }
-
-    if (!ofpbuf_size(msg)) {
-        return EOF;
-    }
 
     nfmr = ofpbuf_try_pull(msg, sizeof *nfmr);
     if (!nfmr) {
@@ -5278,6 +5270,95 @@ ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
     rq->command = OFPFMC14_ADD;
 
     return nx_pull_match(msg, ntohs(nfmr->match_len), &rq->match, NULL, NULL);
+}
+
+/* Converts an OFPMP_FLOW_MONITOR request in 'msg' into an abstract
+ * ofputil_flow_monitor_request in 'rq'.
+ *
+ * Multiple OFPMP_FLOW_MONITOR requests can be packed into a single OpenFlow
+ * message.  Calling this function multiple times for a single 'msg' iterates
+ * through the requests.  The caller must initially leave 'msg''s layer
+ * pointers null and not modify them between calls.
+ *
+ * Returns 0 if successful, EOF if no requests were left in this 'msg',
+ * otherwise an OFPERR_* value. */
+static int
+ofputil_decode_of14_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
+                                         struct ofpbuf *msg)
+{
+    struct ofp14_flow_monitor_request *ofpfmr;
+    enum ofp14_flow_monitor_flags flags;
+
+    ofpfmr = ofpbuf_try_pull(msg, sizeof *ofpfmr);
+    if (!ofpfmr) {
+        VLOG_WARN_RL(&bad_ofmsg_rl,
+                     "OFPMP_FLOW_MONITOR request has %"PRIu32" "
+                     "leftover bytes at end", ofpbuf_size(msg));
+        return OFPERR_OFPFMFC_UNKNOWN;
+    }
+
+    flags = ntohs(ofpfmr->flags);
+    if (!(flags & (OFPFMF14_ADD | OFPFMF14_REMOVED | OFPFMF14_MODIFY))
+        || flags & ~(OFPFMF14_INITIAL | OFPFMF14_ADD | OFPFMF14_REMOVED
+                     | OFPFMF14_MODIFY | OFPFMF14_INSTRUCTIONS
+                     | OFPFMF14_NO_ABBREV | OFPFMF14_ONLY_OWN)) {
+        VLOG_WARN_RL(&bad_ofmsg_rl, "OFPMP_FLOW_MONITOR has bad flags %#"PRIx16,
+                     flags);
+        return OFPERR_OFPFMFC_BAD_FLAGS;
+    }
+
+    rq->id = ntohl(ofpfmr->monitor_id);
+    rq->flags = flags;
+    if (ofputil_port_from_ofp11(ofpfmr->out_port, &rq->out_port)) {
+        VLOG_WARN_RL(&bad_ofmsg_rl,
+                     "OFPMP_FLOW_MONITOR has bad out_port %#"PRIx32,
+                     ntohl(ofpfmr->out_port));
+        return OFPERR_OFPMOFC_BAD_OUT;
+    }
+    rq->out_group = ntohl(ofpfmr->out_group);
+    rq->table_id = ofpfmr->table_id;
+    rq->command = ofpfmr->command;
+
+    return ofputil_pull_ofp11_match(msg, &rq->match, NULL);
+}
+
+/* Converts an OFPST14_FLOW_MONITOR or NXST_FLOW_MONITOR request in 'msg'
+ * into an abstract ofputil_flow_monitor_request in 'rq'.
+ *
+ * Multiple flow_monitor requests can be packed into a single OpenFlow
+ * message.  Calling this function multiple times for a single 'msg' iterates
+ * through the requests.  The caller must initially leave 'msg''s layer
+ * pointers null and not modify them between calls.
+ *
+ * Returns 0 if successful, EOF if no requests were left in this 'msg',
+ * otherwise an OFPERR_* value. */
+int
+ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
+                                    struct ofpbuf *msg)
+{
+    enum ofpraw raw;
+    enum ofperr error;
+
+    error = (msg->frame
+             ? ofpraw_decode(&raw, msg->frame)
+             : ofpraw_pull(&raw, msg));
+    if (error) {
+        return error;
+    }
+
+    if (!ofpbuf_size(msg)) {
+        return EOF;
+    }
+
+    if (raw == OFPRAW_OFPST14_FLOW_MONITOR_REQUEST) {
+        error = ofputil_decode_of14_flow_monitor_request(rq, msg);
+    } else if (raw == OFPRAW_NXST_FLOW_MONITOR_REQUEST) {
+        error = ofputil_decode_nx_flow_monitor_request(rq, msg);
+    } else {
+        OVS_NOT_REACHED();
+    }
+
+    return error;
 }
 
 void
