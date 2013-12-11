@@ -837,15 +837,17 @@ int ofputil_pull_queue_get_config_reply(struct ofpbuf *reply,
                                         struct ofputil_queue_config *);
 
 
-/* Abstract nx_flow_monitor_request. */
+/* Abstract {nx,ofp14}_flow_monitor_request. */
 struct ofputil_flow_monitor_request {
     uint32_t id;
-    enum nx_flow_monitor_flags flags;
+    enum ofp14_flow_monitor_flags flags;
     ofp_port_t out_port;
     uint8_t table_id;
     struct match match;
 };
 
+enum nx_flow_monitor_flags nx_from_ofp14_flow_monitor_flags(
+    enum ofp14_flow_monitor_flags ofp_flags);
 int ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *,
                                         struct ofpbuf *msg);
 void ofputil_append_flow_monitor_request(

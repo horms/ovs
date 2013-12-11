@@ -4699,7 +4699,7 @@ handle_barrier_request(struct ofconn *ofconn, const struct ofp_header *oh)
 
 static void
 ofproto_compose_flow_refresh_update(const struct rule *rule,
-                                    enum nx_flow_monitor_flags flags,
+                                    enum ofp14_flow_monitor_flags flags,
                                     struct list *msgs)
     OVS_REQUIRES(ofproto_mutex)
 {
@@ -4707,7 +4707,7 @@ ofproto_compose_flow_refresh_update(const struct rule *rule,
     struct ofputil_flow_update fu;
     struct match match;
 
-    fu.event = (flags & (NXFMF_INITIAL | NXFMF_ADD)
+    fu.event = (flags & (OFPFMF14_INITIAL | OFPFMF14_ADD)
                 ? NXFME_ADDED : NXFME_MODIFIED);
     fu.reason = 0;
     ovs_mutex_lock(&rule->mutex);
@@ -4720,7 +4720,7 @@ ofproto_compose_flow_refresh_update(const struct rule *rule,
     fu.match = &match;
     fu.priority = rule->cr.priority;
 
-    actions = flags & NXFMF_ACTIONS ? rule_get_actions(rule) : NULL;
+    actions = flags & OFPFMF14_INSTRUCTIONS ? rule_get_actions(rule) : NULL;
     fu.ofpacts = actions ? actions->ofpacts : NULL;
     fu.ofpacts_len = actions ? actions->ofpacts_len : 0;
 
@@ -4739,7 +4739,7 @@ ofmonitor_compose_refresh_updates(struct rule_collection *rules,
 
     for (i = 0; i < rules->n; i++) {
         struct rule *rule = rules->rules[i];
-        enum nx_flow_monitor_flags flags = rule->monitor_flags;
+        enum ofp14_flow_monitor_flags flags = rule->monitor_flags;
         rule->monitor_flags = 0;
 
         ofproto_compose_flow_refresh_update(rule, flags, msgs);
@@ -4752,7 +4752,7 @@ ofproto_collect_ofmonitor_refresh_rule(const struct ofmonitor *m,
                                        struct rule_collection *rules)
     OVS_REQUIRES(ofproto_mutex)
 {
-    enum nx_flow_monitor_flags update;
+    enum ofp14_flow_monitor_flags update;
 
     if (rule_is_hidden(rule)) {
         return;
@@ -4764,9 +4764,9 @@ ofproto_collect_ofmonitor_refresh_rule(const struct ofmonitor *m,
 
     if (seqno) {
         if (rule->add_seqno > seqno) {
-            update = NXFMF_ADD | NXFMF_MODIFY;
+            update = OFPFMF14_ADD | OFPFMF14_MODIFY;
         } else if (rule->modify_seqno > seqno) {
-            update = NXFMF_MODIFY;
+            update = OFPFMF14_MODIFY;
         } else {
             return;
         }
@@ -4775,13 +4775,13 @@ ofproto_collect_ofmonitor_refresh_rule(const struct ofmonitor *m,
             return;
         }
     } else {
-        update = NXFMF_INITIAL;
+        update = OFPFMF14_INITIAL;
     }
 
     if (!rule->monitor_flags) {
         rule_collection_add(rules, rule);
     }
-    rule->monitor_flags |= update | (m->flags & NXFMF_ACTIONS);
+    rule->monitor_flags |= update | (m->flags & OFPFMF14_INSTRUCTIONS);
 }
 
 static void
@@ -4814,7 +4814,7 @@ ofproto_collect_ofmonitor_initial_rules(struct ofmonitor *m,
                                         struct rule_collection *rules)
     OVS_REQUIRES(ofproto_mutex)
 {
-    if (m->flags & NXFMF_INITIAL) {
+    if (m->flags & OFPFMF14_INITIAL) {
         ofproto_collect_ofmonitor_refresh_rules(m, 0, rules);
     }
 }

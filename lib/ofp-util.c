@@ -5194,6 +5194,37 @@ ofputil_encode_table_stats_reply(const struct ofp12_table_stats stats[], int n,
 
 /* ofputil_flow_monitor_request */
 
+static enum ofp14_flow_monitor_flags
+nx_to_ofp14_flow_monitor_flags(enum nx_flow_monitor_flags nx_flags)
+{
+    enum ofp14_flow_monitor_flags ofp_flags;
+
+    /* These NXFMF flags are identity mapped to OFPFMF14 flags */
+    ofp_flags = nx_flags & (NXFMF_INITIAL | NXFMF_ADD | NXFMF_DELETE
+                            | NXFMF_MODIFY | NXFMF_ACTIONS | NXFMF_OWN);
+
+    /* No other flags should be present. */
+    ovs_assert(!(ofp_flags & ~nx_flags));
+
+    return ofp_flags;
+}
+
+enum nx_flow_monitor_flags
+nx_from_ofp14_flow_monitor_flags(enum ofp14_flow_monitor_flags ofp_flags)
+{
+    enum nx_flow_monitor_flags nx_flags;
+
+    /* These OFPFMF14 flags are identity mapped to NX flags */
+    nx_flags = ofp_flags & (OFPFMF14_INITIAL | OFPFMF14_ADD | OFPFMF14_REMOVED
+                            | OFPFMF14_MODIFY | OFPFMF14_INSTRUCTIONS
+                            | OFPFMF14_NO_ABBREV);
+
+    /* No other flags should be present. */
+    ovs_assert(!(nx_flags & ~ofp_flags));
+
+    return nx_flags;
+}
+
 /* Converts an NXST_FLOW_MONITOR request in 'msg' into an abstract
  * ofputil_flow_monitor_request in 'rq'.
  *
@@ -5209,7 +5240,7 @@ ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
                                     struct ofpbuf *msg)
 {
     struct nx_flow_monitor_request *nfmr;
-    uint16_t flags;
+    enum nx_flow_monitor_flags flags;
 
     if (!msg->frame) {
         ofpraw_pull_assert(msg);
@@ -5240,7 +5271,7 @@ ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
     }
 
     rq->id = ntohl(nfmr->id);
-    rq->flags = flags;
+    rq->flags = nx_to_ofp14_flow_monitor_flags(flags);
     rq->out_port = u16_to_ofp(ntohs(nfmr->out_port));
     rq->table_id = nfmr->table_id;
 
@@ -5265,7 +5296,7 @@ ofputil_append_flow_monitor_request(
 
     nfmr = ofpbuf_at_assert(msg, start_ofs, sizeof *nfmr);
     nfmr->id = htonl(rq->id);
-    nfmr->flags = htons(rq->flags);
+    nfmr->flags = htons(nx_from_ofp14_flow_monitor_flags(rq->flags));
     nfmr->out_port = htons(ofp_to_u16(rq->out_port));
     nfmr->match_len = htons(match_len);
     nfmr->table_id = rq->table_id;

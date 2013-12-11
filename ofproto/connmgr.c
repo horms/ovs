@@ -2072,7 +2072,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
                  const struct rule_actions *old_actions)
     OVS_REQUIRES(ofproto_mutex)
 {
-    enum nx_flow_monitor_flags update;
+    enum ofp14_flow_monitor_flags update;
     struct ofconn *ofconn;
 
     if (rule_is_hidden(rule)) {
@@ -2081,16 +2081,16 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
 
     switch (event) {
     case NXFME_ADDED:
-        update = NXFMF_ADD;
+        update = OFPFMF14_ADD;
         rule->add_seqno = rule->modify_seqno = monitor_seqno++;
         break;
 
     case NXFME_DELETED:
-        update = NXFMF_DELETE;
+        update = OFPFMF14_REMOVED;
         break;
 
     case NXFME_MODIFIED:
-        update = NXFMF_MODIFY;
+        update = OFPFMF14_MODIFY;
         rule->modify_seqno = monitor_seqno++;
         break;
 
@@ -2100,7 +2100,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
     }
 
     LIST_FOR_EACH (ofconn, node, &mgr->all_conns) {
-        enum nx_flow_monitor_flags flags = 0;
+        enum ofp14_flow_monitor_flags flags = 0;
         struct ofmonitor *m;
 
         if (ofconn->monitor_paused) {
@@ -2131,7 +2131,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
                 ofconn->sent_abbrev_update = false;
             }
 
-            if (flags & NXFMF_OWN || ofconn != abbrev_ofconn
+            if (flags & OFPFMF14_NO_ABBREV || ofconn != abbrev_ofconn
                 || ofconn->monitor_paused) {
                 struct ofputil_flow_update fu;
                 struct match match;
@@ -2149,7 +2149,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
                 fu.hard_timeout = rule->hard_timeout;
                 ovs_mutex_unlock(&rule->mutex);
 
-                if (flags & NXFMF_ACTIONS) {
+                if (flags & OFPFMF14_INSTRUCTIONS) {
                     const struct rule_actions *actions = rule_get_actions(rule);
                     fu.ofpacts = actions->ofpacts;
                     fu.ofpacts_len = actions->ofpacts_len;
