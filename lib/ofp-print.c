@@ -2170,15 +2170,20 @@ ofp_print_nxt_flow_monitor_cancel(struct ds *string,
 static const char *
 nx_flow_monitor_flags_to_name(uint32_t bit)
 {
-    enum nx_flow_monitor_flags fmf = bit;
+    enum ofp14_flow_monitor_flags fmf = bit;
 
+    /* Note that this returns "" for bits that were not part
+     * of NX flow monitor, which was the precursor to
+     * OpenFlow1.4 flow monitor. It also uses the original
+     * NX names */
     switch (fmf) {
-    case NXFMF_INITIAL: return "initial";
-    case NXFMF_ADD: return "add";
-    case NXFMF_DELETE: return "delete";
-    case NXFMF_MODIFY: return "modify";
-    case NXFMF_ACTIONS: return "actions";
-    case NXFMF_OWN: return "own";
+    case OFPFMF14_INITIAL: return "initial";
+    case OFPFMF14_ADD: return "add";
+    case OFPFMF14_REMOVED: return "delete";
+    case OFPFMF14_MODIFY: return "modify";
+    case OFPFMF14_INSTRUCTIONS: return "actions";
+    case OFPFMF14_NO_ABBREV: return "own";
+    case OFPFMF14_ONLY_OWN: return "";
     }
 
     return NULL;

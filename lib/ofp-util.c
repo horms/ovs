@@ -5219,9 +5219,10 @@ ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
     }
 
     flags = ntohs(nfmr->flags);
-    if (!(flags & (NXFMF_ADD | NXFMF_DELETE | NXFMF_MODIFY))
-        || flags & ~(NXFMF_INITIAL | NXFMF_ADD | NXFMF_DELETE
-                     | NXFMF_MODIFY | NXFMF_ACTIONS | NXFMF_OWN)) {
+    if (!(flags & (OFPFMF14_ADD | OFPFMF14_REMOVED | OFPFMF14_MODIFY))
+        || flags & ~(OFPFMF14_INITIAL | OFPFMF14_ADD | OFPFMF14_REMOVED
+                     | OFPFMF14_MODIFY | OFPFMF14_INSTRUCTIONS
+                     | OFPFMF14_NO_ABBREV)) {
         VLOG_WARN_RL(&bad_ofmsg_rl, "NXST_FLOW_MONITOR has bad flags %#"PRIx16,
                      flags);
         return OFPERR_NXBRC_FM_BAD_FLAGS;

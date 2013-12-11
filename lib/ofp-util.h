@@ -833,11 +833,10 @@ enum ofperr ofputil_decode_queue_get_config_reply(struct ofpbuf *reply,
 int ofputil_pull_queue_get_config_reply(struct ofpbuf *reply,
                                         struct ofputil_queue_config *);
 
-
 /* Abstract nx_flow_monitor_request. */
 struct ofputil_flow_monitor_request {
     uint32_t id;
-    enum nx_flow_monitor_flags flags;
+    enum ofp14_flow_monitor_flags flags;
     ofp_port_t out_port;
     uint8_t table_id;
     struct match match;

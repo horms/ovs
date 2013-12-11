@@ -2159,19 +2159,6 @@ struct nx_flow_monitor_request {
 };
 OFP_ASSERT(sizeof(struct nx_flow_monitor_request) == 16);
 
-/* 'flags' bits in struct nx_flow_monitor_request. */
-enum nx_flow_monitor_flags {
-    /* When to send updates. */
-    NXFMF_INITIAL = 1 << 0,     /* Initially matching flows. */
-    NXFMF_ADD = 1 << 1,         /* New matching flows as they are added. */
-    NXFMF_DELETE = 1 << 2,      /* Old matching flows as they are removed. */
-    NXFMF_MODIFY = 1 << 3,      /* Matching flows as they are changed. */
-
-    /* What to include in updates. */
-    NXFMF_ACTIONS = 1 << 4,     /* If set, actions are included. */
-    NXFMF_OWN = 1 << 5,         /* If set, include own changes in full. */
-};
-
 /* NXST_FLOW_MONITOR reply header.
  *
  * The body of an NXST_FLOW_MONITOR reply is an array of variable-length

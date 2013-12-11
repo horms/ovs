@@ -202,7 +202,7 @@ struct ofmonitor {
     struct hmap_node ofconn_node; /* In ofconn's 'monitors' hmap. */
     uint32_t id;
 
-    enum nx_flow_monitor_flags flags;
+    enum ofp14_flow_monitor_flags flags;
 
     /* Matching. */
     ofp_port_t out_port;
