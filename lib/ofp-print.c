@@ -2193,6 +2193,7 @@ ofp_print_nxst_flow_monitor_request(struct ds *string,
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
     for (;;) {
         struct ofputil_flow_monitor_request request;
+        enum nx_flow_monitor_flags nx_flags;
         int retval;
 
         retval = ofputil_decode_flow_monitor_request(&request, &b);
@@ -2204,7 +2205,8 @@ ofp_print_nxst_flow_monitor_request(struct ds *string,
         }
 
         ds_put_format(string, "\n id=%"PRIu32" flags=", request.id);
-        ofp_print_bit_names(string, request.flags,
+        nx_flags = nx_from_ofp14_flow_monitor_flags(request.flags);
+        ofp_print_bit_names(string, nx_flags,
                             nx_flow_monitor_flags_to_name, ',');
 
         if (request.out_port != OFPP_NONE) {

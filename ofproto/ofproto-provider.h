@@ -384,7 +384,7 @@ struct rule {
      * 'add_seqno' is the sequence number when this rule was created.
      * 'modify_seqno' is the sequence number when this rule was last modified.
      * See 'monitor_seqno' in connmgr.c for more information. */
-    enum nx_flow_monitor_flags monitor_flags OVS_GUARDED_BY(ofproto_mutex);
+    enum ofp14_flow_monitor_flags monitor_flags OVS_GUARDED_BY(ofproto_mutex);
     uint64_t add_seqno OVS_GUARDED_BY(ofproto_mutex);
     uint64_t modify_seqno OVS_GUARDED_BY(ofproto_mutex);
 
