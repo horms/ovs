@@ -445,7 +445,7 @@ netdev_dummy_rx_dealloc(struct netdev_rx *rx_)
 }
 
 static int
-netdev_dummy_rx_recv(struct netdev_rx *rx_, void *buffer, size_t size)
+netdev_dummy_rx_recv(struct netdev_rx *rx_, struct ofpbuf *buffer)
 {
     struct netdev_rx_dummy *rx = netdev_rx_dummy_cast(rx_);
     struct netdev_dummy *netdev = netdev_dummy_cast(rx->up.netdev);
@@ -465,9 +465,10 @@ netdev_dummy_rx_recv(struct netdev_rx *rx_, void *buffer, size_t size)
         return -EAGAIN;
     }
 
-    if (packet->size <= size) {
-        memcpy(buffer, packet->data, packet->size);
-        retval = packet->size;
+    if (packet->size <= ofpbuf_tailroom(buffer)) {
+        memcpy(buffer->data, packet->data, packet->size);
+        buffer->size += packet->size;
+        retval = 0;
 
         ovs_mutex_lock(&netdev->mutex);
         netdev->stats.rx_packets++;

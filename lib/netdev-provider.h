@@ -634,16 +634,22 @@ struct netdev_class {
     void (*rx_destruct)(struct netdev_rx *);
     void (*rx_dealloc)(struct netdev_rx *);
 
-    /* Attempts to receive a packet from 'rx' into the 'size' bytes in
-     * 'buffer'.  If successful, returns the number of bytes in the received
-     * packet, otherwise a negative errno value.  Returns -EAGAIN immediately
-     * if no packet is ready to be received.
+    /* Attempts to receive a packet from 'rx' into 'buffer'.
+     * If successful, returns 0 and increments the 'size' field of 'buffer'
+     * by the number of bytes in the received packet, otherwise a negative
+     * errno value.  Returns -EAGAIN immediately if no packet is ready to
+     * be received.
      *
      * Must return -EMSGSIZE, and discard the packet, if the received packet
-     * is longer than 'size' bytes.
+     * is longer than the tailroom of 'buffer'.
+     *
+     * It is advised that the tailroom of 'buffer' should be
+     * VLAN_HEADER_LEN bytes longer than the expected maximum packet size
+     * to allow space for an out of band VLAN header to be added to the
+     * packet.
      *
      * Specify NULL if this */
-    int (*rx_recv)(struct netdev_rx *rx, void *buffer, size_t size);
+    int (*rx_recv)(struct netdev_rx *rx, struct ofpbuf *buffer);
 
     /* Registers with the poll loop to wake up from the next call to
      * poll_block() when a packet is ready to be received with netdev_rx_recv()
