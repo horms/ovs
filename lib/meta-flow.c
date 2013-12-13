@@ -370,6 +370,42 @@ const struct mf_field mf_fields[MFF_N_IDS] = {
         OFPUTIL_P_NXM_OXM_ANY,
         OFPUTIL_P_NONE,
         -1,
+    }, {
+        MFF_MPLS_LSE0, "mpls_lse0", NULL,
+        MF_FIELD_SIZES(be32),
+        MFM_FULLY,
+        MFS_HEXADECIMAL,
+        MFP_MPLS,
+        false,
+        NXM_NX_MPLS_LSE0, "NXM_NX_MPLS_LSE0",
+        NXM_NX_MPLS_LSE0, "NXM_NX_MPLS_LSE0",
+        OFPUTIL_P_NXM_OXM_ANY,
+        OFPUTIL_P_NONE,
+        -1,
+    }, {
+        MFF_MPLS_LSE1, "mpls_lse1", NULL,
+        MF_FIELD_SIZES(be32),
+        MFM_FULLY,
+        MFS_HEXADECIMAL,
+        MFP_MPLS1,
+        false,
+        NXM_NX_MPLS_LSE1, "NXM_NX_MPLS_LSE1",
+        NXM_NX_MPLS_LSE1, "NXM_NX_MPLS_LSE1",
+        OFPUTIL_P_NXM_OXM_ANY,
+        OFPUTIL_P_NONE,
+        -1,
+    }, {
+        MFF_MPLS_LSE2, "mpls_lse2", NULL,
+        MF_FIELD_SIZES(be32),
+        MFM_FULLY,
+        MFS_HEXADECIMAL,
+        MFP_MPLS2,
+        false,
+        NXM_NX_MPLS_LSE2, "NXM_NX_MPLS_LSE2",
+        NXM_NX_MPLS_LSE2, "NXM_NX_MPLS_LSE2",
+        OFPUTIL_P_NXM_OXM_ANY,
+        OFPUTIL_P_NONE,
+        -1,
     },
 
     /* ## -- ## */
@@ -926,11 +962,15 @@ mf_is_all_wild(const struct mf_field *mf, const struct flow_wildcards *wc)
         return !(wc->masks.vlan_tci & htons(VLAN_PCP_MASK));
 
     case MFF_MPLS_LABEL:
-        return !(wc->masks.mpls_lse & htonl(MPLS_LABEL_MASK));
+        return !(wc->masks.mpls_lse[0] & htonl(MPLS_LABEL_MASK));
     case MFF_MPLS_TC:
-        return !(wc->masks.mpls_lse & htonl(MPLS_TC_MASK));
+        return !(wc->masks.mpls_lse[1] & htonl(MPLS_TC_MASK));
     case MFF_MPLS_BOS:
-        return !(wc->masks.mpls_lse & htonl(MPLS_BOS_MASK));
+        return !(wc->masks.mpls_lse[2] & htonl(MPLS_BOS_MASK));
+    case MFF_MPLS_LSE0:
+    case MFF_MPLS_LSE1:
+    case MFF_MPLS_LSE2:
+        return !wc->masks.mpls_lse[mf->id - MFF_MPLS_LSE0];
 
     case MFF_IPV4_SRC:
         return !wc->masks.nw_src;
@@ -1052,6 +1092,13 @@ mf_are_prereqs_ok(const struct mf_field *mf, const struct flow *flow)
         return (flow->vlan_tci & htons(VLAN_CFI)) != 0;
     case MFP_MPLS:
         return eth_type_mpls(flow->dl_type);
+    case MFP_MPLS1:
+        return (eth_type_mpls(flow->dl_type)
+                && !(flow->mpls_lse[0] & htonl(MPLS_BOS_MASK)));
+    case MFP_MPLS2:
+        return (eth_type_mpls(flow->dl_type)
+                && !(flow->mpls_lse[0] & htonl(MPLS_BOS_MASK))
+                && !(flow->mpls_lse[1] & htonl(MPLS_BOS_MASK)));
     case MFP_IP_ANY:
         return is_ip_any(flow);
 
@@ -1115,6 +1162,15 @@ mf_mask_field_and_prereqs(const struct mf_field *mf, struct flow *mask)
     case MFP_IP_ANY:
         mask->dl_type = OVS_BE16_MAX;
         break;
+    case MFP_MPLS1:
+        mask->dl_type = OVS_BE16_MAX;
+        mask->mpls_lse[0] = htonl(MPLS_BOS_MASK);
+        break;
+    case MFP_MPLS2:
+        mask->dl_type = OVS_BE16_MAX;
+        mask->mpls_lse[0] = htonl(MPLS_BOS_MASK);
+        mask->mpls_lse[1] = htonl(MPLS_BOS_MASK);
+        break;
     case MFP_VLAN_VID:
         mask->vlan_tci |= htons(VLAN_CFI);
         break;
@@ -1153,6 +1209,9 @@ mf_is_value_valid(const struct mf_field *mf, const union mf_value *value)
     case MFF_ETH_DST:
     case MFF_ETH_TYPE:
     case MFF_VLAN_TCI:
+    case MFF_MPLS_LSE0:
+    case MFF_MPLS_LSE1:
+    case MFF_MPLS_LSE2:
     case MFF_IPV4_SRC:
     case MFF_IPV4_DST:
     case MFF_IPV6_SRC:
@@ -1302,15 +1361,21 @@ mf_get_value(const struct mf_field *mf, const struct flow *flow,
         break;
 
     case MFF_MPLS_LABEL:
-        value->be32 = htonl(mpls_lse_to_label(flow->mpls_lse));
+        value->be32 = htonl(mpls_lse_to_label(flow->mpls_lse[0]));
         break;
 
     case MFF_MPLS_TC:
-        value->u8 = mpls_lse_to_tc(flow->mpls_lse);
+        value->u8 = mpls_lse_to_tc(flow->mpls_lse[0]);
         break;
 
     case MFF_MPLS_BOS:
-        value->u8 = mpls_lse_to_bos(flow->mpls_lse);
+        value->u8 = mpls_lse_to_bos(flow->mpls_lse[0]);
+        break;
+
+    case MFF_MPLS_LSE0:
+    case MFF_MPLS_LSE1:
+    case MFF_MPLS_LSE2:
+        value->be32 = flow->mpls_lse[mf->id - MFF_MPLS_LSE0];
         break;
 
     case MFF_IPV4_SRC:
@@ -1498,15 +1563,21 @@ mf_set_value(const struct mf_field *mf,
         break;
 
     case MFF_MPLS_LABEL:
-        match_set_mpls_label(match, value->be32);
+        match_set_mpls_label(match, 0, value->be32);
         break;
 
     case MFF_MPLS_TC:
-        match_set_mpls_tc(match, value->u8);
+        match_set_mpls_tc(match, 0, value->u8);
         break;
 
     case MFF_MPLS_BOS:
-        match_set_mpls_bos(match, value->u8);
+        match_set_mpls_bos(match, 0, value->u8);
+        break;
+
+    case MFF_MPLS_LSE0:
+    case MFF_MPLS_LSE1:
+    case MFF_MPLS_LSE2:
+        match_set_mpls_lse(match, mf->id - MFF_MPLS_LSE0, value->be32);
         break;
 
     case MFF_IPV4_SRC:
@@ -1711,15 +1782,21 @@ mf_set_flow_value(const struct mf_field *mf,
         break;
 
     case MFF_MPLS_LABEL:
-        flow_set_mpls_label(flow, value->be32);
+        flow_set_mpls_label(flow, 0, value->be32);
         break;
 
     case MFF_MPLS_TC:
-        flow_set_mpls_tc(flow, value->u8);
+        flow_set_mpls_tc(flow, 0, value->u8);
         break;
 
     case MFF_MPLS_BOS:
-        flow_set_mpls_bos(flow, value->u8);
+        flow_set_mpls_bos(flow, 0, value->u8);
+        break;
+
+    case MFF_MPLS_LSE0:
+    case MFF_MPLS_LSE1:
+    case MFF_MPLS_LSE2:
+        flow->mpls_lse[mf->id - MFF_MPLS_LSE0] = value->be32;
         break;
 
     case MFF_IPV4_SRC:
@@ -1921,15 +1998,21 @@ mf_set_wild(const struct mf_field *mf, struct match *match)
         break;
 
     case MFF_MPLS_LABEL:
-        match_set_any_mpls_label(match);
+        match_set_any_mpls_label(match, 0);
         break;
 
     case MFF_MPLS_TC:
-        match_set_any_mpls_tc(match);
+        match_set_any_mpls_tc(match, 0);
         break;
 
     case MFF_MPLS_BOS:
-        match_set_any_mpls_bos(match);
+        match_set_any_mpls_bos(match, 0);
+        break;
+
+    case MFF_MPLS_LSE0:
+    case MFF_MPLS_LSE1:
+    case MFF_MPLS_LSE2:
+        match_set_any_mpls_lse(match, mf->id - MFF_MPLS_LSE0);
         break;
 
     case MFF_IPV4_SRC:
@@ -2070,6 +2153,9 @@ mf_set(const struct mf_field *mf,
     case MFF_MPLS_LABEL:
     case MFF_MPLS_TC:
     case MFF_MPLS_BOS:
+    case MFF_MPLS_LSE0:
+    case MFF_MPLS_LSE1:
+    case MFF_MPLS_LSE2:
     case MFF_IP_PROTO:
     case MFF_IP_TTL:
     case MFF_IP_DSCP:

@@ -109,12 +109,11 @@ static void
 parse_mpls(struct ofpbuf *b, struct flow *flow)
 {
     struct mpls_hdr *mh;
-    bool top = true;
+    int idx = 0;
 
     while ((mh = ofpbuf_try_pull(b, sizeof *mh))) {
-        if (top) {
-            top = false;
-            flow->mpls_lse = mh->mpls_lse;
+        if (idx < ARRAY_SIZE(flow->mpls_lse)) {
+            flow->mpls_lse[idx++] = mh->mpls_lse;
         }
         if (mh->mpls_lse & htonl(MPLS_BOS_MASK)) {
             break;
@@ -535,7 +534,7 @@ flow_unwildcard_tp_ports(const struct flow *flow, struct flow_wildcards *wc)
 void
 flow_get_metadata(const struct flow *flow, struct flow_metadata *fmd)
 {
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 23);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 24);
 
     fmd->tun_id = flow->tunnel.tun_id;
     fmd->tun_src = flow->tunnel.ip_src;
@@ -1047,35 +1046,95 @@ flow_set_vlan_pcp(struct flow *flow, uint8_t pcp)
     flow->vlan_tci |= htons((pcp << VLAN_PCP_SHIFT) | VLAN_CFI);
 }
 
+void
+flow_push_mpls(struct flow *flow, ovs_be32 mpls_eth_type,
+               struct flow_wildcards *wc)
+{
+    int n = flow_count_mpls_labels(flow);
+
+    ovs_assert(n < ARRAY_SIZE(flow->mpls_lse));
+
+    memset(wc->masks.mpls_lse, 0xff, sizeof wc->masks.mpls_lse);
+    if (n) {
+        int i;
+
+        for (i = n; i >= 1; i--) {
+            flow->mpls_lse[i] = flow->mpls_lse[i - 1];
+        }
+        flow->mpls_lse[0] = (flow->mpls_lse[1]
+                             & htonl(MPLS_TTL_MASK | MPLS_TC_MASK));
+    } else {
+        ovs_be32 label;
+        uint8_t tc, ttl;
+
+        if (flow->dl_type == htons(ETH_TYPE_IPV6)) {
+            label = htonl(0x2); /* IPV6 Explicit Null. */
+        } else {
+            label = htonl(0x0); /* IPV4 Explicit Null. */
+        }
+        wc->masks.nw_tos |= IP_DSCP_MASK;
+        wc->masks.nw_ttl = 0xff;
+        tc = (flow->nw_tos & IP_DSCP_MASK) >> 2;
+        ttl = flow->nw_ttl ? flow->nw_ttl : 0x40;
+        flow->mpls_lse[0] = set_mpls_lse_values(ttl, tc, 1, label);
+        flow->nw_proto = 0;     /* XXX clear everything else L3+ also */
+    }
+    flow->dl_type = mpls_eth_type;
+}
+
+bool
+flow_pop_mpls(struct flow *flow, ovs_be32 eth_type, struct flow_wildcards *wc)
+{
+    int n = flow_count_mpls_labels(flow);
+    int i;
+
+    if (n == 0) {
+        /* Nothing to pop. */
+        return false;
+    } else if (n == ARRAY_SIZE(flow->mpls_lse)
+        && !(flow->mpls_lse[n - 1] & htonl(MPLS_BOS_MASK))) {
+        /* Can't pop because we don't know what to fill in mpls_lse[n - 1]. */
+        return false;
+    }
+
+    memset(wc->masks.mpls_lse, 0xff, sizeof wc->masks.mpls_lse);
+    for (i = 1; i < n; i++) {
+        flow->mpls_lse[i - 1] = flow->mpls_lse[i];
+    }
+    flow->mpls_lse[n - 1] = 0;
+    flow->dl_type = eth_type;
+    return true;
+}
+
 /* Sets the MPLS Label that 'flow' matches to 'label', which is interpreted
  * as an OpenFlow 1.1 "mpls_label" value. */
 void
-flow_set_mpls_label(struct flow *flow, ovs_be32 label)
+flow_set_mpls_label(struct flow *flow, int idx, ovs_be32 label)
 {
-    set_mpls_lse_label(&flow->mpls_lse, label);
+    set_mpls_lse_label(&flow->mpls_lse[idx], label);
 }
 
 /* Sets the MPLS TTL that 'flow' matches to 'ttl', which should be in the
  * range 0...255. */
 void
-flow_set_mpls_ttl(struct flow *flow, uint8_t ttl)
+flow_set_mpls_ttl(struct flow *flow, int idx, uint8_t ttl)
 {
-    set_mpls_lse_ttl(&flow->mpls_lse, ttl);
+    set_mpls_lse_ttl(&flow->mpls_lse[idx], ttl);
 }
 
 /* Sets the MPLS TC that 'flow' matches to 'tc', which should be in the
  * range 0...7. */
 void
-flow_set_mpls_tc(struct flow *flow, uint8_t tc)
+flow_set_mpls_tc(struct flow *flow, int idx, uint8_t tc)
 {
-    set_mpls_lse_tc(&flow->mpls_lse, tc);
+    set_mpls_lse_tc(&flow->mpls_lse[idx], tc);
 }
 
 /* Sets the MPLS BOS bit that 'flow' matches to which should be 0 or 1. */
 void
-flow_set_mpls_bos(struct flow *flow, uint8_t bos)
+flow_set_mpls_bos(struct flow *flow, int idx, uint8_t bos)
 {
-    set_mpls_lse_bos(&flow->mpls_lse, bos);
+    set_mpls_lse_bos(&flow->mpls_lse[idx], bos);
 }
 
 
@@ -1235,8 +1294,17 @@ flow_compose(struct ofpbuf *b, const struct flow *flow)
     }
 
     if (eth_type_mpls(flow->dl_type)) {
+        int n;
+
         b->l2_5 = b->l3;
-        push_mpls(b, flow->dl_type, flow->mpls_lse);
+        for (n = 1; n < ARRAY_SIZE(flow->mpls_lse); n++) {
+            if (flow->mpls_lse[n - 1] & htonl(MPLS_BOS_MASK)) {
+                break;
+            }
+        }
+        while (n > 0) {
+            push_mpls(b, flow->dl_type, flow->mpls_lse[--n]);
+        }
     }
 }
 
