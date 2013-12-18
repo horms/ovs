@@ -509,6 +509,15 @@ match_set_mpls_bos(struct match *match, int idx, uint8_t mpls_bos)
     flow_set_mpls_bos(&match->flow, idx, mpls_bos);
 }
 
+/* Modifies 'match' so that it matches only packets with an MPLS header whose
+ * LSE equals 'mpls_lse' */
+void
+match_set_mpls_lse(struct match *match, int idx, ovs_be32 mpls_lse)
+{
+    match->wc.masks.mpls_lse[idx] = OVS_BE32_MAX;
+    flow_set_mpls_lse(&match->flow, idx, mpls_lse);
+}
+
 void
 match_set_tp_src(struct match *match, ovs_be16 tp_src)
 {
