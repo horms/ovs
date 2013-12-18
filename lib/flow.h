@@ -203,6 +203,7 @@ void flow_set_mpls_label(struct flow *, int idx, ovs_be32 label);
 void flow_set_mpls_ttl(struct flow *, int idx, uint8_t ttl);
 void flow_set_mpls_tc(struct flow *, int idx, uint8_t tc);
 void flow_set_mpls_bos(struct flow *, int idx, uint8_t stack);
+void flow_set_mpls_lse(struct flow *, int idx, ovs_be32 lse);
 
 void flow_compose(struct ofpbuf *, const struct flow *);
 

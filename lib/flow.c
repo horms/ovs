@@ -1163,6 +1163,12 @@ flow_set_mpls_bos(struct flow *flow, int idx, uint8_t bos)
     set_mpls_lse_bos(&flow->mpls_lse[idx], bos);
 }
 
+/* Sets the entire MPLS LSE. */
+void
+flow_set_mpls_lse(struct flow *flow, int idx, ovs_be32 lse)
+{
+    flow->mpls_lse[idx] = lse;
+}
 
 static void
 flow_compose_l4(struct ofpbuf *b, const struct flow *flow)
