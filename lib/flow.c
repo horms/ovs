@@ -1046,6 +1046,32 @@ flow_set_vlan_pcp(struct flow *flow, uint8_t pcp)
     flow->vlan_tci |= htons((pcp << VLAN_PCP_SHIFT) | VLAN_CFI);
 }
 
+/* Returns the number of MPLS LSEs present in 'flow'
+ *
+ * Returns 0 if the 'dl_type' of 'flow' is not an MPLS ethernet type.
+ * Otherwise traverses 'flow''s MPLS label stack stopping at the
+ * first entry that has the BoS bit set. If no such entry exists then
+ * the maximum number of LSEs that can be stored in 'flow' is returned.
+ */
+int
+flow_count_mpls_labels(const struct flow *flow)
+{
+    if (eth_type_mpls(flow->dl_type)) {
+        int i;
+        int len = ARRAY_SIZE(flow->mpls_lse);
+
+        for (i = 0; i < len; i++) {
+            if (flow->mpls_lse[i] & htonl(MPLS_BOS_MASK)) {
+                return i + 1;
+            }
+        }
+
+        return len;
+    } else {
+        return 0;
+    }
+}
+
 void
 flow_push_mpls(struct flow *flow, ovs_be32 mpls_eth_type,
                struct flow_wildcards *wc)
