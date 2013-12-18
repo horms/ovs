@@ -509,6 +509,14 @@ match_set_mpls_bos(struct match *match, int idx, uint8_t mpls_bos)
     flow_set_mpls_bos(&match->flow, idx, mpls_bos);
 }
 
+/* Modifies 'match' so that the MPLS LSE is wildcarded. */
+void
+match_set_any_mpls_lse(struct match *match, int idx)
+{
+    match->wc.masks.mpls_lse[idx] = htonl(0);
+    flow_set_mpls_lse(&match->flow, idx, htonl(0));
+}
+
 /* Modifies 'match' so that it matches only packets with an MPLS header whose
  * LSE equals 'mpls_lse' */
 void
