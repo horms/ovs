@@ -1072,6 +1072,38 @@ flow_count_mpls_labels(const struct flow *flow)
     }
 }
 
+/* Returns the number consecutive of MPLS LSEs, starting at the
+ * outermost LSE, that are common in 'flow_a' and 'flow_b'
+ */
+int
+flow_count_common_mpls_labels(const struct flow *flow_a,
+                              const struct flow *flow_b)
+{
+    int flow_a_n = flow_count_mpls_labels(flow_a);
+    int flow_b_n = flow_count_mpls_labels(flow_b);
+    int min_n = MIN(flow_a_n, flow_b_n);
+
+    if (min_n == 0) {
+        return 0;
+    } else {
+        int common_n = 0;
+        int a_last = flow_a_n - 1;
+        int b_last = flow_b_n - 1;
+        int i;
+
+        for (i = 0; i < min_n; i++) {
+            if (flow_a->mpls_lse[a_last - i] !=
+                flow_b->mpls_lse[b_last - i]) {
+                break;
+            } else {
+                common_n++;
+            }
+        }
+
+        return common_n;
+    }
+}
+
 void
 flow_push_mpls(struct flow *flow, ovs_be32 mpls_eth_type,
                struct flow_wildcards *wc)

@@ -3397,7 +3397,71 @@ static void
 commit_mpls_action(const struct flow *flow, struct flow *base,
                    struct ofpbuf *odp_actions, struct flow_wildcards *wc)
 {
-    /* XXX need to fill this in */
+    int base_n = flow_count_mpls_labels(base);
+    int flow_n = flow_count_mpls_labels(flow);
+    int common_n = flow_count_common_mpls_labels(flow, base);
+
+    if (flow_n == base_n && flow_n == common_n) {
+        /* The MPLS LSEs are the same in flow and base, nothing to do */
+        return;
+    } else {
+        while (base_n > common_n) {
+            if (base_n - 1 == common_n && flow_n > common_n) {
+                /* If there is only one more LSE in base than there
+                 * are common between base and flow; and flow has
+                 * at least one more LSE than is common then the topmost
+                 * LSE of base may be updated using set */
+                struct ovs_key_mpls mpls_key;
+
+                mpls_key.mpls_lse = flow->mpls_lse[flow_n - base_n];
+                commit_set_action(odp_actions, OVS_KEY_ATTR_MPLS,
+                                  &mpls_key, sizeof mpls_key);
+                flow_set_mpls_lse(base, 0, mpls_key.mpls_lse);
+                common_n++;
+            } else {
+                /* Otherwise, if there more LSEs in base than are
+                 * common between base and flow then pop the topmost one. */
+                ovs_be16 dl_type;
+                bool popped;
+
+                /* If all the LSEs are to be popped and this is not
+                 * the outermost LSE then use ETH_TYPE_MPLS as the ethertype
+                 * parameter of the POP_MPLS action instead of * flow->dl_type.
+                 *
+                 * This is because the POP_MPLS action requires its ethertype
+                 * argument to be an MPLS ethernet type but in this case
+                 * flow->dl_type will be a non-MPLS ethernet type.
+                 *
+                 * When the final POP_MPLS action occurs it use
+                 * flow->dl_type and the and the resulting packet will
+                 * have the desired dl_type. */
+                if ((!eth_type_mpls(flow->dl_type)) && base_n > 1) {
+                    dl_type = htons(ETH_TYPE_MPLS);
+                } else {
+                    dl_type = flow->dl_type;
+                }
+                nl_msg_put_be16(odp_actions, OVS_ACTION_ATTR_POP_MPLS, dl_type);
+                popped = flow_pop_mpls(base, flow->dl_type, wc);
+                ovs_assert(popped);
+                base_n--;
+            }
+        }
+
+        /* If, after the above popping and setting, there are more LSEs
+         * in flow than base then some LSEs need to be pushed */
+        while (base_n < flow_n) {
+            struct ovs_action_push_mpls *mpls;
+
+            mpls = nl_msg_put_unspec_zero(odp_actions,
+                                          OVS_ACTION_ATTR_PUSH_MPLS,
+                                          sizeof *mpls);
+            mpls->mpls_ethertype = flow->dl_type;
+            mpls->mpls_lse = flow->mpls_lse[flow_n - base_n - 1];
+            flow_push_mpls(base, mpls->mpls_ethertype, wc);
+            flow_set_mpls_lse(base, 0, mpls->mpls_lse);
+            base_n++;
+        }
+    }
 }
 
 static void
