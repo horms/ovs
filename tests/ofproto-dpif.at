@@ -508,13 +508,13 @@ ovs-appctl -t ovs-ofctl exit
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:42,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:42,dl_dst=50:54:00:00:00:07,mpls_lse0=42816,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:42,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:42,dl_dst=50:54:00:00:00:07,mpls_lse0=42816,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:42,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:42,dl_dst=50:54:00:00:00:07,mpls_lse0=42816,mpls_lse1=0,mpls_lse2=0
 ])
 
 dnl Modified MPLS controller action.
@@ -549,13 +549,13 @@ done
 OVS_WAIT_UNTIL([ovs-appctl -t ovs-ofctl exit])
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:43,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=0
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:43,dl_dst=50:54:00:00:00:07,mpls_lse0=42560,mpls_lse1=46912,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:43,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=0
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:43,dl_dst=50:54:00:00:00:07,mpls_lse0=42560,mpls_lse1=46912,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:43,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=0
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:43,dl_dst=50:54:00:00:00:07,mpls_lse0=42560,mpls_lse1=46912,mpls_lse2=0
 ])
 
 dnl Modified MPLS controller action.
@@ -569,13 +569,14 @@ ovs-appctl -t ovs-ofctl exit
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,dl_vlan=99,dl_vlan_pcp=7,dl_src=40:44:44:44:44:44,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,dl_vlan=99,dl_vlan_pcp=7,dl_src=40:44:44:44:44:44,dl_dst=50:54:00:00:00:07,mpls_lse0=42816,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,dl_vlan=99,dl_vlan_pcp=7,dl_src=40:44:44:44:44:44,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,dl_vlan=99,dl_vlan_pcp=7,dl_src=40:44:44:44:44:44,dl_dst=50:54:00:00:00:07,mpls_lse0=42816,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,dl_vlan=99,dl_vlan_pcp=7,dl_src=40:44:44:44:44:44,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,dl_vlan=99,dl_vlan_pcp=7,dl_src=40:44:44:44:44:44,dl_dst=50:54:00:00:00:07,mpls_lse0=42816,mpls_lse1=0,mpls_lse2=0
+dnl
 ])
 
 dnl Modified MPLS controller action.
@@ -589,13 +590,13 @@ ovs-appctl -t ovs-ofctl exit
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:45,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=63,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:45,dl_dst=50:54:00:00:00:07,mpls_lse0=42815,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:45,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=63,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:45,dl_dst=50:54:00:00:00:07,mpls_lse0=42815,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:45,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=63,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:45,dl_dst=50:54:00:00:00:07,mpls_lse0=42815,mpls_lse1=0,mpls_lse2=0
 ])
 
 dnl Modified MPLS controller action.
@@ -609,13 +610,13 @@ ovs-appctl -t ovs-ofctl exit
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:46,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=10,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:46,dl_dst=50:54:00:00:00:07,mpls_lse0=42762,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:46,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=10,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:46,dl_dst=50:54:00:00:00:07,mpls_lse0=42762,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:46,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=10,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:46,dl_dst=50:54:00:00:00:07,mpls_lse0=42762,mpls_lse1=0,mpls_lse2=0
 ])
 
 dnl Modified MPLS controller action.
@@ -629,13 +630,13 @@ ovs-appctl -t ovs-ofctl exit
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:47,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=10,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:47,dl_dst=50:54:00:00:00:07,mpls_lse0=42762,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:47,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=10,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:47,dl_dst=50:54:00:00:00:07,mpls_lse0=42762,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:47,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=10,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:47,dl_dst=50:54:00:00:00:07,mpls_lse0=42762,mpls_lse1=0,mpls_lse2=0
 ])
 
 dnl Modified MPLS controller action.
@@ -649,13 +650,13 @@ ovs-appctl -t ovs-ofctl exit
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:48,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=9,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:48,dl_dst=50:54:00:00:00:07,mpls_lse0=42761,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:48,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=9,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:48,dl_dst=50:54:00:00:00:07,mpls_lse0=42761,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xa total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:48,dl_dst=50:54:00:00:00:07,mpls_label=10,mpls_tc=3,mpls_ttl=9,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=40:44:44:44:44:48,dl_dst=50:54:00:00:00:07,mpls_lse0=42761,mpls_lse1=0,mpls_lse2=0
 ])
 
 dnl Modified MPLS actions.
@@ -669,13 +670,13 @@ ovs-appctl -t ovs-ofctl exit
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xb total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=50:55:55:55:55:55,dl_dst=50:54:00:00:00:07,mpls_label=1000,mpls_tc=7,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=50:55:55:55:55:55,dl_dst=50:54:00:00:00:07,mpls_lse0=4099904,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xb total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=50:55:55:55:55:55,dl_dst=50:54:00:00:00:07,mpls_label=1000,mpls_tc=7,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=50:55:55:55:55:55,dl_dst=50:54:00:00:00:07,mpls_lse0=4099904,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xb total_len=60 in_port=1 (via action) data_len=60 (unbuffered)
-mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=50:55:55:55:55:55,dl_dst=50:54:00:00:00:07,mpls_label=1000,mpls_tc=7,mpls_ttl=64,mpls_bos=1
+mpls,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=50:55:55:55:55:55,dl_dst=50:54:00:00:00:07,mpls_lse0=4099904,mpls_lse1=0,mpls_lse2=0
 ])
 
 dnl Modified MPLS ipv6 controller action.
@@ -689,13 +690,13 @@ ovs-appctl -t ovs-ofctl exit
 
 AT_CHECK([cat ofctl_monitor.log], [0], [dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xc total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mplsm,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=70:77:77:77:77:77,dl_dst=50:54:00:00:00:07,mpls_label=1000,mpls_tc=7,mpls_ttl=128,mpls_bos=1
+mplsm,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=70:77:77:77:77:77,dl_dst=50:54:00:00:00:07,mpls_lse0=4099968,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xc total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mplsm,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=70:77:77:77:77:77,dl_dst=50:54:00:00:00:07,mpls_label=1000,mpls_tc=7,mpls_ttl=128,mpls_bos=1
+mplsm,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=70:77:77:77:77:77,dl_dst=50:54:00:00:00:07,mpls_lse0=4099968,mpls_lse1=0,mpls_lse2=0
 dnl
 NXT_PACKET_IN (xid=0x0): cookie=0xc total_len=64 in_port=1 (via action) data_len=64 (unbuffered)
-mplsm,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=70:77:77:77:77:77,dl_dst=50:54:00:00:00:07,mpls_label=1000,mpls_tc=7,mpls_ttl=128,mpls_bos=1
+mplsm,metadata=0,in_port=0,vlan_tci=0x0000,dl_src=70:77:77:77:77:77,dl_dst=50:54:00:00:00:07,mpls_lse0=4099968,mpls_lse1=0,mpls_lse2=0
 ])
 
 
