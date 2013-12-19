@@ -30,6 +30,7 @@ in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8847),mpl
 in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8847),mpls(label=100,tc=7,ttl=100,bos=0)
 in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8848),mpls(label=1000,tc=4,ttl=200,bos=1)
 in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8848),mpls(label=1000,tc=4,ttl=200,bos=0)
+in_port(1),eth(src=00:01:02:03:04:05,dst=10:11:12:13:14:15),eth_type(0x8848),mpls(lse0=0x64e64,lse1=0x64e64,lse2=0x64f64)
 ])
 
 (echo '# Valid forms without tun_id or VLAN header.'

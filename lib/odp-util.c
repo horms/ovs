@@ -1869,6 +1869,66 @@ parse_odp_key_mask_attr(const char *s, const struct simap *port_names,
 
 
     {
+        uint32_t lse[3], lse_mask[3];
+        int n = -1;
+        int i;
+        bool ok = false;
+
+        if (mask) {
+            ok = ovs_scan(s, "mpls(lse0=%"SCNi32"/%"SCNi32","
+                          "lse1=%"SCNi32"/%"SCNi32","
+                          "lse2=%"SCNi32"/%"SCNx32")%n",
+                          &lse[0], &lse_mask[0], &lse[1], &lse_mask[1],
+                          &lse[2], &lse_mask[2], &n);
+        }
+
+        if (!ok && mask) {
+            ok = ovs_scan(s, "mpls(lse0=%"SCNi32"/%"SCNi32","
+                          "lse1=%"SCNi32"/%"SCNi32","
+                          "lse2=%"SCNi32"/%"SCNx32")%n",
+                          &lse[0], &lse_mask[0], &lse[1], &lse_mask[1],
+                          &lse[2], &lse_mask[2], &n);
+        }
+
+        if (!ok) {
+            ok = ovs_scan(s, "mpls(lse0=%"SCNi32","
+                          "lse1=%"SCNi32",lse2=%"SCNi32")%n",
+                          &lse[0], &lse[1], &lse[2], &n);
+            if (ok && mask) {
+                for (i = 0; i < ARRAY_SIZE(lse_mask); i++) {
+                    lse_mask[0] = UINT32_MAX;
+                }
+            }
+        }
+
+        if (ok) {
+            int n_lse;
+            ovs_be32 be_lse[3];
+            struct ovs_key_mpls *mpls;
+
+            for (i = 0; i < ARRAY_SIZE(lse); i++) {
+                be_lse[i] = htonl(lse[i]);
+            }
+
+            n_lse = count_mpls_labels(be_lse, ARRAY_SIZE(be_lse));
+            mpls = nl_msg_put_unspec_uninit(key, OVS_KEY_ATTR_MPLS,
+                                            n_lse * sizeof *mpls);
+            for (i = 0; i < n_lse; i++) {
+                mpls[i].mpls_lse = be_lse[i];
+            }
+            if (mask) {
+                mpls = nl_msg_put_unspec_uninit(mask, OVS_KEY_ATTR_MPLS,
+                                                n_lse * sizeof *mpls);
+                for (i = 0; i < n_lse; i++) {
+                    mpls[i].mpls_lse = htonl(lse_mask[i]);
+                }
+            }
+
+            return n;
+        }
+    }
+
+    {
         struct ovs_key_ipv4 ipv4_key;
         struct ovs_key_ipv4 ipv4_mask;
 
