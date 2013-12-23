@@ -372,9 +372,9 @@ format_mpls(struct ds *ds, const struct ovs_key_mpls *mpls_key,
         int i;
 
         for (i = 0; i < n; i++) {
-            ds_put_format(ds, "lse%d=%#"PRIx32, i, mpls_key[i].mpls_lse);
+            ds_put_format(ds, "lse%d=%#"PRIx32, i, ntohl(mpls_key[i].mpls_lse));
             if (mpls_mask) {
-                ds_put_format(ds, "%#"PRIx32, mpls_mask[i].mpls_lse);
+                ds_put_format(ds, "%#"PRIx32, ntohl(mpls_mask[i].mpls_lse));
             }
             ds_put_char(ds, ',');
         }
