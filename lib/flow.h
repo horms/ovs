@@ -195,6 +195,7 @@ void flow_set_dl_vlan(struct flow *, ovs_be16 vid);
 void flow_set_vlan_vid(struct flow *, ovs_be16 vid);
 void flow_set_vlan_pcp(struct flow *, uint8_t pcp);
 
+int count_mpls_labels(const ovs_be32 *, int len);
 int flow_count_mpls_labels(const struct flow *, struct flow_wildcards *);
 int flow_count_common_mpls_labels(const struct flow *flow_a,
                                   const struct flow *flow_b,
