@@ -198,9 +198,9 @@ void flow_set_vlan_pcp(struct flow *, uint8_t pcp);
 int flow_count_mpls_labels(const struct flow *);
 int flow_count_common_mpls_labels(const struct flow *flow_a,
                                   const struct flow *flow_b);
-void flow_push_mpls(struct flow *, ovs_be32 mpls_eth_type,
+void flow_push_mpls(struct flow *, ovs_be16 mpls_eth_type,
                     struct flow_wildcards *);
-bool flow_pop_mpls(struct flow *, ovs_be32 eth_type, struct flow_wildcards *);
+bool flow_pop_mpls(struct flow *, ovs_be16 eth_type, struct flow_wildcards *);
 void flow_set_mpls_label(struct flow *, int idx, ovs_be32 label);
 void flow_set_mpls_ttl(struct flow *, int idx, uint8_t ttl);
 void flow_set_mpls_tc(struct flow *, int idx, uint8_t tc);

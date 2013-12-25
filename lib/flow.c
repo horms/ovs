@@ -1105,7 +1105,7 @@ flow_count_common_mpls_labels(const struct flow *flow_a,
 }
 
 void
-flow_push_mpls(struct flow *flow, ovs_be32 mpls_eth_type,
+flow_push_mpls(struct flow *flow, ovs_be16 mpls_eth_type,
                struct flow_wildcards *wc)
 {
     int n = flow_count_mpls_labels(flow);
@@ -1141,7 +1141,7 @@ flow_push_mpls(struct flow *flow, ovs_be32 mpls_eth_type,
 }
 
 bool
-flow_pop_mpls(struct flow *flow, ovs_be32 eth_type, struct flow_wildcards *wc)
+flow_pop_mpls(struct flow *flow, ovs_be16 eth_type, struct flow_wildcards *wc)
 {
     int n = flow_count_mpls_labels(flow);
     int i;
