@@ -2827,7 +2827,7 @@ parse_l2_5_onward(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
                 return ODP_FIT_TOO_LITTLE;
             }
         } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_MPLS)) {
-            if (flow->mpls_lse != 0 && flow->dl_type != htons(0xffff)) {
+            if (flow->mpls_lse[0] != htonl(0) && flow->dl_type != htons(0xffff)) {
                 return ODP_FIT_ERROR;
             }
             expected_attrs |= (UINT64_C(1) << OVS_KEY_ATTR_MPLS);
