@@ -616,13 +616,13 @@ nx_put_raw(struct ofpbuf *b, bool oxm, const struct match *match,
 
     /* MPLS. */
     if (eth_type_mpls(flow->dl_type)) {
-        uint32_t mask0 = match->wc.masks.mpls_lse[0];
+        ovs_be32 mask0 = match->wc.masks.mpls_lse[0];
         if (mask0) {
             ovs_be32 lse0 = flow->mpls_lse[0];
-            uint32_t tc_mask = mask0 & htonl(MPLS_TC_MASK);
-            uint32_t bos_mask = mask0 & htonl(MPLS_BOS_MASK);
-            uint32_t label_mask = mask0 & htonl(MPLS_LABEL_MASK);
-            uint32_t ttl_mask = mask0 & htonl(MPLS_TTL_MASK);
+            ovs_be32 tc_mask = mask0 & htonl(MPLS_TC_MASK);
+            ovs_be32 bos_mask = mask0 & htonl(MPLS_BOS_MASK);
+            ovs_be32 label_mask = mask0 & htonl(MPLS_LABEL_MASK);
+            ovs_be32 ttl_mask = mask0 & htonl(MPLS_TTL_MASK);
 
             if ((!tc_mask || tc_mask == htonl(MPLS_TC_MASK)) &&
                 (!bos_mask || bos_mask == htonl(MPLS_BOS_MASK)) &&
