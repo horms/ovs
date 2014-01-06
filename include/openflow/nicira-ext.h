@@ -1803,44 +1803,6 @@ OFP_ASSERT(sizeof(struct nx_action_output_reg) == 24);
 #define NXM_NX_TCP_FLAGS   NXM_HEADER  (0x0001, 34, 2)
 #define NXM_NX_TCP_FLAGS_W NXM_HEADER_W(0x0001, 34, 2)
 
-/* MPLS LSEs.
- *
- * NXM_NX_MPLS_LSE0 is the outermost label.
- *
- * Prereqs:
- *   NXM_OF_ETH_TYPE must be either 0x8847 or 0x8848.
- *   For NXM_NX_MPLS_LSE1 and later, NXM_NX_MPLS_LSE0 must match a value of 0
- *   in the BOS bit.
- *   For NXM_NX_MPLS_LSE2 and later, NXM_NX_MPLS_LSE1 must match a value of 0
- *   in the BOS bit.
- *   For NXM_NX_MPLS_LSE3 and later, NXM_NX_MPLS_LSE2 must match a value of 0
- *   in the BOS bit.
- *   and so on...
- *
- * Format:
- *   32-bit integer in network byte order.  Space is reserved for up to
- *   8 labels, but switches may implement fewer.
- *
- * Masking: Fully maskable.
- */
-#define NXM_NX_MPLS_LSE0   NXM_HEADER  (0x0001, 35, 4)
-#define NXM_NX_MPLS_LSE0_W NXM_HEADER_W(0x0001, 35, 4)
-#define NXM_NX_MPLS_LSE1   NXM_HEADER  (0x0001, 36, 4)
-#define NXM_NX_MPLS_LSE1_W NXM_HEADER_W(0x0001, 36, 4)
-#define NXM_NX_MPLS_LSE2   NXM_HEADER  (0x0001, 37, 4)
-#define NXM_NX_MPLS_LSE2_W NXM_HEADER_W(0x0001, 37, 4)
-#define NXM_NX_MPLS_LSE3   NXM_HEADER  (0x0001, 38, 4)
-#define NXM_NX_MPLS_LSE3_W NXM_HEADER_W(0x0001, 38, 4)
-#define NXM_NX_MPLS_LSE4   NXM_HEADER  (0x0001, 39, 4)
-#define NXM_NX_MPLS_LSE4_W NXM_HEADER_W(0x0001, 39, 4)
-#define NXM_NX_MPLS_LSE5   NXM_HEADER  (0x0001, 40, 4)
-#define NXM_NX_MPLS_LSE5_W NXM_HEADER_W(0x0001, 40, 4)
-#define NXM_NX_MPLS_LSE6   NXM_HEADER  (0x0001, 41, 4)
-#define NXM_NX_MPLS_LSE6_W NXM_HEADER_W(0x0001, 41, 4)
-#define NXM_NX_MPLS_LSE7   NXM_HEADER  (0x0001, 42, 4)
-#define NXM_NX_MPLS_LSE8_W NXM_HEADER_W(0x0001, 42, 4)
-
-
 /* ## --------------------- ## */
 /* ## Requests and replies. ## */
 /* ## --------------------- ## */

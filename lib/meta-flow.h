@@ -85,9 +85,6 @@ enum OVS_PACKED_ENUM mf_field_id {
     MFF_MPLS_LABEL,             /* be32 */
     MFF_MPLS_TC,                /* u8 */
     MFF_MPLS_BOS,               /* u8 */
-    MFF_MPLS_LSE0,              /* be32 */
-    MFF_MPLS_LSE1,              /* be32 */
-    MFF_MPLS_LSE2,              /* be32 */
 
     /* L3. */
     MFF_IPV4_SRC,               /* be32 */
@@ -196,8 +193,6 @@ enum OVS_PACKED_ENUM mf_prereqs {
 
     /* L2.5 requirements. */
     MFP_MPLS,
-    MFP_MPLS1,
-    MFP_MPLS2,
 
     /* L2+L3 requirements. */
     MFP_TCP,                    /* On IPv4 or IPv6. */

@@ -616,39 +616,17 @@ nx_put_raw(struct ofpbuf *b, bool oxm, const struct match *match,
 
     /* MPLS. */
     if (eth_type_mpls(flow->dl_type)) {
-        ovs_be32 mask0 = match->wc.masks.mpls_lse[0];
-        if (mask0) {
-            ovs_be32 lse0 = flow->mpls_lse[0];
-            ovs_be32 tc_mask = mask0 & htonl(MPLS_TC_MASK);
-            ovs_be32 bos_mask = mask0 & htonl(MPLS_BOS_MASK);
-            ovs_be32 label_mask = mask0 & htonl(MPLS_LABEL_MASK);
-            ovs_be32 ttl_mask = mask0 & htonl(MPLS_TTL_MASK);
-
-            if ((!tc_mask || tc_mask == htonl(MPLS_TC_MASK)) &&
-                (!bos_mask || bos_mask == htonl(MPLS_BOS_MASK)) &&
-                (!label_mask || label_mask == htonl(MPLS_LABEL_MASK)) &&
-                !ttl_mask)
-            {
-                if (tc_mask) {
-                    nxm_put_8(b, OXM_OF_MPLS_TC, mpls_lse_to_tc(lse0));
-                }
-
-                if (bos_mask) {
-                    nxm_put_8(b, OXM_OF_MPLS_BOS, mpls_lse_to_bos(lse0));
-                }
-
-                if (label_mask) {
-                    nxm_put_32(b, OXM_OF_MPLS_LABEL,
-                               htonl(mpls_lse_to_label(lse0)));
-                }
-            } else {
-                nxm_put_32m(b, NXM_NX_MPLS_LSE0, lse0, mask0);
-            }
+        if (match->wc.masks.mpls_lse[0] & htonl(MPLS_TC_MASK)) {
+            nxm_put_8(b, OXM_OF_MPLS_TC, mpls_lse_to_tc(flow->mpls_lse[0]));
         }
 
-        for (i = 1; i < ARRAY_SIZE(flow->mpls_lse); i++) {
-            nxm_put_32m(b, NXM_NX_MPLS_LSE0 + i, flow->mpls_lse[i],
-                        match->wc.masks.mpls_lse[i]);
+        if (match->wc.masks.mpls_lse[0] & htonl(MPLS_BOS_MASK)) {
+            nxm_put_8(b, OXM_OF_MPLS_BOS, mpls_lse_to_bos(flow->mpls_lse[0]));
+        }
+
+        if (match->wc.masks.mpls_lse[0] & htonl(MPLS_LABEL_MASK)) {
+            nxm_put_32(b, OXM_OF_MPLS_LABEL,
+                       htonl(mpls_lse_to_label(flow->mpls_lse[0])));
         }
     }
 
