@@ -181,8 +181,7 @@ void commit_odp_tunnel_action(const struct flow *, struct flow *base,
 enum slow_path_reason commit_odp_actions(const struct flow *,
                                          struct flow *base,
                                          struct ofpbuf *odp_actions,
-                                         struct flow_wildcards *wc,
-                                         int *mpls_depth_delta);
+                                         struct flow_wildcards *wc);
 
 /* ofproto-dpif interface.
  *
