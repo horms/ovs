@@ -2155,18 +2155,22 @@ compose_mpls_pop_action(struct xlate_ctx *ctx, ovs_be16 eth_type)
     struct flow_wildcards *wc = &ctx->xout->wc;
     struct flow *flow = &ctx->xin->flow;
 
-    if (!flow_pop_mpls(flow, eth_type, wc) &&
-        flow_count_mpls_labels(flow, wc) >= ARRAY_SIZE(flow->mpls_lse)) {
-        if (ctx->xin->packet != NULL) {
-            static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
-            VLOG_WARN_RL(&rl, "bridge %s: dropping packet on which an "
-                         "MPLS pop action can't be performed as it has "
-                         "have more MPLS LSEs than the %"PRIuSIZE" "
-                         "that can be handled.",
-                         ctx->xbridge->name, ARRAY_SIZE(flow->mpls_lse));
+    if (!flow_pop_mpls(flow, eth_type, wc)) {
+        int n = flow_count_mpls_labels(flow, wc);
+        size_t max_stack = MIN(ARRAY_SIZE(flow->mpls_lse),
+                               ctx->xbridge->max_mpls_depth);
+        if (n >= max_stack) {
+            if (ctx->xin->packet != NULL) {
+                static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+                VLOG_WARN_RL(&rl, "bridge %s: dropping packet on which an "
+                             "MPLS pop action can't be performed as it has "
+                             "have more MPLS LSEs than the %"PRIuSIZE" "
+                             "that can be handled.", ctx->xbridge->name,
+                             max_stack);
+            }
+            ctx->exit = true;
+            ofpbuf_clear(&ctx->xout->odp_actions);
         }
-        ctx->exit = true;
-        ofpbuf_clear(&ctx->xout->odp_actions);
     }
 }
 
