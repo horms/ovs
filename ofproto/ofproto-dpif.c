@@ -562,7 +562,8 @@ type_run(const char *type)
                               ofproto->netflow, ofproto->up.frag_handling,
                               ofproto->up.forward_bpdu,
                               connmgr_has_in_band(ofproto->up.connmgr),
-                              ofproto->backer->variable_length_userdata);
+                              ofproto->backer->variable_length_userdata,
+                              ofproto->backer->max_mpls_depth);
 
             HMAP_FOR_EACH (bundle, hmap_node, &ofproto->bundles) {
                 xlate_bundle_set(ofproto, bundle, bundle->name,

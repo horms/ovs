@@ -92,6 +92,10 @@ struct xbridge {
      * OVS_USERSPACE_ATTR_USERDATA in OVS_ACTION_ATTR_USERSPACE actions.
      * False if the datapath supports only 8-byte (or shorter) userdata. */
     bool variable_length_userdata;
+
+    /* Number of MPLS label stack entries that the datapath supports
+     * in matches. */
+    size_t max_mpls_depth;
 };
 
 struct xbundle {
@@ -248,7 +252,8 @@ xlate_ofproto_set(struct ofproto_dpif *ofproto, const char *name,
                   const struct dpif_ipfix *ipfix,
                   const struct netflow *netflow, enum ofp_config_flags frag,
                   bool forward_bpdu, bool has_in_band,
-                  bool variable_length_userdata)
+                  bool variable_length_userdata,
+                  size_t max_mpls_depth)
 {
     struct xbridge *xbridge = xbridge_lookup(ofproto);
 
@@ -301,6 +306,7 @@ xlate_ofproto_set(struct ofproto_dpif *ofproto, const char *name,
     xbridge->miss_rule = miss_rule;
     xbridge->no_packet_in_rule = no_packet_in_rule;
     xbridge->variable_length_userdata = variable_length_userdata;
+    xbridge->max_mpls_depth = max_mpls_depth;
 }
 
 void
