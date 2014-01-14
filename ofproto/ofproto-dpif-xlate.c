@@ -2127,17 +2127,22 @@ compose_mpls_push_action(struct xlate_ctx *ctx, struct ofpact_push_mpls *mpls)
         ctx->xout->slow |= commit_odp_actions(flow, &ctx->base_flow,
                                               &ctx->xout->odp_actions,
                                               &ctx->xout->wc);
-    } else if (n >= ARRAY_SIZE(flow->mpls_lse)) {
-        if (ctx->xin->packet != NULL) {
-            static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
-            VLOG_WARN_RL(&rl, "bridge %s: dropping packet which after an "
-                         "MPLS push action will have more MPLS LSEs than "
-                         "the %"PRIuSIZE" that can be handled.",
-                         ctx->xbridge->name, ARRAY_SIZE(flow->mpls_lse));
+    } else {
+        size_t max_stack = MIN(ARRAY_SIZE(flow->mpls_lse),
+                               ctx->xbridge->max_mpls_depth);
+
+        if (n >= max_stack) {
+            if (ctx->xin->packet != NULL) {
+                static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+                VLOG_WARN_RL(&rl, "bridge %s: dropping packet which after an "
+                            "MPLS push action will have more MPLS LSEs than "
+                            "the %"PRIuSIZE" that can be handled.",
+                            ctx->xbridge->name, max_stack);
+            }
+            ctx->exit = true;
+            ofpbuf_clear(&ctx->xout->odp_actions);
+            return;
         }
-        ctx->exit = true;
-        ofpbuf_clear(&ctx->xout->odp_actions);
-        return;
     }
 
     flow_push_mpls(flow, mpls->ethertype, wc);
