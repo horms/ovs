@@ -256,6 +256,10 @@ struct dpif_backer {
      * OVS_USERSPACE_ATTR_USERDATA in OVS_ACTION_ATTR_USERSPACE actions.
      * False if the datapath supports only 8-byte (or shorter) userdata. */
     bool variable_length_userdata;
+
+    /* Maximum number of MPLS label stack entries that the datapath supports
+     * in a match */
+    size_t max_mpls_depth;
 };
 
 /* All existing ofproto_backer instances, indexed by ofproto->up.type. */
@@ -781,6 +785,7 @@ struct odp_garbage {
 };
 
 static bool check_variable_length_userdata(struct dpif_backer *backer);
+static size_t check_max_mpls_depth(struct dpif_backer *backer);
 
 static int
 open_dpif_backer(const char *type, struct dpif_backer **backerp)
@@ -881,6 +886,7 @@ open_dpif_backer(const char *type, struct dpif_backer **backerp)
         return error;
     }
     backer->variable_length_userdata = check_variable_length_userdata(backer);
+    backer->max_mpls_depth = check_max_mpls_depth(backer);
 
     if (backer->recv_set_enable) {
         udpif_set_threads(backer->udpif, n_handlers, n_revalidators);
@@ -963,6 +969,59 @@ check_variable_length_userdata(struct dpif_backer *backer)
                   dpif_name(backer->dpif), ovs_strerror(error));
         return true;
     }
+}
+
+/* Tests the MPLS label stack depth supported by 'backer''s datapath.
+ *
+ * Returns the number of elements in a struct flow's mpls_lse field
+ * if the datapath supports at least that many entries in an
+ * MPLS label stack.
+ * Otherwise returns the number of MPLS push actions supported by
+ * the datapath. */
+static size_t
+check_max_mpls_depth(struct dpif_backer *backer)
+{
+    size_t i;
+    struct flow flow;
+    int error;
+
+    /* If ARRAY_SIZE(flow.mpls_lse) becomes large then it might
+     * make more sense to do a binary search here. */
+    for (i = ARRAY_SIZE(flow.mpls_lse) - 1; i > 0; i--) {
+        struct odputil_keybuf keybuf;
+        struct ofpbuf key;
+
+        memset(&flow, 0, sizeof flow);
+        flow.dl_type = htons(ETH_TYPE_MPLS);
+        flow_set_mpls_bos(&flow, ARRAY_SIZE(flow.mpls_lse) - 1, 1);
+
+        ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
+        odp_flow_key_from_flow(&key, &flow, 0);
+
+        error = dpif_flow_put(backer->dpif, DPIF_FP_CREATE, key.data, key.size,
+                              NULL, 0, NULL, 0, NULL);
+        if (!error) {
+            error = dpif_flow_del(backer->dpif, key.data, key.size, NULL);
+            if (error) {
+                goto err;
+            }
+            i++;
+            break;
+        } else if (error != EINVAL) {
+            goto err;
+        }
+    }
+
+    VLOG_INFO("%s: MPLS label stack length probed as %"PRIuSIZE,
+              dpif_name(backer->dpif), i);
+    return i;
+
+err:
+    /* Something odd happened.  We're not sure how large an
+     * MPLS label stack the datapath supports. Default to 0. */
+    VLOG_WARN("%s: mpls stack length feature probe failed (%s)",
+              dpif_name(backer->dpif), ovs_strerror(error));
+    return 0;
 }
 
 static int
