@@ -2127,7 +2127,7 @@ compose_mpls_push_action(struct xlate_ctx *ctx, struct ofpact_push_mpls *mpls)
             VLOG_WARN_RL(&rl, "bridge %s: dropping packet which after an "
                          "MPLS push action will have more MPLS LSEs than "
                          "the %"PRIuSIZE" that can be handled.",
-                         ctx->xbridge->name, ARRAY_SIZE(flow->mpls_lse) - 1);
+                         ctx->xbridge->name, ARRAY_SIZE(flow->mpls_lse));
         }
         ctx->exit = true;
         ofpbuf_clear(&ctx->xout->odp_actions);
@@ -2152,7 +2152,7 @@ compose_mpls_pop_action(struct xlate_ctx *ctx, ovs_be16 eth_type)
                          "MPLS pop action can't be performed as it has "
                          "have more MPLS LSEs than the %"PRIuSIZE" "
                          "that can be handled.",
-                         ctx->xbridge->name, ARRAY_SIZE(flow->mpls_lse) - 1);
+                         ctx->xbridge->name, ARRAY_SIZE(flow->mpls_lse));
         }
         ctx->exit = true;
         ofpbuf_clear(&ctx->xout->odp_actions);
