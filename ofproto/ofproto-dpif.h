@@ -62,6 +62,8 @@ struct OVS_LOCKABLE group_dpif;
  *   Ofproto-dpif-xlate is responsible for translating translating OpenFlow
  *   actions into datapath actions. */
 
+size_t ofproto_dpif_get_max_mpls_depth(const struct ofproto_dpif *);
+
 void rule_dpif_lookup(struct ofproto_dpif *, const struct flow *,
                       struct flow_wildcards *, struct rule_dpif **rule);
 

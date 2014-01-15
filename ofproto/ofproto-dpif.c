@@ -323,6 +323,12 @@ ofproto_dpif_cast(const struct ofproto *ofproto)
     return CONTAINER_OF(ofproto, struct ofproto_dpif, up);
 }
 
+size_t
+ofproto_dpif_get_max_mpls_depth(const struct ofproto_dpif *ofproto)
+{
+    return ofproto->backer->max_mpls_depth;
+}
+
 static struct ofport_dpif *get_ofp_port(const struct ofproto_dpif *ofproto,
                                         ofp_port_t ofp_port);
 static void ofproto_trace(struct ofproto_dpif *, const struct flow *,

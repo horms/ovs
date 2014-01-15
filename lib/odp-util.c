@@ -2419,7 +2419,8 @@ ovs_to_odp_frag_mask(uint8_t nw_frag_mask)
 
 static void
 odp_flow_key_from_flow__(struct ofpbuf *buf, const struct flow *data,
-                         const struct flow *flow, odp_port_t odp_in_port)
+                         const struct flow *flow, odp_port_t odp_in_port,
+                         size_t max_mpls_depth)
 {
     bool is_mask;
     struct ovs_key_ethernet *eth_key;
@@ -2523,7 +2524,7 @@ odp_flow_key_from_flow__(struct ofpbuf *buf, const struct flow *data,
         struct ovs_key_mpls *mpls_key;
         int i, n;
 
-        n = flow_count_mpls_labels(flow, NULL);
+        n = MIN(flow_count_mpls_labels(flow, NULL), max_mpls_depth);
         mpls_key = nl_msg_put_unspec_uninit(buf, OVS_KEY_ATTR_MPLS,
                                             n * sizeof *mpls_key);
         for (i = 0; i < n; i++) {
@@ -2610,7 +2611,7 @@ void
 odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
                        odp_port_t odp_in_port)
 {
-    odp_flow_key_from_flow__(buf, flow, flow, odp_in_port);
+    odp_flow_key_from_flow__(buf, flow, flow, odp_in_port, SIZE_MAX);
 }
 
 /* Appends a representation of 'mask' as OVS_KEY_ATTR_* attributes to
@@ -2623,9 +2624,11 @@ odp_flow_key_from_flow(struct ofpbuf *buf, const struct flow *flow,
  * capable of being expanded to allow for that much space. */
 void
 odp_flow_key_from_mask(struct ofpbuf *buf, const struct flow *mask,
-                       const struct flow *flow, uint32_t odp_in_port_mask)
+                       const struct flow *flow, uint32_t odp_in_port_mask,
+                       size_t max_mpls_depth)
 {
-    odp_flow_key_from_flow__(buf, mask, flow, u32_to_odp(odp_in_port_mask));
+    odp_flow_key_from_flow__(buf, mask, flow, u32_to_odp(odp_in_port_mask),
+                             max_mpls_depth);
 }
 
 /* Generate ODP flow key from the given packet metadata */
