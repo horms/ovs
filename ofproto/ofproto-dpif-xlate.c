@@ -1937,7 +1937,9 @@ xlate_table_action(struct xlate_ctx *ctx, ofp_port_t in_port, uint8_t table_id,
                                               !skip_wildcards
                                               ? &ctx->xout->wc : NULL,
                                               honor_table_miss,
-                                              &ctx->table_id, &rule);
+                                              &ctx->table_id,
+                                              ctx->xin->resubmit_stats,
+                                              &rule);
         ctx->xin->flow.in_port.ofp_port = old_in_port;
 
         if (ctx->xin->resubmit_hook) {
@@ -3115,7 +3117,7 @@ xlate_actions__(struct xlate_in *xin, struct xlate_out *xout)
     if (!xin->ofpacts && !ctx.rule) {
         ctx.table_id = rule_dpif_lookup(ctx.xbridge->ofproto, flow,
                                         !xin->skip_wildcards ? wc : NULL,
-                                        &rule);
+                                        ctx.xin->resubmit_stats, &rule);
         if (ctx.xin->resubmit_stats) {
             rule_dpif_credit_stats(rule, ctx.xin->resubmit_stats);
         }

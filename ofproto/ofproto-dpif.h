@@ -87,13 +87,16 @@ size_t ofproto_dpif_get_max_mpls_depth(const struct ofproto_dpif *);
 bool ofproto_dpif_get_enable_recirc(const struct ofproto_dpif *);
 
 uint8_t rule_dpif_lookup(struct ofproto_dpif *, struct flow *,
-                      struct flow_wildcards *, struct rule_dpif **rule);
+                         struct flow_wildcards *,
+                         const struct dpif_flow_stats *,
+                         struct rule_dpif **rule);
 
 enum rule_dpif_lookup_verdict rule_dpif_lookup_from_table(struct ofproto_dpif *,
                                                           const struct flow *,
                                                           struct flow_wildcards *,
                                                           bool force_controller_on_miss,
                                                           uint8_t *table_id,
+                                                          const struct dpif_flow_stats *,
                                                           struct rule_dpif **rule);
 
 void rule_dpif_ref(struct rule_dpif *);
