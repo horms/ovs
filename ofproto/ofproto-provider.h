@@ -264,6 +264,9 @@ struct oftable {
 
     /* Table config: contains enum ofp_table_config; accessed atomically. */
     atomic_uint config;
+
+    atomic_uint64_t n_matched;
+    atomic_uint64_t n_missed;
 };
 
 /* Assigns TABLE to each oftable, in turn, in OFPROTO.
