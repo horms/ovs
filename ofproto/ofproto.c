@@ -6780,6 +6780,8 @@ oftable_init(struct oftable *table)
     classifier_init(&table->cls, flow_segment_u32s);
     table->max_flows = UINT_MAX;
     atomic_init(&table->config, (unsigned int)OFPROTO_TABLE_MISS_DEFAULT);
+    atomic_init(&table->n_matched, 0);
+    atomic_init(&table->n_missed, 0);
 }
 
 /* Destroys 'table', including its classifier and eviction groups.
