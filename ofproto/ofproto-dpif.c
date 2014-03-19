@@ -89,6 +89,12 @@ struct rule_dpif {
      *   recently been processed by a revalidator. */
     struct ovs_mutex stats_mutex;
     struct dpif_flow_stats stats OVS_GUARDED;
+
+    /* If non-zero then the recirculation id that has
+     * been allocated for use with this rule.
+     * The recirculation id and associated internal flow should
+     * be freed when the rule is freed */
+    uint32_t recirc_id;
 };
 
 static void rule_get_stats(struct rule *, uint64_t *packets, uint64_t *bytes,
@@ -3167,6 +3173,19 @@ rule_dpif_get_actions(const struct rule_dpif *rule)
     return rule_get_actions(&rule->up);
 }
 
+/* Returns 'rule''s recirculation id. */
+uint32_t
+rule_dpif_get_recirc_id(struct rule_dpif *rule)
+    OVS_REQUIRES(rule->up.mutex)
+{
+    if (!rule->recirc_id) {
+        struct ofproto_dpif *ofproto = ofproto_dpif_cast(rule->up.ofproto);
+
+        rule->recirc_id = ofproto_dpif_alloc_recirc_id(ofproto);
+    }
+    return rule->recirc_id;
+}
+
 static uint8_t
 rule_dpif_lookup__ (struct ofproto_dpif *ofproto, const struct flow *flow,
                     struct flow_wildcards *wc,
@@ -3413,6 +3432,8 @@ rule_construct(struct rule *rule_)
     rule->stats.n_packets = 0;
     rule->stats.n_bytes = 0;
     rule->stats.used = rule->up.modified;
+    rule->recirc_id = 0;
+
     return 0;
 }
 
@@ -3436,7 +3457,13 @@ static void
 rule_destruct(struct rule *rule_)
 {
     struct rule_dpif *rule = rule_dpif_cast(rule_);
+
     ovs_mutex_destroy(&rule->stats_mutex);
+    if (rule->recirc_id) {
+        struct ofproto_dpif *ofproto = ofproto_dpif_cast(rule->up.ofproto);
+
+        ofproto_dpif_free_recirc_id(ofproto, rule->recirc_id);
+    }
 }
 
 static void
