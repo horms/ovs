@@ -1515,25 +1515,20 @@ get_features(struct ofproto *ofproto_ OVS_UNUSED,
 }
 
 static void
-get_tables(struct ofproto *ofproto_, struct ofp12_table_stats *ots)
+get_tables(struct ofproto *ofproto, struct ofp12_table_stats *ots)
 {
-    struct ofproto_dpif *ofproto = ofproto_dpif_cast(ofproto_);
-    struct dpif_dp_stats s;
-    uint64_t n_miss, n_no_pkt_in, n_bytes, n_dropped_frags;
-    uint64_t n_lookup;
-    long long int used;
+    int i;
 
     strcpy(ots->name, "classifier");
 
-    dpif_get_dp_stats(ofproto->backer->dpif, &s);
-    rule_get_stats(&ofproto->miss_rule->up, &n_miss, &n_bytes, &used);
-    rule_get_stats(&ofproto->no_packet_in_rule->up, &n_no_pkt_in, &n_bytes,
-                   &used);
-    rule_get_stats(&ofproto->drop_frags_rule->up, &n_dropped_frags, &n_bytes,
-                   &used);
-    n_lookup = s.n_hit + s.n_missed - n_dropped_frags;
-    ots->lookup_count = htonll(n_lookup);
-    ots->matched_count = htonll(n_lookup - n_miss - n_no_pkt_in);
+    for (i = 0; i < ofproto->n_tables; i++) {
+        uint64_t missed, matched;
+
+        atomic_read(&ofproto->tables[i].n_matched, &matched);
+        ots[i].matched_count = htonll(matched);
+        atomic_read(&ofproto->tables[i].n_missed, &missed);
+        ots[i].lookup_count = htonll(matched + missed);
+    }
 }
 
 static struct ofport *
@@ -3192,7 +3187,9 @@ rule_dpif_get_actions(const struct rule_dpif *rule)
  * where misses occur. */
 uint8_t
 rule_dpif_lookup(struct ofproto_dpif *ofproto, struct flow *flow,
-                 struct flow_wildcards *wc, struct rule_dpif **rule)
+                 struct flow_wildcards *wc,
+                 const struct dpif_flow_stats *stats,
+                 struct rule_dpif **rule)
 {
     enum rule_dpif_lookup_verdict verdict;
     enum ofputil_port_config config = 0;
@@ -3212,7 +3209,7 @@ rule_dpif_lookup(struct ofproto_dpif *ofproto, struct flow *flow,
     }
 
     verdict = rule_dpif_lookup_from_table(ofproto, flow, wc, true,
-                                          &table_id, rule);
+                                          &table_id, stats, rule);
 
     switch (verdict) {
     case RULE_DPIF_LOOKUP_VERDICT_MATCH:
@@ -3322,7 +3319,9 @@ rule_dpif_lookup_from_table(struct ofproto_dpif *ofproto,
                             const struct flow *flow,
                             struct flow_wildcards *wc,
                             bool honor_table_miss,
-                            uint8_t *table_id, struct rule_dpif **rule)
+                            uint8_t *table_id,
+                            const struct dpif_flow_stats *stats,
+                            struct rule_dpif **rule)
 {
     uint8_t next_id;
 
@@ -3332,6 +3331,12 @@ rule_dpif_lookup_from_table(struct ofproto_dpif *ofproto,
     {
         *table_id = next_id;
         *rule = rule_dpif_lookup_in_table(ofproto, *table_id, flow, wc);
+        if (stats) {
+            struct oftable *tbl = &ofproto->up.tables[next_id];
+            atomic_uint64_t *stat = *rule ? &tbl->n_matched : &tbl->n_missed;
+            uint64_t orig;
+            atomic_add(stat, stats->n_packets, &orig);
+        }
         if (*rule) {
             return RULE_DPIF_LOOKUP_VERDICT_MATCH;
         } else if (!honor_table_miss) {
@@ -4190,7 +4195,7 @@ ofproto_trace(struct ofproto_dpif *ofproto, struct flow *flow,
     if (ofpacts) {
         rule = NULL;
     } else {
-        rule_dpif_lookup(ofproto, flow, &trace.wc, &rule);
+        rule_dpif_lookup(ofproto, flow, &trace.wc, NULL, &rule);
 
         trace_format_rule(ds, 0, rule);
         if (rule == ofproto->miss_rule) {
