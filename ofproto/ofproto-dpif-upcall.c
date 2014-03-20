@@ -1142,6 +1142,7 @@ handle_upcalls(struct handler *handler, struct list *upcalls)
         struct ofpbuf *packet = &upcall->dpif_upcall.packet;
         struct dpif_op *op;
         ovs_be16 flow_vlan_tci;
+        bool other_ofproto_recirc;
 
         /* Save a copy of flow.vlan_tci in case it is changed to
          * generate proper mega flow masks for VLAN splinter flows. */
@@ -1173,6 +1174,9 @@ handle_upcalls(struct handler *handler, struct list *upcalls)
             miss->flow.vlan_tci = 0;
         }
 
+        other_ofproto_recirc = !(!miss->xout.recirc_ofproto
+                                 || miss->ofproto == miss->xout.recirc_ofproto);
+
         /* Do not install a flow into the datapath if:
          *
          *    - The datapath already has too many flows.
@@ -1180,10 +1184,16 @@ handle_upcalls(struct handler *handler, struct list *upcalls)
          *    - An earlier iteration of this loop already put the same flow.
          *
          *    - We received this packet via some flow installed in the kernel
-         *      already. */
+         *      already.
+         *
+         *    - A recirculation action was composed to allow
+         *      further processing of actions in a different ofproto
+         *      (due to being received on a patch-port during an
+         *       earlier part of the translation). */
         if (may_put
             && !miss->put
-            && upcall->dpif_upcall.type == DPIF_UC_MISS) {
+            && upcall->dpif_upcall.type == DPIF_UC_MISS
+            && !other_ofproto_recirc) {
             struct ofpbuf mask;
             bool megaflow;
 
@@ -1229,15 +1239,21 @@ handle_upcalls(struct handler *handler, struct list *upcalls)
         miss->flow.vlan_tci = flow_vlan_tci;
 
         if (ofpbuf_size(&miss->xout.odp_actions)) {
+            struct xlate_out *xout = &miss->xout;
 
-            op = &ops[n_ops++];
-            op->type = DPIF_OP_EXECUTE;
-            op->u.execute.packet = packet;
-            odp_key_to_pkt_metadata(miss->key, miss->key_len,
-                                    &op->u.execute.md);
-            op->u.execute.actions = ofpbuf_data(&miss->xout.odp_actions);
-            op->u.execute.actions_len = ofpbuf_size(&miss->xout.odp_actions);
-            op->u.execute.needs_help = (miss->xout.slow & SLOW_ACTION) != 0;
+            if (other_ofproto_recirc) {
+                ofproto_dpif_execute_actions(xout->recirc_ofproto, &miss->flow,
+                                             NULL, NULL, 0, &miss->xout, packet);
+            } else {
+                op = &ops[n_ops++];
+                op->type = DPIF_OP_EXECUTE;
+                op->u.execute.packet = packet;
+                odp_key_to_pkt_metadata(miss->key, miss->key_len,
+                                        &op->u.execute.md);
+                op->u.execute.actions = ofpbuf_data(&xout->odp_actions);
+                op->u.execute.actions_len = ofpbuf_size(&xout->odp_actions);
+                op->u.execute.needs_help = (xout->slow & SLOW_ACTION) != 0;
+            }
         }
     }
 

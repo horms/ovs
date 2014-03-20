@@ -59,6 +59,24 @@ struct xlate_out {
     bool use_recirc;            /* Should generate recirc? */
     struct xlate_recirc recirc; /* Information used for generating
                                  * recirculation actions */
+
+    /* The following are used in cases where recirculation actions
+     * are composed to allow further processing of actions which
+     * would not otherwise be possible.
+     * In particular processing the inner-packet of an MPLS packet
+     * after a pop MPLS action.
+     */
+    /* ofproto used when composing a recirculation action.
+     * NULL if no recirculation action has been composed */
+    struct ofproto_dpif *recirc_ofproto;
+    /* metadata of packet when recirculation action is composed.
+     * All-zeros if no recirculation action has been composed. */
+    struct pkt_metadata recirc_md;
+    /* Un-translated actions if action translation is occurring without
+     * a rule when a recirculation action is composed.
+     * Empty if no recirculation action has been composed. */
+    struct ofpbuf recirc_ofpacts;
+
     uint64_t odp_actions_stub[256 / 8];
     struct ofpbuf odp_actions;
 };

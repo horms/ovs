@@ -3073,52 +3073,121 @@ rule_expire(struct rule_dpif *rule)
 
 /* Executes, within 'ofproto', the actions in 'rule' or 'ofpacts' on 'packet'.
  * 'flow' must reflect the data in 'packet'. */
-int
-ofproto_dpif_execute_actions(struct ofproto_dpif *ofproto,
-                             const struct flow *flow,
-                             struct rule_dpif *rule,
-                             const struct ofpact *ofpacts, size_t ofpacts_len,
-                             struct ofpbuf *packet)
+static int
+ofproto_dpif_execute_actions__(struct ofproto_dpif *ofproto,
+                               const struct flow *flow,
+                               struct ofpbuf *packet,
+                               struct xlate_out *xout)
 {
-    struct dpif_flow_stats stats;
-    struct xlate_out xout;
-    struct xlate_in xin;
     ofp_port_t in_port;
     struct dpif_execute execute;
     int error;
-
-    ovs_assert((rule != NULL) != (ofpacts != NULL));
-
-    dpif_flow_stats_extract(flow, packet, time_msec(), &stats);
-
-    if (rule) {
-        rule_dpif_credit_stats(rule, &stats);
-    }
-
-    xlate_in_init(&xin, ofproto, flow, rule, stats.tcp_flags, packet);
-    xin.ofpacts = ofpacts;
-    xin.ofpacts_len = ofpacts_len;
-    xin.resubmit_stats = &stats;
-    xlate_actions(&xin, &xout);
 
     in_port = flow->in_port.ofp_port;
     if (in_port == OFPP_NONE) {
         in_port = OFPP_LOCAL;
     }
-    execute.actions = ofpbuf_data(&xout.odp_actions);
-    execute.actions_len = ofpbuf_size(&xout.odp_actions);
+    execute.actions = ofpbuf_data(&xout->odp_actions);
+    execute.actions_len = ofpbuf_size(&xout->odp_actions);
     execute.packet = packet;
     execute.md.tunnel = flow->tunnel;
     execute.md.skb_priority = flow->skb_priority;
     execute.md.pkt_mark = flow->pkt_mark;
     execute.md.in_port.odp_port = ofp_port_to_odp_port(ofproto, in_port);
-    execute.needs_help = (xout.slow & SLOW_ACTION) != 0;
+    /* A non-NULL value for xout->recirc_ofproto indicates there was
+     * recirculation and execution needs help in this case
+     * to handle packets received from a patch port as
+     * these make little sense if they appear via the datapath
+     * after recirculation */
+    execute.needs_help = (xout->slow & SLOW_ACTION) != 0
+        || xout->recirc_ofproto;
 
     error = dpif_execute(ofproto->backer->dpif, &execute);
 
-    xlate_out_uninit(&xout);
-
     return error;
+}
+
+#define MAX_RECIRC_DEPTH 5
+
+/* Executes, within 'ofproto', the actions in 'rule', 'ofpacts',
+ * or 'xout_' on 'packet'.  'flow' must reflect the data in 'packet'. */
+int
+ofproto_dpif_execute_actions(struct ofproto_dpif *ofproto,
+                             const struct flow *flow,
+                             struct rule_dpif *rule,
+                             const struct ofpact *ofpacts, size_t ofpacts_len,
+                             struct xlate_out *xout_, struct ofpbuf *packet)
+{
+    int i;
+    struct flow next_flow;
+    struct ofpact *free_ofpacts = NULL;
+
+    ovs_assert(count_1bits((rule ? 0x1 : 0)
+                           || (ofpacts ? 0x2 : 0)
+                           || (xout_ ? 0x3 : 0)) == 1);
+
+    for (i = 0; i < MAX_RECIRC_DEPTH; i++) {
+        struct xlate_out xout_storage, *xout;
+        int error;
+        bool use_xout_storage;
+
+        use_xout_storage = !(xout_ && i == 0);
+        xout = use_xout_storage ? &xout_storage : xout_;
+
+        if (use_xout_storage) {
+            struct xlate_in xin;
+            struct dpif_flow_stats stats;
+
+            xout = &xout_storage;
+
+            dpif_flow_stats_extract(flow, packet, time_msec(), &stats);
+
+            xlate_in_init(&xin, ofproto, flow, rule, stats.tcp_flags, packet);
+            xin.ofpacts = ofpacts;
+            xin.ofpacts_len = ofpacts_len;
+            xin.resubmit_stats = &stats;
+            xlate_actions(&xin, xout);
+
+            if (rule) {
+                rule_dpif_credit_stats(rule, &stats);
+            }
+        } else {
+            xout = xout_;
+        }
+
+        error = ofproto_dpif_execute_actions__(ofproto, flow, packet, xout);
+        free(free_ofpacts);
+
+        ofproto = xout->recirc_ofproto;
+
+        /* A NULL value for ofproto indicates there was
+         * no recirculation and thus no need to loop */
+        if (error || !ofproto) {
+            if (use_xout_storage) {
+                xlate_out_uninit(&xout_storage);
+            }
+            return error;
+        }
+
+        flow_extract(packet, &xout->recirc_md, &next_flow);
+        flow = &next_flow;
+
+        rule = NULL;
+        ofpacts_len = ofpbuf_size(&xout->recirc_ofpacts);
+        if (use_xout_storage) {
+            ofpacts = free_ofpacts = ofpbuf_steal_data(&xout->recirc_ofpacts);
+        } else {
+            free_ofpacts = NULL;
+            ofpacts = ofpbuf_data(&xout->recirc_ofpacts);
+        }
+
+        if (use_xout_storage) {
+            xlate_out_uninit(&xout_storage);
+        }
+    }
+
+    VLOG_WARN_RL(&rl, "recirculated too much during action execution");
+    return EINVAL;
 }
 
 void
@@ -3485,7 +3554,7 @@ rule_dpif_execute(struct rule_dpif *rule, const struct flow *flow,
 {
     struct ofproto_dpif *ofproto = ofproto_dpif_cast(rule->up.ofproto);
 
-    ofproto_dpif_execute_actions(ofproto, flow, rule, NULL, 0, packet);
+    ofproto_dpif_execute_actions(ofproto, flow, rule, NULL, 0, NULL, packet);
 }
 
 static enum ofperr
@@ -3698,7 +3767,7 @@ packet_out(struct ofproto *ofproto_, struct ofpbuf *packet,
     struct ofproto_dpif *ofproto = ofproto_dpif_cast(ofproto_);
 
     ofproto_dpif_execute_actions(ofproto, flow, NULL, ofpacts,
-                                 ofpacts_len, packet);
+                                 ofpacts_len, NULL, packet);
     return 0;
 }
 

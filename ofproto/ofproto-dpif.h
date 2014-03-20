@@ -38,6 +38,7 @@ struct ofport_dpif;
 struct dpif_backer;
 struct OVS_LOCKABLE rule_dpif;
 struct OVS_LOCKABLE group_dpif;
+struct xlate_out;
 
 enum rule_dpif_lookup_verdict {
     RULE_DPIF_LOOKUP_VERDICT_MATCH,         /* A match occurred. */
@@ -145,7 +146,8 @@ bool vsp_adjust_flow(const struct ofproto_dpif *, struct flow *);
 
 int ofproto_dpif_execute_actions(struct ofproto_dpif *, const struct flow *,
                                  struct rule_dpif *, const struct ofpact *,
-                                 size_t ofpacts_len, struct ofpbuf *)
+                                 size_t ofpacts_len, struct xlate_out *,
+                                 struct ofpbuf *)
     OVS_EXCLUDED(xlate_rwlock);
 void ofproto_dpif_send_packet_in(struct ofproto_dpif *,
                                  struct ofproto_packet_in *);
