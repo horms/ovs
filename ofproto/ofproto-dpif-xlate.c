@@ -2255,10 +2255,6 @@ compose_recirculate_action(struct xlate_ctx *ctx,
             return;
         }
 
-        ctx->xout->recirc_ofproto = ctx->xbridge->ofproto;
-        ctx->xout->recirc_md = pkt_metadata_from_flow(&ctx->xin->flow);
-        ctx->xout->recirc_md.recirc_id = id;
-
         match_init_recirc(&match, id);
 
         ofpbuf_use_const(&ofpacts, ofpact_current, ofpacts_len);
@@ -2279,6 +2275,10 @@ compose_recirculate_action(struct xlate_ctx *ctx,
 
         ofpbuf_put(&ctx->xout->recirc_ofpacts, ofpact_current, ofpacts_len);
     }
+
+    ctx->xout->recirc_ofproto = ctx->xbridge->ofproto;
+    ctx->xout->recirc_md = pkt_metadata_from_flow(&ctx->xin->flow);
+    ctx->xout->recirc_md.recirc_id = id;
 
     ctx->xout->slow |= commit_odp_actions(&ctx->xin->flow, &ctx->base_flow,
                                           &ctx->xout->odp_actions,
