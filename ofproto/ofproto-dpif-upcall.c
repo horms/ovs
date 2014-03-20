@@ -1329,11 +1329,12 @@ static bool
 revalidate_ukey(struct udpif *udpif, struct udpif_flow_dump *udump,
                 struct udpif_key *ukey)
 {
-    struct ofpbuf xout_actions, *actions;
+    struct ofpbuf xout_actions, xout_mask_key, *actions;
     uint64_t slow_path_buf[128 / 8];
+    struct odputil_keybuf xout_mask_key_buf;
     struct xlate_out xout, *xoutp;
     struct netflow *netflow;
-    struct flow flow, udump_mask;
+    struct flow flow, udump_mask, xout_mask;
     struct ofproto_dpif *ofproto;
     struct dpif_flow_stats push;
     uint32_t *udump32, *xout32;
@@ -1347,6 +1348,9 @@ revalidate_ukey(struct udpif *udpif, struct udpif_flow_dump *udump,
     xoutp = NULL;
     actions = NULL;
     netflow = NULL;
+
+    ofpbuf_use_stack(&xout_mask_key, &xout_mask_key_buf,
+                     sizeof xout_mask_key_buf);
 
     /* If we don't need to revalidate, we can simply push the stats contained
      * in the udump, otherwise we'll have to get the actions so we can check
@@ -1408,13 +1412,30 @@ revalidate_ukey(struct udpif *udpif, struct udpif_flow_dump *udump,
         goto exit;
     }
 
+    /* Convert xout.wc.masks to a key that relates to flow.
+     * Only masks that relate to 'flow' will be included in the resulting key.
+     * This has the effect of filtering 'xout.wc.masks' based on 'flow'.
+     *
+     * In particular this filters out mpls_lse mask bits set on
+     * non-MPLS flows */
+    odp_flow_key_from_mask(&xout_mask_key, &xout.wc.masks, &flow, UINT32_MAX,
+                           ofproto_dpif_get_max_mpls_depth(ofproto));
+
+    /* Convert 'xout_mask_key' back to a mask which is used
+     * in the comparison immediately below */
+    if (odp_flow_key_to_mask(ofpbuf_data(&xout_mask_key),
+                             ofpbuf_size(&xout_mask_key), &xout_mask, &flow)
+        == ODP_FIT_ERROR) {
+        goto exit;
+    }
+
     /* Since the kernel is free to ignore wildcarded bits in the mask, we can't
      * directly check that the masks are the same.  Instead we check that the
      * mask in the kernel is more specific i.e. less wildcarded, than what
      * we've calculated here.  This guarantees we don't catch any packets we
      * shouldn't with the megaflow. */
     udump32 = (uint32_t *) &udump_mask;
-    xout32 = (uint32_t *) &xout.wc.masks;
+    xout32 = (uint32_t *) &xout_mask;
     for (i = 0; i < FLOW_U32S; i++) {
         if ((udump32[i] | xout32[i]) != udump32[i]) {
             goto exit;
@@ -1430,6 +1451,7 @@ exit:
         }
         netflow_unref(netflow);
     }
+    ofpbuf_uninit(&xout_mask_key);
     ofpbuf_delete(actions);
     xlate_out_uninit(xoutp);
     return ok;
