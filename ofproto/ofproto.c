@@ -4482,6 +4482,21 @@ handle_flow_mod__(struct ofproto *ofproto, struct ofconn *ofconn,
 {
     enum ofperr error;
 
+    /* Only internal flow mods can set recircualtion fields. */
+    if (!(fm->flags & OFPUTIL_FF_INTERNAL)) {
+        char *err_field = NULL;
+
+        err_field = fm->match.flow.recirc_id ? "recirc_id" : err_field;
+        err_field = fm->match.flow.dp_hash   ? "dp_hash"   : err_field;
+
+        if (err_field) {
+            VLOG_WARN_RL(&rl, "%s: (flow_mod) only internal flows can set %s",
+                         ofproto->name, err_field);
+            error = OFPERR_OFPFMFC_EPERM;
+            return error;
+        }
+    }
+
     ovs_mutex_lock(&ofproto_mutex);
     if (ofproto->n_pending < 50) {
         switch (fm->command) {
