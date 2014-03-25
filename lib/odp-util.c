@@ -3479,6 +3479,19 @@ odp_put_tunnel_action(const struct flow_tnl *tunnel,
     tun_key_to_attr(odp_actions, tunnel);
     nl_msg_end_nested(odp_actions, offset);
 }
+
+void
+odp_put_recirc_action(uint32_t recirc_id, uint8_t  hash_alg,
+                      uint32_t hash_bias, struct ofpbuf *odp_actions)
+{
+    struct ovs_action_recirc *act_recirc;
+
+    act_recirc = nl_msg_put_unspec_uninit(odp_actions, OVS_ACTION_ATTR_RECIRC,
+                                          sizeof *act_recirc);
+    act_recirc->hash_alg = hash_alg;
+    act_recirc->hash_bias = hash_bias;
+    act_recirc->recirc_id = recirc_id;
+}
 
 /* The commit_odp_actions() function and its helpers. */
 

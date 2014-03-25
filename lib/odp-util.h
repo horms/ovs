@@ -235,6 +235,8 @@ size_t odp_put_userspace_action(uint32_t pid,
                                 struct ofpbuf *odp_actions);
 void odp_put_tunnel_action(const struct flow_tnl *tunnel,
                            struct ofpbuf *odp_actions);
+void odp_put_recirc_action(uint32_t recirc_id, uint8_t  hash_alg,
+                           uint32_t hash_bias, struct ofpbuf *odp_actions);
 void odp_put_pkt_mark_action(const uint32_t pkt_mark,
                              struct ofpbuf *odp_actions);
 

@@ -1843,14 +1843,10 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
                                               &ctx->xout->wc);
 
         if (ctx->xout->use_recirc) {
-            struct ovs_action_recirc *act_recirc;
             struct xlate_recirc *xr = &ctx->xout->recirc;
 
-            act_recirc = nl_msg_put_unspec_uninit(&ctx->xout->odp_actions,
-                               OVS_ACTION_ATTR_RECIRC, sizeof *act_recirc);
-            act_recirc->recirc_id = xr->recirc_id;
-            act_recirc->hash_alg = xr->hash_alg;
-            act_recirc->hash_bias = xr->hash_bias;
+            odp_put_recirc_action(xr->recirc_id, xr->hash_alg, xr->hash_bias,
+                                  &ctx->xout->odp_actions);
         } else {
             nl_msg_put_odp_port(&ctx->xout->odp_actions, OVS_ACTION_ATTR_OUTPUT,
                                 out_port);
