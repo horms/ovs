@@ -66,6 +66,10 @@ VLOG_DEFINE_THIS_MODULE(dpif_netdev);
 /* By default, choose a priority in the middle. */
 #define NETDEV_RULE_PRIORITY 0x8000
 
+/* Use per thread recirc_depth to prevent recirculation loop. */
+#define MAX_RECIRC_DEPTH 5
+DEFINE_STATIC_PER_THREAD_DATA(uint32_t, recirc_depth, 0)
+
 /* Configuration parameters. */
 enum { MAX_FLOWS = 65536 };     /* Maximum number of flows in flow table. */
 
@@ -1845,8 +1849,8 @@ dp_netdev_count_packet(struct dp_netdev *dp, enum dp_stat_type type)
 }
 
 static void
-dp_netdev_port_input(struct dp_netdev *dp, struct ofpbuf *packet,
-                     struct pkt_metadata *md)
+dp_netdev_input(struct dp_netdev *dp, struct ofpbuf *packet,
+                struct pkt_metadata *md)
     OVS_REQ_RDLOCK(dp->port_rwlock)
 {
     struct dp_netdev_flow *netdev_flow;
@@ -1872,6 +1876,17 @@ dp_netdev_port_input(struct dp_netdev *dp, struct ofpbuf *packet,
                                    flow_hash_5tuple(&key, 0) % dp->n_handlers,
                                    DPIF_UC_MISS, &key, NULL);
     }
+}
+
+static void
+dp_netdev_port_input(struct dp_netdev *dp, struct ofpbuf *packet,
+                     struct pkt_metadata *md)
+    OVS_REQ_RDLOCK(dp->port_rwlock)
+{
+    uint32_t *recirc_depth = recirc_depth_get();
+
+    *recirc_depth = 0;
+    dp_netdev_input(dp, packet, md);
 }
 
 static int
@@ -1944,6 +1959,16 @@ dp_execute_cb(void *aux_, struct ofpbuf *packet,
     struct dp_netdev_execute_aux *aux = aux_;
     int type = nl_attr_type(a);
     struct dp_netdev_port *p;
+    uint32_t *depth = recirc_depth_get();
+    bool steal = may_steal;
+
+    if (may_steal) {
+        /* Do not allow stealing packet if we are in the middle
+         * of recirculation, or we are about to start recricualtion. */
+        if ((*depth) || (type == OVS_ACTION_ATTR_RECIRC)) {
+            steal = false;
+        }
+    }
 
     switch ((enum ovs_action_attr)type) {
     case OVS_ACTION_ATTR_OUTPUT:
@@ -1959,7 +1984,7 @@ dp_execute_cb(void *aux_, struct ofpbuf *packet,
         userdata = nl_attr_find_nested(a, OVS_USERSPACE_ATTR_USERDATA);
 
         /* Make a copy if we are not allowed to steal the packet's data. */
-        if (!may_steal) {
+        if (!steal) {
             packet = ofpbuf_clone_with_headroom(packet, DP_NETDEV_HEADROOM);
         }
         dp_netdev_output_userspace(aux->dp, packet,
@@ -1967,28 +1992,44 @@ dp_execute_cb(void *aux_, struct ofpbuf *packet,
                                        % aux->dp->n_handlers,
                                    DPIF_UC_ACTION, aux->key,
                                    userdata);
-        if (!may_steal) {
+        if (!steal) {
             ofpbuf_uninit(packet);
         }
         break;
     }
 
-    case OVS_ACTION_ATTR_RECIRC: {
-        const struct ovs_action_recirc *act;
-        act = nl_attr_get(a);
-        md->recirc_id =act->recirc_id;
-        md->dp_hash = 0;
+    case OVS_ACTION_ATTR_RECIRC:
+        if (*depth < MAX_RECIRC_DEPTH) {
+            uint32_t old_recirc_id = md->recirc_id;
+            uint32_t old_dp_hash = md->dp_hash;
+            const struct ovs_action_recirc *act;
 
-        if (act->hash_alg == OVS_RECIRC_HASH_ALG_L4) {
-            struct flow flow;
+            act = nl_attr_get(a);
+            md->recirc_id = act->recirc_id;
 
-            flow_extract(packet, md, &flow);
-            md->dp_hash = flow_hash_symmetric_l4(&flow, act->hash_bias);
+            if (act->hash_alg == OVS_RECIRC_HASH_ALG_L4) {
+                struct flow flow;
+
+                flow_extract(packet, md, &flow);
+                md->dp_hash = flow_hash_symmetric_l4(&flow, act->hash_bias);
+                if (!md->dp_hash) {
+                    md->dp_hash = 1;  /* 0 is not valid */
+                }
+            } else {
+                md->dp_hash = 0;
+            }
+
+            (*depth)++;
+            dp_netdev_input(aux->dp, packet, md);
+
+            (*depth)--;
+            md->recirc_id = old_recirc_id;
+            md->recirc_id = old_dp_hash;
+            break;
+        } else {
+            VLOG_WARN("Packet dropped. Max recirculation dpeth exceeded.");
         }
-
-        dp_netdev_port_input(aux->dp, packet, md);
         break;
-    }
 
     case OVS_ACTION_ATTR_PUSH_VLAN:
     case OVS_ACTION_ATTR_POP_VLAN:
