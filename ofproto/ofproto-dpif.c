@@ -4485,11 +4485,19 @@ ofproto_dpif_unixctl_init(void)
 }
 
 
+/* Returns true if 'table' is the table used for internal rules,
+ * false otherwise. */
+bool
+table_is_internal(uint8_t table_id)
+{
+    return table_id == TBL_INTERNAL;
+}
+
 /* Returns true if 'rule' is an internal rule, false otherwise. */
 bool
 rule_is_internal(const struct rule *rule)
 {
-    return rule->table_id == TBL_INTERNAL;
+    return table_is_internal(rule->table_id);
 }
 
 /* Linux VLAN device support (e.g. "eth0.10" for VLAN 10.)
