@@ -336,10 +336,7 @@ update_recirc_rules(struct bond *bond)
         struct bond_slave *slave = bond->hash[i].slave;
 
         if (slave) {
-            match_init_catchall(&match);
-            match_set_recirc_id(&match, bond->recirc_id);
-            /* recirc_id -> metadata to speed up look ups. */
-            match_set_metadata(&match, htonll(bond->recirc_id));
+            match_init_recirc(&match, bond->recirc_id);
             match_set_dp_hash_masked(&match, i, BOND_MASK);
 
             add_pr_rule(bond, &match, slave->ofp_port,

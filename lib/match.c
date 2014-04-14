@@ -150,6 +150,15 @@ match_init_catchall(struct match *match)
     flow_wildcards_init_catchall(&match->wc);
 }
 
+void
+match_init_recirc(struct match *match, uint32_t id)
+{
+    match_init_catchall(match);
+    match_set_recirc_id(match, id);
+    /* recirc_id -> metadata to speed up look ups. */
+    match_set_metadata(match, htonll(id));
+}
+
 /* For each bit or field wildcarded in 'match', sets the corresponding bit or
  * field in 'flow' to all-0-bits.  It is important to maintain this invariant
  * in a match that might be inserted into a classifier.
