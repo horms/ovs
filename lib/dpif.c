@@ -1126,6 +1126,9 @@ dpif_execute_helper_cb(void *aux_, struct ofpbuf *packet,
         aux->error = aux->dpif->dpif_class->execute(aux->dpif, &execute);
         break;
 
+    case OVS_ACTION_ATTR_RECIRC:
+        break;
+
     case OVS_ACTION_ATTR_PUSH_VLAN:
     case OVS_ACTION_ATTR_POP_VLAN:
     case OVS_ACTION_ATTR_PUSH_MPLS:
@@ -1133,7 +1136,6 @@ dpif_execute_helper_cb(void *aux_, struct ofpbuf *packet,
     case OVS_ACTION_ATTR_SET:
     case OVS_ACTION_ATTR_SAMPLE:
     case OVS_ACTION_ATTR_UNSPEC:
-    case OVS_ACTION_ATTR_RECIRC:
     case __OVS_ACTION_ATTR_MAX:
         OVS_NOT_REACHED();
     }
