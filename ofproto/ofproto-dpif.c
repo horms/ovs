@@ -3078,12 +3078,13 @@ rule_expire(struct rule_dpif *rule)
 
 /* Executes, within 'ofproto', the actions in 'rule' or 'ofpacts' on 'packet'.
  * 'flow' must reflect the data in 'packet'. */
-int
-ofproto_dpif_execute_actions(struct ofproto_dpif *ofproto,
-                             const struct flow *flow,
-                             struct rule_dpif *rule,
-                             const struct ofpact *ofpacts, size_t ofpacts_len,
-                             struct ofpbuf *packet)
+static int
+ofproto_dpif_execute_actions__(struct ofproto_dpif *ofproto,
+                               const struct flow *flow,
+                               struct rule_dpif *rule,
+                               const struct ofpact *ofpacts, size_t ofpacts_len,
+                               struct ofpbuf *packet,
+                               struct list *recirc_list)
 {
     struct dpif_flow_stats stats;
     struct xlate_out xout;
@@ -3091,8 +3092,6 @@ ofproto_dpif_execute_actions(struct ofproto_dpif *ofproto,
     ofp_port_t in_port;
     struct dpif_execute execute;
     int error;
-
-    ovs_assert((rule != NULL) != (ofpacts != NULL));
 
     dpif_flow_stats_extract(flow, packet, time_msec(), &stats);
 
@@ -3118,12 +3117,78 @@ ofproto_dpif_execute_actions(struct ofproto_dpif *ofproto,
     execute.md.pkt_mark = flow->pkt_mark;
     execute.md.in_port.odp_port = ofp_port_to_odp_port(ofproto, in_port);
     execute.needs_help = (xout.slow & SLOW_ACTION) != 0;
+    execute.recirc_list = recirc_list;
 
     error = dpif_execute(ofproto->backer->dpif, &execute);
 
     xlate_out_uninit(&xout);
 
     return error;
+}
+
+#define MAX_RECIRC_DEPTH 5
+
+/* Executes, within 'ofproto', the actions in 'rule', 'ofpacts',
+ * or 'xout_' on 'packet'.  'flow' must reflect the data in 'packet'. */
+int
+ofproto_dpif_execute_actions(struct ofproto_dpif *ofproto,
+                             const struct flow *flow,
+                             struct rule_dpif *rule,
+                             const struct ofpact *ofpacts, size_t ofpacts_len,
+                             struct ofpbuf *packet)
+{
+    int i, error;
+    struct list recirc_list = LIST_INITIALIZER(&recirc_list);
+    ofp_port_t in_port;
+
+    ovs_assert((rule != NULL) != (ofpacts != NULL));
+
+    error = ofproto_dpif_execute_actions__(ofproto, flow, rule, ofpacts,
+                                           ofpacts_len, packet, &recirc_list);
+    if (error || list_is_empty(&recirc_list)) {
+        return error;
+    }
+
+    in_port = flow->in_port.ofp_port;
+
+    for (i = 0; i < MAX_RECIRC_DEPTH; i++) {
+        struct list next_recirc_list = LIST_INITIALIZER(&next_recirc_list);
+        struct dpif_execute_recirc *recirc, *next_recirc;
+
+        LIST_FOR_EACH_SAFE(recirc, next_recirc, list_node, &recirc_list) {
+            struct flow new_flow;
+
+            flow_extract(recirc->packet, &recirc->md, &new_flow);
+            /* Undo port mangling in ofproto_dpif_execute_actions__() */
+            new_flow.in_port.ofp_port = in_port;
+            flow = &new_flow;
+
+            error = ofproto_dpif_execute_actions__(ofproto, flow, NULL, NULL,
+                                                   0, recirc->packet,
+                                                   &next_recirc_list);
+            if (error) {
+                break;
+            }
+            dpif_execute_recirc_destroy(recirc);
+        }
+        if (error) {
+            struct dpif_execute_recirc *recirc, *next_recirc;
+
+            list_push_back(&next_recirc_list, &recirc_list);
+            LIST_FOR_EACH_SAFE(recirc, next_recirc, list_node, &recirc_list) {
+                dpif_execute_recirc_destroy(recirc);
+            }
+
+            return error;
+        } else if (list_is_empty(&next_recirc_list)) {
+            return 0;
+        }
+
+        list_move(&recirc_list, &next_recirc_list);
+    }
+
+    VLOG_WARN_RL(&rl, "recirculated too much during action execution");
+    return EINVAL;
 }
 
 void
