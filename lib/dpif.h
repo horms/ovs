@@ -577,6 +577,14 @@ struct dpif_flow_del {
     struct dpif_flow_stats *stats;  /* Optional flow statistics. */
 };
 
+struct dpif_execute_recirc {
+    struct list list_node;      /* Private list element for use by owner. */
+    struct pkt_metadata md;
+    struct ofpbuf *packet;
+};
+
+void dpif_execute_recirc_destroy(struct dpif_execute_recirc *);
+
 struct dpif_execute {
     /* Raw support for execute passed along to the provider. */
     const struct nlattr *actions;   /* Actions to execute on packet. */
@@ -592,6 +600,8 @@ struct dpif_execute {
      * OVS_ACTION_ATTR_USERSPACE actions it passes the packet through to the
      * dpif implementation. */
     bool needs_help;
+
+    struct list *recirc_list;
 };
 
 int dpif_execute(struct dpif *, struct dpif_execute *);

@@ -1102,7 +1102,35 @@ dpif_flow_dump_done(struct dpif_flow_dump *dump)
 struct dpif_execute_helper_aux {
     struct dpif *dpif;
     int error;
+    struct list *recirc_list;
 };
+
+static void
+dpif_execute_recirc_add(uint32_t id, struct ofpbuf *packet,
+                        struct pkt_metadata *md, struct list *list)
+{
+    struct dpif_execute_recirc *recirc;
+
+    if (!list) {
+        return;
+    }
+
+    recirc = xmalloc(sizeof(struct dpif_execute_recirc));
+    list_init(&recirc->list_node);
+    list_push_front(list, &recirc->list_node);
+    recirc->md = *md;
+    recirc->md.recirc_id = id;
+    recirc->packet = ofpbuf_clone_with_headroom(packet,
+                                                ofpbuf_headroom(packet));
+}
+
+void
+dpif_execute_recirc_destroy(struct dpif_execute_recirc *recirc)
+{
+    list_remove(&recirc->list_node);
+    ofpbuf_delete(recirc->packet);
+    free(recirc);
+}
 
 /* This is called for actions that need the context of the datapath to be
  * meaningful. */
@@ -1126,6 +1154,12 @@ dpif_execute_helper_cb(void *aux_, struct ofpbuf *packet,
         aux->error = aux->dpif->dpif_class->execute(aux->dpif, &execute);
         break;
 
+    case OVS_ACTION_ATTR_RECIRC:
+        /* XXX: Use may_steal */
+        dpif_execute_recirc_add(nl_attr_get_u32(action), packet,
+                                md, aux->recirc_list);
+        break;
+
     case OVS_ACTION_ATTR_PUSH_VLAN:
     case OVS_ACTION_ATTR_POP_VLAN:
     case OVS_ACTION_ATTR_PUSH_MPLS:
@@ -1133,7 +1167,6 @@ dpif_execute_helper_cb(void *aux_, struct ofpbuf *packet,
     case OVS_ACTION_ATTR_SET:
     case OVS_ACTION_ATTR_SAMPLE:
     case OVS_ACTION_ATTR_UNSPEC:
-    case OVS_ACTION_ATTR_RECIRC:
     case OVS_ACTION_ATTR_HASH:
     case __OVS_ACTION_ATTR_MAX:
         OVS_NOT_REACHED();
@@ -1148,7 +1181,7 @@ dpif_execute_helper_cb(void *aux_, struct ofpbuf *packet,
 static int
 dpif_execute_with_help(struct dpif *dpif, struct dpif_execute *execute)
 {
-    struct dpif_execute_helper_aux aux = {dpif, 0};
+    struct dpif_execute_helper_aux aux = {dpif, 0, execute->recirc_list};
 
     COVERAGE_INC(dpif_execute_with_help);
 
