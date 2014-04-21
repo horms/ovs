@@ -1966,6 +1966,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
             act_hash->hash_basis = xr->hash_basis;
 
             /* Recirc action. */
+            ctx->xout->has_recirc = true;
             nl_msg_put_u32(&ctx->xout->odp_actions, OVS_ACTION_ATTR_RECIRC,
                            xr->recirc_id);
         } else {
@@ -3105,6 +3106,7 @@ xlate_out_copy(struct xlate_out *dst, const struct xlate_out *src)
     dst->has_learn = src->has_learn;
     dst->has_normal = src->has_normal;
     dst->has_fin_timeout = src->has_fin_timeout;
+    dst->has_recirc = src->has_recirc;
     dst->nf_output_iface = src->nf_output_iface;
     dst->mirrors = src->mirrors;
 
@@ -3228,6 +3230,7 @@ xlate_actions__(struct xlate_in *xin, struct xlate_out *xout)
     ctx.xout->has_learn = false;
     ctx.xout->has_normal = false;
     ctx.xout->has_fin_timeout = false;
+    ctx.xout->has_recirc = false;
     ctx.xout->nf_output_iface = NF_OUT_DROP;
     ctx.xout->mirrors = 0;
     ofpbuf_use_stub(&ctx.xout->odp_actions, ctx.xout->odp_actions_stub,
