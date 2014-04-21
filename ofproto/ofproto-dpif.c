@@ -3116,7 +3116,11 @@ ofproto_dpif_execute_actions__(struct ofproto_dpif *ofproto,
     execute.md.skb_priority = flow->skb_priority;
     execute.md.pkt_mark = flow->pkt_mark;
     execute.md.in_port.odp_port = ofp_port_to_odp_port(ofproto, in_port);
-    execute.needs_help = (xout.slow & SLOW_ACTION) != 0;
+    /* If recirculation occurred execution needs help in case
+     * the packet was received from a port that doesn't exist
+     * in the datapath: e.g. the CONTROLLER port. */
+    execute.needs_help = (xout.slow & SLOW_ACTION) != 0
+        || xout.has_recirc;
     execute.recirc_list = recirc_list;
 
     error = dpif_execute(ofproto->backer->dpif, &execute);
