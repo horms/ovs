@@ -1146,12 +1146,14 @@ dpif_execute_helper_cb(void *aux_, struct ofpbuf *packet,
     switch ((enum ovs_action_attr)type) {
     case OVS_ACTION_ATTR_OUTPUT:
     case OVS_ACTION_ATTR_USERSPACE:
+    case OVS_ACTION_ATTR_HASH:
         execute.actions = action;
         execute.actions_len = NLA_ALIGN(action->nla_len);
         execute.packet = packet;
         execute.md = *md;
         execute.needs_help = false;
         aux->error = aux->dpif->dpif_class->execute(aux->dpif, &execute);
+        *md = execute.md;
         break;
 
     case OVS_ACTION_ATTR_RECIRC:
@@ -1167,7 +1169,6 @@ dpif_execute_helper_cb(void *aux_, struct ofpbuf *packet,
     case OVS_ACTION_ATTR_SET:
     case OVS_ACTION_ATTR_SAMPLE:
     case OVS_ACTION_ATTR_UNSPEC:
-    case OVS_ACTION_ATTR_HASH:
     case __OVS_ACTION_ATTR_MAX:
         OVS_NOT_REACHED();
     }
