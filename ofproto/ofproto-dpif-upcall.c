@@ -223,9 +223,6 @@ static size_t read_upcalls(struct handler *,
                            struct hmap *);
 static void handle_upcalls(struct handler *, struct hmap *, struct upcall *,
                            size_t n_upcalls);
-static void udpif_stop_threads(struct udpif *);
-static void udpif_start_threads(struct udpif *, size_t n_handlers,
-                                size_t n_revalidators);
 static void *udpif_flow_dumper(void *);
 static void *udpif_upcall_handler(void *);
 static void *udpif_revalidator(void *);
@@ -281,7 +278,8 @@ udpif_create(struct dpif_backer *backer, struct dpif *dpif)
 void
 udpif_destroy(struct udpif *udpif)
 {
-    udpif_stop_threads(udpif);
+    udpif_set_threads(udpif, 0, 0);
+    udpif_flush(udpif);
 
     list_remove(&udpif->list_node);
     latch_destroy(&udpif->exit_latch);
@@ -291,11 +289,18 @@ udpif_destroy(struct udpif *udpif)
     free(udpif);
 }
 
-/* Stops the handler and revalidator threads, must be enclosed in
- * ovsrcu quiescent state unless when destroying udpif. */
-static void
-udpif_stop_threads(struct udpif *udpif)
+/* Tells 'udpif' how many threads it should use to handle upcalls.  Disables
+ * all threads if 'n_handlers' and 'n_revalidators' is zero.  'udpif''s
+ * datapath handle must have packet reception enabled before starting threads.
+ */
+void
+udpif_set_threads(struct udpif *udpif, size_t n_handlers,
+                  size_t n_revalidators)
 {
+    int error;
+
+    ovsrcu_quiesce_start();
+    /* Stop the old threads (if any). */
     if (udpif->handlers &&
         (udpif->n_handlers != n_handlers
          || udpif->n_revalidators != n_revalidators)) {
@@ -352,14 +357,15 @@ udpif_stop_threads(struct udpif *udpif)
         udpif->handlers = NULL;
         udpif->n_handlers = 0;
     }
-}
 
-/* Starts the handler and revalidator threads, must be enclosed in
- * ovsrcu quiescent state. */
-static void
-udpif_start_threads(struct udpif *udpif, size_t n_handlers,
-                    size_t n_revalidators)
-{
+    error = dpif_handlers_set(udpif->dpif, n_handlers);
+    if (error) {
+        VLOG_ERR("failed to configure handlers in dpif %s: %s",
+                 dpif_name(udpif->dpif), ovs_strerror(error));
+        return;
+    }
+
+    /* Start new threads (if necessary). */
     if (!udpif->handlers && n_handlers) {
         size_t i;
 
@@ -391,31 +397,7 @@ udpif_start_threads(struct udpif *udpif, size_t n_handlers,
         }
         xpthread_create(&udpif->flow_dumper, NULL, udpif_flow_dumper, udpif);
     }
-}
 
-/* Tells 'udpif' how many threads it should use to handle upcalls.
- * 'n_handlers' and 'n_revalidators' can never be zero.  'udpif''s
- * datapath handle must have packet reception enabled before starting
- * threads. */
-void
-udpif_set_threads(struct udpif *udpif, size_t n_handlers,
-                  size_t n_revalidators)
-{
-    int error;
-
-    ovs_assert(n_handlers && n_revalidators);
-
-    ovsrcu_quiesce_start();
-    udpif_stop_threads(udpif);
-
-    error = dpif_handlers_set(udpif->dpif, n_handlers);
-    if (error) {
-        VLOG_ERR("failed to configure handlers in dpif %s: %s",
-                 dpif_name(udpif->dpif), ovs_strerror(error));
-        return;
-    }
-
-    udpif_start_threads(udpif, n_handlers, n_revalidators);
     ovsrcu_quiesce_end();
 }
 
@@ -431,11 +413,8 @@ udpif_synchronize(struct udpif *udpif)
      * its main loop once. */
     size_t n_handlers = udpif->n_handlers;
     size_t n_revalidators = udpif->n_revalidators;
-
-    ovsrcu_quiesce_start();
-    udpif_stop_threads(udpif);
-    udpif_start_threads(udpif, n_handlers, n_revalidators);
-    ovsrcu_quiesce_end();
+    udpif_set_threads(udpif, 0, 0);
+    udpif_set_threads(udpif, n_handlers, n_revalidators);
 }
 
 /* Notifies 'udpif' that something changed which may render previous
@@ -487,13 +466,9 @@ udpif_flush(struct udpif *udpif)
     n_handlers = udpif->n_handlers;
     n_revalidators = udpif->n_revalidators;
 
-    ovsrcu_quiesce_start();
-
-    udpif_stop_threads(udpif);
+    udpif_set_threads(udpif, 0, 0);
     dpif_flow_flush(udpif->dpif);
-    udpif_start_threads(udpif, n_handlers, n_revalidators);
-
-    ovsrcu_quiesce_end();
+    udpif_set_threads(udpif, n_handlers, n_revalidators);
 }
 
 /* Removes all flows from all datapaths. */
