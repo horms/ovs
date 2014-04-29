@@ -96,7 +96,7 @@ void *bond_choose_output_slave(struct bond *, const struct flow *,
 /* Rebalancing. */
 void bond_account(struct bond *, const struct flow *, uint16_t vlan,
                   uint64_t n_bytes);
-void bond_rebalance(struct bond *);
+bool bond_rebalance(struct bond *);
 
 /* Recirculation
  *
@@ -104,9 +104,9 @@ void bond_rebalance(struct bond *);
  *
  * When recirculation is used, each bond port is assigned with a unique
  * recirc_id. The output action to the bond port will be replaced by
- * a Hash action, followed by a RECIRC action.
+ * a RECIRC action.
  *
- *   ... actions= ... HASH(hash(L4)), RECIRC(recirc_id) ....
+ *   ... actions= ... RECIRC(L4_HASH, recirc_id) ....
  *
  * On handling first output packet, 256 post recirculation flows are installed:
  *
@@ -118,4 +118,5 @@ void bond_rebalance(struct bond *);
 void bond_update_post_recirc_rules(struct bond *, const bool force);
 bool bond_may_recirc(const struct bond *, uint32_t *recirc_id,
                      uint32_t *hash_bias);
+void bond_recirculation_account(struct bond *);
 #endif /* bond.h */
