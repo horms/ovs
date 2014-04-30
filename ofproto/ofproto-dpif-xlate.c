@@ -1605,12 +1605,15 @@ compose_sample_action(const struct xbridge *xbridge,
     sample_offset = nl_msg_start_nested(odp_actions, OVS_ACTION_ATTR_SAMPLE);
 
     nl_msg_put_u32(odp_actions, OVS_SAMPLE_ATTR_PROBABILITY, probability);
+    nl_msg_put_u32(odp_actions, OVS_SAMPLE_ATTR_FLAGS,
+                   OVS_SAMPLE_FLAG_SIDE_EFFECTS);
 
     actions_offset = nl_msg_start_nested(odp_actions, OVS_SAMPLE_ATTR_ACTIONS);
 
     odp_port = ofp_port_to_odp_port(xbridge, flow->in_port.ofp_port);
     pid = dpif_port_get_pid(xbridge->dpif, odp_port,
                             flow_hash_5tuple(flow, 0));
+    nl_msg_put_flag(odp_actions, OVS_ACTION_ATTR_POP_VLAN);
     cookie_offset = odp_put_userspace_action(pid, cookie, cookie_size,
                                              odp_actions);
 
