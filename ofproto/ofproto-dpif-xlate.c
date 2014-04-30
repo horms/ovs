@@ -1616,6 +1616,7 @@ compose_sample_action(const struct xbridge *xbridge,
     odp_port = ofp_port_to_odp_port(xbridge, flow->in_port.ofp_port);
     pid = dpif_port_get_pid(xbridge->dpif, odp_port,
                             flow_hash_5tuple(flow, 0));
+    nl_msg_put_flag(odp_actions, OVS_ACTION_ATTR_POP_VLAN);
     cookie_offset = odp_put_userspace_action(pid, cookie, cookie_size,
                                              odp_actions);
 
