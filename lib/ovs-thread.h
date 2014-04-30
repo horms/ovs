@@ -27,15 +27,14 @@
 /* Mutex. */
 struct OVS_LOCKABLE ovs_mutex {
     pthread_mutex_t lock;
-    const char *where;          /* NULL if and only if uninitialized. */
+    const char *where;
 };
 
 /* "struct ovs_mutex" initializer. */
 #ifdef PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP
-#define OVS_MUTEX_INITIALIZER { PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP, \
-                                "<unlocked>" }
+#define OVS_MUTEX_INITIALIZER { PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP, NULL }
 #else
-#define OVS_MUTEX_INITIALIZER { PTHREAD_MUTEX_INITIALIZER, "<unlocked>" }
+#define OVS_MUTEX_INITIALIZER { PTHREAD_MUTEX_INITIALIZER, NULL }
 #endif
 
 #ifdef PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP
@@ -92,15 +91,15 @@ void xpthread_mutexattr_gettype(pthread_mutexattr_t *, int *typep);
  *       than exposing them only to porters. */
 struct OVS_LOCKABLE ovs_rwlock {
     pthread_rwlock_t lock;
-    const char *where;          /* NULL if and only if uninitialized. */
+    const char *where;
 };
 
 /* Initializer. */
 #ifdef PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
 #define OVS_RWLOCK_INITIALIZER \
-        { PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP, "<unlocked>" }
+        { PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP, NULL }
 #else
-#define OVS_RWLOCK_INITIALIZER { PTHREAD_RWLOCK_INITIALIZER, "<unlocked>" }
+#define OVS_RWLOCK_INITIALIZER { PTHREAD_RWLOCK_INITIALIZER, NULL }
 #endif
 
 /* ovs_rwlock functions analogous to pthread_rwlock_*() functions.
