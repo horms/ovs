@@ -838,6 +838,7 @@ struct odp_garbage {
 static bool check_variable_length_userdata(struct dpif_backer *backer);
 static size_t check_max_mpls_depth(struct dpif_backer *backer);
 static bool check_recirc(struct dpif_backer *backer);
+static void check_sample(struct dpif_backer *backer);
 
 static int
 open_dpif_backer(const char *type, struct dpif_backer **backerp)
@@ -943,11 +944,95 @@ open_dpif_backer(const char *type, struct dpif_backer **backerp)
     backer->max_mpls_depth = check_max_mpls_depth(backer);
     backer->rid_pool = recirc_id_pool_create();
 
+    check_sample(backer);
+
     if (backer->recv_set_enable) {
         udpif_set_threads(backer->udpif, n_handlers, n_revalidators);
     }
 
     return error;
+}
+
+static void
+check_sample__(struct dpif_backer *backer, bool contain_side_effects)
+{
+    struct flow flow;
+    struct odputil_keybuf keybuf;
+    struct ofpbuf key;
+    int error;
+    struct ofpbuf actions;
+    size_t sample_offset, actions_offset;
+    const char *msg;
+    bool supported = false;
+
+    /* Compose a sample action with side effects */
+    ofpbuf_init(&actions, 64);
+
+    sample_offset = nl_msg_start_nested(&actions, OVS_ACTION_ATTR_SAMPLE);
+
+    nl_msg_put_u32(&actions, OVS_SAMPLE_ATTR_PROBABILITY, UINT32_MAX/2);
+
+    if (contain_side_effects) {
+        msg = "sample action with contained side effects";
+        nl_msg_put_u32(&actions, OVS_SAMPLE_ATTR_FLAGS,
+                       OVS_SAMPLE_FLAG_SIDE_EFFECTS);
+    } else {
+        msg = "sample action with uncontained side effects";
+    }
+
+    actions_offset = nl_msg_start_nested(&actions, OVS_SAMPLE_ATTR_ACTIONS);
+
+    nl_msg_put_flag(&actions, OVS_ACTION_ATTR_POP_VLAN);
+
+    nl_msg_end_nested(&actions, actions_offset);
+    nl_msg_end_nested(&actions, sample_offset);
+
+    nl_msg_put_flag(&actions, OVS_ACTION_ATTR_POP_VLAN);
+
+    /* Compose a flow. */
+    memset(&flow, 0, sizeof flow);
+    flow.dl_type = htons(0x800);
+    flow_set_dl_vlan(&flow, 1);
+
+    ofpbuf_use_stack(&key, &keybuf, sizeof keybuf);
+    odp_flow_key_from_flow(&key, &flow, NULL, 0);
+
+    error = dpif_flow_put(backer->dpif, DPIF_FP_CREATE | DPIF_FP_MODIFY,
+                          ofpbuf_data(&key), ofpbuf_size(&key), NULL, 0,
+                          ofpbuf_data(&actions), ofpbuf_size(&actions), NULL);
+
+    ofpbuf_uninit(&actions);
+
+    if (error && error != EEXIST) {
+        if (error != EINVAL) {
+            VLOG_WARN("%s: %s feature probe failed (%s)",
+                      dpif_name(backer->dpif), msg, ovs_strerror(error));
+        }
+        goto done;
+    }
+
+    supported = true;
+
+    error = dpif_flow_del(backer->dpif, ofpbuf_data(&key), ofpbuf_size(&key),
+                          NULL);
+    if (error) {
+        VLOG_WARN("%s: failed to delete action for %s",
+                  dpif_name(backer->dpif), msg);
+    }
+
+done:
+    if (supported) {
+        VLOG_WARN("%s: supported", msg);
+    } else {
+        VLOG_WARN("%s: not supported", msg);
+    }
+}
+
+static void
+check_sample(struct dpif_backer *backer)
+{
+    check_sample__(backer, false);
+    check_sample__(backer, true);
 }
 
 /* Tests whether 'backer''s datapath supports recirculation Only newer datapath
