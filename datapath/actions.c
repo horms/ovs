@@ -606,11 +606,21 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 			err = execute_set_action(skb, nla_data(a));
 			break;
 
-		case OVS_ACTION_ATTR_SAMPLE:
-			err = sample(dp, skb, a);
-			if (unlikely(err)) /* skb already freed. */
+		case OVS_ACTION_ATTR_SAMPLE: {
+			struct sk_buff *sample_skb;
+			const bool last_action = (a->nla_len == rem);
+
+			if (!last_action || keep_skb)
+				sample_skb = skb_clone(skb, GFP_ATOMIC);
+			else
+				sample_skb = skb;
+
+			err = sample(dp, sample_skb, a);
+			if (unlikely(err && sample_skb == skb))
+				/* skb already freed. */
 				return err;
 			break;
+		}
 		}
 
 		if (unlikely(err)) {

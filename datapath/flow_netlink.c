@@ -1205,9 +1205,10 @@ static int validate_and_copy_sample(const struct nlattr *attr,
 				    struct sw_flow_actions **sfa)
 {
 	const struct nlattr *attrs[OVS_SAMPLE_ATTR_MAX + 1];
-	const struct nlattr *probability, *actions;
+	const struct nlattr *probability, *actions, *flags;
 	const struct nlattr *a;
 	int rem, start, err, st_acts;
+	bool allow_side_effects = false;
 
 	memset(attrs, 0, sizeof(attrs));
 	nla_for_each_nested(a, attr, rem) {
@@ -1227,6 +1228,21 @@ static int validate_and_copy_sample(const struct nlattr *attr,
 	if (!actions || (nla_len(actions) && nla_len(actions) < NLA_HDRLEN))
 		return -EINVAL;
 
+	/* The flags attribute is optional */
+	flags = attrs[OVS_SAMPLE_ATTR_FLAGS];
+	if (flags) {
+		u32 flags_val;
+
+		if (nla_len(flags) != sizeof(u32))
+			return -EINVAL;
+
+		flags_val = nla_get_u32(flags);
+		if (flags_val & ~OVS_SAMPLE_FLAG_SIDE_EFFECTS)
+			return -EINVAL;
+		if (flags_val & OVS_SAMPLE_FLAG_SIDE_EFFECTS)
+			allow_side_effects = true;
+	}
+
 	/* validation done, copy sample action. */
 	start = add_nested_action_start(sfa, OVS_ACTION_ATTR_SAMPLE);
 	if (start < 0)
@@ -1240,8 +1256,8 @@ static int validate_and_copy_sample(const struct nlattr *attr,
 		return st_acts;
 
 	err = ovs_nla_copy_actions(actions, key, depth + 1, sfa);
-	if (err)
-		return err;
+	if (err < 0 || (err > 0 && !allow_side_effects))
+		return -EINVAL;
 
 	add_nested_action_end(*sfa, st_acts);
 	add_nested_action_end(*sfa, start);
@@ -1434,6 +1450,7 @@ int ovs_nla_copy_actions(const struct nlattr *attr,
 {
 	const struct nlattr *a;
 	int rem, err;
+	bool side_effect = false;
 
 	if (depth >= SAMPLE_ACTION_DEPTH)
 		return -EOVERFLOW;
@@ -1489,9 +1506,11 @@ int ovs_nla_copy_actions(const struct nlattr *attr,
 		}
 
 		case OVS_ACTION_ATTR_POP_VLAN:
+			side_effect = true;
 			break;
 
 		case OVS_ACTION_ATTR_PUSH_VLAN:
+			side_effect = true;
 			vlan = nla_data(a);
 			if (vlan->vlan_tpid != htons(ETH_P_8021Q))
 				return -EINVAL;
@@ -1503,6 +1522,7 @@ int ovs_nla_copy_actions(const struct nlattr *attr,
 			break;
 
 		case OVS_ACTION_ATTR_SET:
+			side_effect = true;
 			err = validate_set(a, key, sfa, &skip_copy);
 			if (err)
 				return err;
@@ -1510,7 +1530,7 @@ int ovs_nla_copy_actions(const struct nlattr *attr,
 
 		case OVS_ACTION_ATTR_SAMPLE:
 			err = validate_and_copy_sample(a, key, depth, sfa);
-			if (err)
+			if (err < 0)
 				return err;
 			skip_copy = true;
 			break;
@@ -1528,7 +1548,7 @@ int ovs_nla_copy_actions(const struct nlattr *attr,
 	if (rem > 0)
 		return -EINVAL;
 
-	return 0;
+	return (side_effect && depth) ? 1 : 0;
 }
 
 static int sample_action_to_attr(const struct nlattr *attr, struct sk_buff *skb)

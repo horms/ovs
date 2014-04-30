@@ -149,11 +149,23 @@ format_generic_odp_action(struct ds *ds, const struct nlattr *a)
     }
 }
 
+static const char *
+sample_flags_to_string(uint32_t flag)
+{
+    switch (flag) {
+    case OVS_SAMPLE_FLAG_SIDE_EFFECTS:
+        return "side_effects";
+    default:
+        return NULL;
+    }
+}
+
 static void
 format_odp_sample_action(struct ds *ds, const struct nlattr *attr)
 {
     static const struct nl_policy ovs_sample_policy[] = {
         [OVS_SAMPLE_ATTR_PROBABILITY] = { .type = NL_A_U32 },
+        [OVS_SAMPLE_ATTR_FLAGS] = { .type = NL_A_U32, .optional = true },
         [OVS_SAMPLE_ATTR_ACTIONS] = { .type = NL_A_NESTED }
     };
     struct nlattr *a[ARRAY_SIZE(ovs_sample_policy)];
@@ -172,6 +184,14 @@ format_odp_sample_action(struct ds *ds, const struct nlattr *attr)
                         UINT32_MAX;
 
     ds_put_format(ds, "(sample=%.1f%%,", percentage);
+
+    if (a[OVS_SAMPLE_ATTR_FLAGS]) {
+        uint32_t flags = nl_attr_get_u32(a[OVS_SAMPLE_ATTR_FLAGS]);
+
+        ds_put_cstr(ds, "flags(");
+        format_flags(ds, sample_flags_to_string, flags, ',');
+        ds_put_cstr(ds, "),");
+    }
 
     ds_put_cstr(ds, "actions(");
     nla_acts = nl_attr_get(a[OVS_SAMPLE_ATTR_ACTIONS]);

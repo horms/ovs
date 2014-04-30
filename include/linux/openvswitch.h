@@ -478,6 +478,14 @@ enum ovs_flow_attr {
 
 #define OVS_FLOW_ATTR_MAX (__OVS_FLOW_ATTR_MAX - 1)
 
+enum ovs_sample_flags {
+	OVS_SAMPLE_FLAG_SIDE_EFFECTS = 1 << 0, /* Allow actions with side
+						* effects in sample actions.
+						* The side effects are contained
+						* within the execution of the
+						* sample action. */
+};
+
 /**
  * enum ovs_sample_attr - Attributes for %OVS_ACTION_ATTR_SAMPLE action.
  * @OVS_SAMPLE_ATTR_PROBABILITY: 32-bit fraction of packets to sample with
@@ -486,6 +494,8 @@ enum ovs_flow_attr {
  * fractions of packets.
  * @OVS_SAMPLE_ATTR_ACTIONS: Set of actions to execute in sampling event.
  * Actions are passed as nested attributes.
+ * @OVS_SAMPLE_ATTR_FLAGS: Bitmap of enum ovs_sample_flags values.
+ *                         If absent a bitmap of all zeros is assumed.
  *
  * Executes the specified actions with the given probability on a per-packet
  * basis.
@@ -494,6 +504,7 @@ enum ovs_sample_attr {
 	OVS_SAMPLE_ATTR_UNSPEC,
 	OVS_SAMPLE_ATTR_PROBABILITY, /* u32 number */
 	OVS_SAMPLE_ATTR_ACTIONS,     /* Nested OVS_ACTION_ATTR_* attributes. */
+	OVS_SAMPLE_ATTR_FLAGS,       /* u32 number which is a bitmap of */
 	__OVS_SAMPLE_ATTR_MAX,
 };
 

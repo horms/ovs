@@ -179,6 +179,7 @@ odp_execute_sample(void *dp, struct ofpbuf *packet, bool steal,
             subactions = a;
             break;
 
+        case OVS_SAMPLE_ATTR_FLAGS:
         case OVS_SAMPLE_ATTR_UNSPEC:
         case __OVS_SAMPLE_ATTR_MAX:
         default:
