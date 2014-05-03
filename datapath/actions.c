@@ -596,8 +596,8 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 
 			err = execute_recirc(dp, recirc_skb, a);
 
-			if (last_action || err)
-				return err;
+			if (unlikely(err && recirc_skb != skb))
+				kfree_skb(recirc_skb);
 
 			break;
 		}
