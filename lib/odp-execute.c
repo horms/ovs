@@ -503,6 +503,8 @@ requires_datapath_assistance(const struct nlattr *a)
     case OVS_ACTION_ATTR_HASH:
     case OVS_ACTION_ATTR_PUSH_MPLS:
     case OVS_ACTION_ATTR_POP_MPLS:
+    case OVS_ACTION_ATTR_POP_ETH:
+    case OVS_ACTION_ATTR_PUSH_ETH:
         return false;
 
     case OVS_ACTION_ATTR_UNSPEC:
@@ -620,6 +622,22 @@ odp_execute_actions(void *dp, struct dp_packet **packets, int cnt, bool steal,
                 /* We do not need to free the packets. odp_execute_sample() has
                  * stolen them*/
                 return;
+            }
+            break;
+
+        case OVS_ACTION_ATTR_PUSH_ETH: {
+            const struct ovs_action_push_eth *eth = nl_attr_get(a);
+
+            for (i = 0; i < cnt; i++) {
+                push_eth(packets[i], &eth->addresses.eth_dst,
+                         &eth->addresses.eth_src, eth->eth_type);
+            }
+            break;
+        }
+
+        case OVS_ACTION_ATTR_POP_ETH:
+            for (i = 0; i < cnt; i++) {
+                pop_eth(packets[i]);
             }
             break;
 

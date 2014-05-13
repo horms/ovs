@@ -317,6 +317,11 @@ size_t odp_put_userspace_action(uint32_t pid,
                                 odp_port_t tunnel_out_port,
                                 bool include_actions,
                                 struct ofpbuf *odp_actions);
+void odp_put_pop_eth_action(struct ofpbuf *odp_actions);
+void odp_put_push_eth_action(struct ofpbuf *odp_actions,
+                             const struct eth_addr *eth_src,
+                             const struct eth_addr *eth_dst,
+                             const ovs_be16 eth_type);
 void odp_put_tunnel_action(const struct flow_tnl *tunnel,
                            struct ofpbuf *odp_actions);
 

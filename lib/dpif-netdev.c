@@ -3629,6 +3629,8 @@ dp_execute_cb(void *aux_, struct dp_packet **packets, int cnt,
     case OVS_ACTION_ATTR_SET_MASKED:
     case OVS_ACTION_ATTR_SAMPLE:
     case OVS_ACTION_ATTR_HASH:
+    case OVS_ACTION_ATTR_PUSH_ETH:
+    case OVS_ACTION_ATTR_POP_ETH:
     case OVS_ACTION_ATTR_UNSPEC:
     case __OVS_ACTION_ATTR_MAX:
         OVS_NOT_REACHED();
