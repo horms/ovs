@@ -251,12 +251,20 @@ dp_packet_equal(const struct dp_packet *a, const struct dp_packet *b)
            !memcmp(dp_packet_data(a), dp_packet_data(b), dp_packet_size(a));
 }
 
-/* Get the start of the Ethernet frame.  'l3_ofs' marks the end of the l2
- * headers, so return NULL if it is not set. */
+static inline bool
+dp_packet_is_l3(const struct dp_packet *b)
+{
+    return b->l3_ofs == 0;
+}
+
+/* Get the start of the Ethernet frame.  Return NULL if 'b' is an l3 packet
+ * or if 'l3_ofs', which marks the end of the l2 headers, is not set. */
 static inline void *
 dp_packet_l2(const struct dp_packet *b)
 {
-    return (b->l3_ofs != UINT16_MAX) ? dp_packet_data(b) : NULL;
+    return (b->l3_ofs != UINT16_MAX && !dp_packet_is_l3(b))
+        ?  dp_packet_data(b)
+        : NULL;
 }
 
 /* Resets all layer offsets.  'l3' offset must be set before 'l2' can be

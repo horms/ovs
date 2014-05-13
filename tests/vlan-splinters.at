@@ -28,7 +28,7 @@ for args in '9 p2' '11 p3' '15 p4'; do
 
     # Check that when a packet is received on $splinter_port, it is
     # treated as if it had been received on p1 in the correct VLAN.
-    AT_CHECK([ovs-appctl ofproto/trace ovs-dummy "in_port($splinter_port)"],
+    AT_CHECK([ovs-appctl ofproto/trace ovs-dummy "in_port($splinter_port),eth(src=00:00:00:00:00:00,dst=00:00:00:00:00:00)"],
              [0], [stdout])
     AT_CHECK_UNQUOTED([sed -n '/^Flow/p; /^Datapath/p' stdout], [0], [dnl
 Flow: in_port=$p1,dl_vlan=$vlan,dl_vlan_pcp=0,dl_src=00:00:00:00:00:00,dl_dst=00:00:00:00:00:00,dl_type=0x05ff
@@ -37,7 +37,7 @@ Datapath actions: $access_port
 
     # Check that when an OpenFlow action sends a packet to p1 on
     # splintered VLAN $vlan, it is actually output to $splinter_port.
-    AT_CHECK([ovs-appctl ofproto/trace ovs-dummy "in_port($access_port)"],
+    AT_CHECK([ovs-appctl ofproto/trace ovs-dummy "in_port($access_port),eth(src=00:00:00:00:00:00,dst=00:00:00:00:00:00)"],
              [0], [stdout])
     AT_CHECK_UNQUOTED([tail -1 stdout], [0], [Datapath actions: $splinter_port
 ])
