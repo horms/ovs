@@ -121,6 +121,8 @@ odp_action_len(uint16_t type)
     case OVS_ACTION_ATTR_SET_MASKED: return ATTR_LEN_VARIABLE;
     case OVS_ACTION_ATTR_SAMPLE: return ATTR_LEN_VARIABLE;
     case OVS_ACTION_ATTR_CT: return ATTR_LEN_VARIABLE;
+    case OVS_ACTION_ATTR_PUSH_ETH: return sizeof(struct ovs_action_push_eth);
+    case OVS_ACTION_ATTR_POP_ETH: return 0;
 
     case OVS_ACTION_ATTR_UNSPEC:
     case __OVS_ACTION_ATTR_MAX:
@@ -828,6 +830,16 @@ format_odp_action(struct ds *ds, const struct nlattr *a)
         format_odp_key_attr(nl_attr_get(a), NULL, NULL, ds, true);
         ds_put_cstr(ds, ")");
         break;
+    case OVS_ACTION_ATTR_PUSH_ETH: {
+        const struct ovs_action_push_eth *eth = nl_attr_get(a);
+        ds_put_format(ds, "push_eth(src="ETH_ADDR_FMT",dst="ETH_ADDR_FMT")",
+                      ETH_ADDR_ARGS(eth->addresses.eth_src),
+                      ETH_ADDR_ARGS(eth->addresses.eth_dst));
+        break;
+    }
+    case OVS_ACTION_ATTR_POP_ETH:
+        ds_put_cstr(ds, "pop_eth");
+        break;
     case OVS_ACTION_ATTR_PUSH_VLAN: {
         const struct ovs_action_push_vlan *vlan = nl_attr_get(a);
         ds_put_cstr(ds, "push_vlan(");
@@ -1015,14 +1027,39 @@ parse_odp_userspace_action(const char *s, struct ofpbuf *actions)
             odp_put_userspace_action(pid, user_data, user_data_size,
                                      tunnel_out_port, include_actions, actions);
             res = n + n1;
+            goto out;
         } else if (s[n] == ')') {
             odp_put_userspace_action(pid, user_data, user_data_size,
                                      ODPP_NONE, include_actions, actions);
             res = n + 1;
-        } else {
-            res = -EINVAL;
+            goto out;
         }
     }
+
+    {
+        struct ovs_action_push_eth push;
+        int n1 = -1;
+
+        if (ovs_scan(&s[n], "push_eth(src="ETH_ADDR_SCAN_FMT","
+                     "dst="ETH_ADDR_SCAN_FMT")%n",
+                     ETH_ADDR_SCAN_ARGS(push.addresses.eth_src),
+                     ETH_ADDR_SCAN_ARGS(push.addresses.eth_dst), &n1)) {
+
+            nl_msg_put_unspec(actions, OVS_ACTION_ATTR_PUSH_ETH,
+                              &push, sizeof push);
+
+            res = n + n1;
+            goto out;
+        }
+    }
+
+    if (!strncmp(&s[n], "pop_eth", 7)) {
+        nl_msg_put_flag(actions, OVS_ACTION_ATTR_POP_ETH);
+        res = 7;
+        goto out;
+    }
+
+    res = -EINVAL;
 out:
     ofpbuf_uninit(&buf);
     return res;
@@ -5347,6 +5384,26 @@ odp_put_userspace_action(uint32_t pid,
     nl_msg_end_nested(odp_actions, offset);
 
     return userdata_ofs;
+}
+
+void
+odp_put_pop_eth_action(struct ofpbuf *odp_actions)
+{
+    nl_msg_put_flag(odp_actions, OVS_ACTION_ATTR_POP_ETH);
+}
+
+void
+odp_put_push_eth_action(struct ofpbuf *odp_actions,
+                        const struct eth_addr *eth_src,
+                        const struct eth_addr *eth_dst)
+{
+    struct ovs_action_push_eth eth;
+
+    eth.addresses.eth_src = *eth_src;
+    eth.addresses.eth_dst = *eth_dst;
+
+    nl_msg_put_unspec(odp_actions, OVS_ACTION_ATTR_PUSH_ETH,
+                      &eth, sizeof eth);
 }
 
 void
