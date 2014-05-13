@@ -369,6 +369,8 @@ mf_are_prereqs_ok(const struct mf_field *mf, const struct flow *flow)
     case MFP_NONE:
         return true;
 
+    case MFP_ETHERNET:
+        return flow->base_layer == LAYER_2;
     case MFP_ARP:
       return (flow->dl_type == htons(ETH_TYPE_ARP) ||
               flow->dl_type == htons(ETH_TYPE_RARP));
@@ -456,6 +458,9 @@ mf_mask_field_and_prereqs__(const struct mf_field *mf,
     case MFP_VLAN_VID:
         WC_MASK_FIELD_MASK(wc, vlan_tci, htons(VLAN_CFI));
         break;
+    case MFP_ETHERNET:
+        WC_MASK_FIELD(wc, base_layer);
+        break;
     case MFP_NONE:
         break;
     }
@@ -491,6 +496,11 @@ mf_bitmap_set_field_and_prereqs(const struct mf_field *mf, struct mf_bitmap *bm)
         break;
     case MFP_VLAN_VID:
         bitmap_set1(bm->bm, MFF_VLAN_TCI);
+        break;
+    case MFP_ETHERNET:
+        bitmap_set1(bm->bm, MFF_ETH_SRC);
+        bitmap_set1(bm->bm, MFF_ETH_DST);
+        bitmap_set1(bm->bm, MFF_ETH_TYPE);
         break;
     case MFP_NONE:
         break;

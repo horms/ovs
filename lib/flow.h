@@ -39,6 +39,9 @@ struct dp_packet;
 struct pkt_metadata;
 struct match;
 
+/* Maximum number of supported MPLS labels. */
+#define FLOW_MAX_MPLS_LABELS 3
+
 /* Some flow fields are mutually exclusive or only appear within the flow
  * pipeline.  IPv6 headers are bigger than IPv4 and MPLS, and IPv6 ND packets
  * are bigger than TCP,UDP and IGMP packets. */

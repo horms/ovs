@@ -4459,15 +4459,15 @@ in_port=2 actions=output:1
 ])
 AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
 
-odp_flow="in_port(p1)"
-br_flow="in_port=1"
+odp_flow="in_port(p1),eth(src=00:00:00:00:00:00,dst=00:00:00:00:00:00)"
+br_flow="in_port=1,dl_dst=00:00:00:00:00:00"
 # Test command: ofproto/trace odp_flow with in_port as a name.
 AT_CHECK([ovs-appctl ofproto/trace "$odp_flow"], [0], [stdout])
 AT_CHECK([tail -1 stdout], [0], [dnl
 Datapath actions: 2
 ])
 
-odp_flow="in_port(1)"
+odp_flow="in_port(1),eth(src=00:00:00:00:00:00,dst=00:00:00:00:00:00)"
 # Test command: ofproto/trace odp_flow
 AT_CHECK([ovs-appctl ofproto/trace "$odp_flow"], [0], [stdout])
 AT_CHECK([tail -1 stdout], [0], [dnl

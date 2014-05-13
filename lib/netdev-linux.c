@@ -1045,6 +1045,7 @@ netdev_linux_rxq_recv_sock(int fd, struct dp_packet *buffer)
     }
 
     dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
+    dp_packet_reset_offsets(buffer);
 
     for (cmsg = CMSG_FIRSTHDR(&msgh); cmsg; cmsg = CMSG_NXTHDR(&msgh, cmsg)) {
         const struct tpacket_auxdata *aux;
@@ -1085,6 +1086,7 @@ netdev_linux_rxq_recv_tap(int fd, struct dp_packet *buffer)
     }
 
     dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
+    dp_packet_reset_offsets(buffer);
     return 0;
 }
 

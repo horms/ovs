@@ -168,7 +168,7 @@ void xlate_ofport_set(struct ofproto_dpif *, struct ofbundle *,
                       const struct ofproto_port_queue *qdscp,
                       size_t n_qdscp, enum ofputil_port_config,
                       enum ofputil_port_state, bool is_tunnel,
-                      bool may_enable);
+                      bool may_enable, bool is_l3);
 void xlate_ofport_remove(struct ofport_dpif *);
 
 struct ofproto_dpif * xlate_lookup_ofproto(const struct dpif_backer *,
