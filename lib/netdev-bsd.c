@@ -583,6 +583,7 @@ netdev_rxq_bsd_recv_pcap(struct netdev_rxq_bsd *rxq, struct dp_packet *buffer)
 
         if (ret > 0) {
             dp_packet_set_size(buffer, dp_packet_size(buffer) + arg.retval);
+            dp_packet_reset_offsets(buffer);
             return 0;
         }
         if (ret == -1) {
@@ -609,6 +610,7 @@ netdev_rxq_bsd_recv_tap(struct netdev_rxq_bsd *rxq, struct dp_packet *buffer)
         ssize_t retval = read(rxq->fd, dp_packet_data(buffer), size);
         if (retval >= 0) {
             dp_packet_set_size(buffer, dp_packet_size(buffer) + retval);
+            dp_packet_reset_offsets(buffer);
             return 0;
         } else if (errno != EINTR) {
             if (errno != EAGAIN) {
