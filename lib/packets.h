@@ -104,6 +104,8 @@ struct pkt_metadata {
     uint32_t ct_mark;           /* Connection mark. */
     ovs_u128 ct_label;          /* Connection label. */
     union flow_in_port in_port; /* Input port. */
+    ovs_be16 packet_ethertype;  /* Ethertype of the packet */
+    uint8_t base_layer;         /* Packet starts at this layer */
     struct flow_tnl tunnel;     /* Encapsulating tunnel parameters. Note that
                                  * if 'ip_dst' == 0, the rest of the fields may
                                  * be uninitialized. */
