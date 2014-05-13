@@ -23,7 +23,7 @@
 /* This sequence number should be incremented whenever anything involving flows
  * or the wildcarding of flows changes.  This will cause build assertion
  * failures in places which likely need to be updated. */
-#define FLOW_WC_SEQ 35
+#define FLOW_WC_SEQ 36
 
 /* Number of Open vSwitch extension 32-bit registers. */
 #define FLOW_N_REGS 8
@@ -52,6 +52,11 @@ BUILD_ASSERT_DECL(FLOW_TNL_F_OAM == NX_TUN_FLAG_OAM);
 
 const char *flow_tun_flag_to_string(uint32_t flags);
 
+enum base_layer {
+    LAYER_2 = 0,
+    LAYER_3 = 1
+};
+
 /* Maximum number of supported MPLS labels. */
 #define FLOW_MAX_MPLS_LABELS 3
 
@@ -70,6 +75,10 @@ const char *flow_tun_flag_to_string(uint32_t flags);
  * The fields are organized in four segments to facilitate staged lookup, where
  * lower layer fields are first used to determine if the later fields need to
  * be looked at.  This enables better wildcarding for datapath flows.
+ *
+ * The starting layer is specified by 'base_layer'.  When 'base_layer' is
+ * LAYER_3, dl_src, dl_tci, and vlan_tci are not used for matching. The
+ * dl_type field is still used to specify the layer 3 protocol.
  *
  * NOTE: Order of the fields is significant, any change in the order must be
  * reflected in miniflow_extract()!
@@ -92,6 +101,8 @@ struct flow {
     ovs_u128 ct_label;          /* Connection label. */
     uint32_t conj_id;           /* Conjunction ID. */
     ofp_port_t actset_output;   /* Output port in action set. */
+    uint8_t base_layer;         /* Fields start at this layer */
+    uint8_t pad2[7];            /* Pad to 64 bits. */
 
     /* L2, Order the same as in the Ethernet header! (64-bit aligned) */
     struct eth_addr dl_dst;     /* Ethernet destination address. */
@@ -129,8 +140,8 @@ BUILD_ASSERT_DECL(sizeof(struct flow_tnl) % sizeof(uint64_t) == 0);
 
 /* Remember to update FLOW_WC_SEQ when changing 'struct flow'. */
 BUILD_ASSERT_DECL(offsetof(struct flow, igmp_group_ip4) + sizeof(uint32_t)
-                  == sizeof(struct flow_tnl) + 216
-                  && FLOW_WC_SEQ == 35);
+                  == sizeof(struct flow_tnl) + 224
+                  && FLOW_WC_SEQ == 36);
 
 /* Incremental points at which flow classification may be performed in
  * segments.
