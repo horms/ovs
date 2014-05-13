@@ -504,6 +504,8 @@ requires_datapath_assistance(const struct nlattr *a)
     case OVS_ACTION_ATTR_PUSH_MPLS:
     case OVS_ACTION_ATTR_POP_MPLS:
     case OVS_ACTION_ATTR_TRUNC:
+    case OVS_ACTION_ATTR_POP_ETH:
+    case OVS_ACTION_ATTR_PUSH_ETH:
         return false;
 
     case OVS_ACTION_ATTR_UNSPEC:
@@ -636,6 +638,22 @@ odp_execute_actions(void *dp, struct dp_packet_batch *batch, bool steal,
             }
             break;
         }
+
+        case OVS_ACTION_ATTR_PUSH_ETH: {
+            const struct ovs_action_push_eth *eth = nl_attr_get(a);
+
+            for (i = 0; i < cnt; i++) {
+                push_eth(packets[i], &eth->addresses.eth_dst,
+                         &eth->addresses.eth_src);
+            }
+            break;
+        }
+
+        case OVS_ACTION_ATTR_POP_ETH:
+            for (i = 0; i < cnt; i++) {
+                pop_eth(packets[i]);
+            }
+            break;
 
         case OVS_ACTION_ATTR_OUTPUT:
         case OVS_ACTION_ATTR_TUNNEL_PUSH:
