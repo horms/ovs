@@ -273,6 +273,7 @@ dummy_packet_stream_run(struct netdev_dummy *dev, struct dummy_packet_stream *s)
                                           dp_packet_clone(&s->rxbuf), 0);
                 dp_packet_clear(&s->rxbuf);
             }
+            dp_packet_reset_offsets(&s->rxbuf);
         } else if (retval != -EAGAIN) {
             error = (retval < 0 ? -retval
                      : dp_packet_size(&s->rxbuf) ? EPROTO

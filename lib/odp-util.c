@@ -4307,7 +4307,7 @@ odp_flow_key_from_flow__(const struct odp_flow_key_parms *parms,
                          bool export_mask, struct ofpbuf *buf)
 {
     struct ovs_key_ethernet *eth_key;
-    size_t encap;
+    size_t encap = 0;
     const struct flow *flow = parms->flow;
     const struct flow *data = export_mask ? parms->mask : parms->flow;
 
@@ -4345,41 +4345,43 @@ odp_flow_key_from_flow__(const struct odp_flow_key_parms *parms,
         nl_msg_put_odp_port(buf, OVS_KEY_ATTR_IN_PORT, data->in_port.odp_port);
     }
 
-    eth_key = nl_msg_put_unspec_uninit(buf, OVS_KEY_ATTR_ETHERNET,
-                                       sizeof *eth_key);
-    get_ethernet_key(data, eth_key);
+    if (flow->base_layer == LAYER_2) {
+        eth_key = nl_msg_put_unspec_uninit(buf, OVS_KEY_ATTR_ETHERNET,
+                                           sizeof *eth_key);
+        get_ethernet_key(data, eth_key);
 
-    if (flow->vlan_tci != htons(0) || flow->dl_type == htons(ETH_TYPE_VLAN)) {
-        if (export_mask) {
-            nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, OVS_BE16_MAX);
-        } else {
-            nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, htons(ETH_TYPE_VLAN));
+        if (flow->vlan_tci != htons(0) ||
+            flow->dl_type == htons(ETH_TYPE_VLAN)) {
+            if (export_mask) {
+                nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, OVS_BE16_MAX);
+            } else {
+                nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE,
+                                htons(ETH_TYPE_VLAN));
+            }
+            nl_msg_put_be16(buf, OVS_KEY_ATTR_VLAN, data->vlan_tci);
+            encap = nl_msg_start_nested(buf, OVS_KEY_ATTR_ENCAP);
+            if (flow->vlan_tci == htons(0)) {
+                goto unencap;
+            }
         }
-        nl_msg_put_be16(buf, OVS_KEY_ATTR_VLAN, data->vlan_tci);
-        encap = nl_msg_start_nested(buf, OVS_KEY_ATTR_ENCAP);
-        if (flow->vlan_tci == htons(0)) {
+
+        if (ntohs(flow->dl_type) < ETH_TYPE_MIN) {
+            /* For backwards compatibility with kernels that don't support
+             * wildcarding, the following convention is used to encode the
+             * OVS_KEY_ATTR_ETHERTYPE for key and mask:
+             *
+             *   key      mask    matches
+             * -------- --------  -------
+             *  >0x5ff   0xffff   Specified Ethernet II Ethertype.
+             *  >0x5ff      0     Any Ethernet II or non-Ethernet II frame.
+             *  <none>   0xffff   Any non-Ethernet II frame (except valid
+             *                    802.3 SNAP packet with valid eth_type).
+             */
+            if (export_mask) {
+                nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, OVS_BE16_MAX);
+            }
             goto unencap;
         }
-    } else {
-        encap = 0;
-    }
-
-    if (ntohs(flow->dl_type) < ETH_TYPE_MIN) {
-        /* For backwards compatibility with kernels that don't support
-         * wildcarding, the following convention is used to encode the
-         * OVS_KEY_ATTR_ETHERTYPE for key and mask:
-         *
-         *   key      mask    matches
-         * -------- --------  -------
-         *  >0x5ff   0xffff   Specified Ethernet II Ethertype.
-         *  >0x5ff      0     Any Ethernet II or non-Ethernet II frame.
-         *  <none>   0xffff   Any non-Ethernet II frame (except valid
-         *                    802.3 SNAP packet with valid eth_type).
-         */
-        if (export_mask) {
-            nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, OVS_BE16_MAX);
-        }
-        goto unencap;
     }
 
     nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, data->dl_type);
@@ -4538,6 +4540,10 @@ odp_key_from_pkt_metadata(struct ofpbuf *buf, const struct pkt_metadata *md)
     if (md->in_port.odp_port != ODPP_NONE) {
         nl_msg_put_odp_port(buf, OVS_KEY_ATTR_IN_PORT, md->in_port.odp_port);
     }
+
+    if (md->base_layer == LAYER_3) {
+        nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, md->packet_ethertype);
+    }
 }
 
 /* Generate packet metadata from the given ODP flow key. */
@@ -4546,10 +4552,13 @@ odp_key_to_pkt_metadata(const struct nlattr *key, size_t key_len,
                         struct pkt_metadata *md)
 {
     const struct nlattr *nla;
+    ovs_be16 ethertype;
     size_t left;
     uint32_t wanted_attrs = 1u << OVS_KEY_ATTR_PRIORITY |
         1u << OVS_KEY_ATTR_SKB_MARK | 1u << OVS_KEY_ATTR_TUNNEL |
-        1u << OVS_KEY_ATTR_IN_PORT;
+        1u << OVS_KEY_ATTR_IN_PORT | 1u << OVS_KEY_ATTR_ETHERTYPE |
+        1u << OVS_KEY_ATTR_ETHERNET | 1u << OVS_KEY_ATTR_IPV4 |
+        1u << OVS_KEY_ATTR_IPV6;
 
     pkt_metadata_init(md, ODPP_NONE);
 
@@ -4614,14 +4623,38 @@ odp_key_to_pkt_metadata(const struct nlattr *key, size_t key_len,
             md->in_port.odp_port = nl_attr_get_odp_port(nla);
             wanted_attrs &= ~(1u << OVS_KEY_ATTR_IN_PORT);
             break;
+        case OVS_KEY_ATTR_ETHERNET:
+            wanted_attrs &= ~(1u << OVS_KEY_ATTR_ETHERNET);
+            break;
+        case OVS_KEY_ATTR_ETHERTYPE:
+            ethertype = nl_attr_get_be16(nla);
+            wanted_attrs &= ~(1u << OVS_KEY_ATTR_ETHERTYPE);
+            break;
+        case OVS_KEY_ATTR_IPV4:
+            wanted_attrs &= ~(1u << OVS_KEY_ATTR_IPV4);
+            break;
+        case OVS_KEY_ATTR_IPV6:
+            wanted_attrs &= ~(1u << OVS_KEY_ATTR_IPV6);
+            break;
         default:
             break;
         }
 
         if (!wanted_attrs) {
-            return; /* Have everything. */
+            break; /* Have everything. */
         }
     }
+
+    /* OVS_KEY_ATTR_ETHERTYPE present and OVS_KEY_ATTR_ETHERNET absent
+     * indicates Layer 3. */
+    if (!(wanted_attrs & (1u << OVS_KEY_ATTR_ETHERTYPE)) &&
+        wanted_attrs & (1u << OVS_KEY_ATTR_ETHERNET)) {
+        md->base_layer = LAYER_3;
+        md->packet_ethertype = ethertype;
+    } else {
+        md->base_layer = LAYER_2;
+    }
+
 }
 
 uint32_t
@@ -4785,7 +4818,15 @@ parse_ethertype(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
         *expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_ETHERTYPE;
     } else {
         if (!is_mask) {
-            flow->dl_type = htons(FLOW_DL_TYPE_NONE);
+            if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV4)) {
+                flow->dl_type = htons(ETH_TYPE_IP);
+            } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV6)) {
+                flow->dl_type = htons(ETH_TYPE_IPV6);
+            } else {
+                flow->dl_type = htons(FLOW_DL_TYPE_NONE);
+            }
+        } else if (src_flow->base_layer == LAYER_3) {
+            flow->dl_type = htons(0xffff);
         } else if (ntohs(src_flow->dl_type) < ETH_TYPE_MIN) {
             /* See comments in odp_flow_key_from_flow__(). */
             VLOG_ERR_RL(&rl, "mask expected for non-Ethernet II frame");
@@ -5204,12 +5245,13 @@ odp_flow_key_to_flow__(const struct nlattr *key, size_t key_len,
 
         eth_key = nl_attr_get(attrs[OVS_KEY_ATTR_ETHERNET]);
         put_ethernet_key(eth_key, flow);
-        if (is_mask) {
-            expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_ETHERNET;
-        }
-    }
-    if (!is_mask) {
+        flow->base_layer = LAYER_2;
         expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_ETHERNET;
+    } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_ETHERTYPE)) {
+        flow->base_layer = LAYER_3;
+        expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_ETHERTYPE;
+    } else if (is_mask && src_flow->base_layer == LAYER_3) {
+        flow->base_layer = LAYER_3;
     }
 
     /* Get Ethertype or 802.1Q TPID or FLOW_DL_TYPE_NONE. */
