@@ -55,10 +55,10 @@
 static void ofp_print_queue_name(struct ds *string, uint32_t port);
 static void ofp_print_error(struct ds *, enum ofperr);
 
-/* Returns a string that represents the contents of the Ethernet frame in the
+/* Returns a string that represents the contents of the packet in the
  * 'len' bytes starting at 'data'.  The caller must free the returned string.*/
 char *
-ofp_packet_to_string(const void *data, size_t len)
+ofp_packet_to_string(const void *data, size_t len, bool is_layer3)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     struct dp_packet buf;
@@ -66,6 +66,9 @@ ofp_packet_to_string(const void *data, size_t len)
     size_t l4_size;
 
     dp_packet_use_const(&buf, data, len);
+    if (is_layer3) {
+        buf.l3_ofs = 0;
+    }
     flow_extract(&buf, &flow);
     flow_format(&ds, &flow);
 
@@ -200,7 +203,7 @@ ofp_print_packet_in(struct ds *string, const struct ofp_header *oh,
 
     if (verbosity > 0) {
         char *packet = ofp_packet_to_string(public->packet,
-                                            public->packet_len);
+                                            public->packet_len, false);
         ds_put_cstr(string, packet);
         free(packet);
     }
@@ -236,7 +239,7 @@ ofp_print_packet_out(struct ds *string, const struct ofp_header *oh,
     if (po.buffer_id == UINT32_MAX) {
         ds_put_format(string, " data_len=%"PRIuSIZE, po.packet_len);
         if (verbosity > 0 && po.packet_len > 0) {
-            char *packet = ofp_packet_to_string(po.packet, po.packet_len);
+            char *packet = ofp_packet_to_string(po.packet, po.packet_len, false);
             ds_put_char(string, '\n');
             ds_put_cstr(string, packet);
             free(packet);
@@ -3580,5 +3583,5 @@ ofp_print(FILE *stream, const void *oh, size_t len, int verbosity)
 void
 ofp_print_packet(FILE *stream, const void *data, size_t len)
 {
-    print_and_free(stream, ofp_packet_to_string(data, len));
+    print_and_free(stream, ofp_packet_to_string(data, len, false));
 }

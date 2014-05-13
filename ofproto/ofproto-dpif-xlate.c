@@ -156,6 +156,7 @@ struct xport {
 
     bool may_enable;                 /* May be enabled in bonds. */
     bool is_tunnel;                  /* Is a tunnel port. */
+    bool is_layer3;                  /* Is a layer 3 port. */
 
     struct cfm *cfm;                 /* CFM handle or null. */
     struct bfd *bfd;                 /* BFD handle or null. */
@@ -601,7 +602,7 @@ static void xlate_xport_set(struct xport *xport, odp_port_t odp_port,
                             int stp_port_no, const struct rstp_port *rstp_port,
                             enum ofputil_port_config config,
                             enum ofputil_port_state state, bool is_tunnel,
-                            bool may_enable);
+                            bool may_enable, bool is_layer3);
 static void xlate_xbridge_remove(struct xlate_cfg *, struct xbridge *);
 static void xlate_xbundle_remove(struct xlate_cfg *, struct xbundle *);
 static void xlate_xport_remove(struct xlate_cfg *, struct xport *);
@@ -764,12 +765,13 @@ xlate_xport_set(struct xport *xport, odp_port_t odp_port,
                 const struct bfd *bfd, const struct lldp *lldp, int stp_port_no,
                 const struct rstp_port* rstp_port,
                 enum ofputil_port_config config, enum ofputil_port_state state,
-                bool is_tunnel, bool may_enable)
+                bool is_tunnel, bool may_enable, bool is_layer3)
 {
     xport->config = config;
     xport->state = state;
     xport->stp_port_no = stp_port_no;
     xport->is_tunnel = is_tunnel;
+    xport->is_layer3 = is_layer3;
     xport->may_enable = may_enable;
     xport->odp_port = odp_port;
 
@@ -860,7 +862,7 @@ xlate_xport_copy(struct xbridge *xbridge, struct xbundle *xbundle,
     xlate_xport_set(new_xport, xport->odp_port, xport->netdev, xport->cfm,
                     xport->bfd, xport->lldp, xport->stp_port_no,
                     xport->rstp_port, xport->config, xport->state,
-                    xport->is_tunnel, xport->may_enable);
+                    xport->is_tunnel, xport->may_enable, xport->is_layer3);
 
     if (xport->peer) {
         struct xport *peer = xport_lookup(new_xcfg, xport->peer->ofport);
@@ -1098,7 +1100,7 @@ xlate_ofport_set(struct ofproto_dpif *ofproto, struct ofbundle *ofbundle,
                  const struct ofproto_port_queue *qdscp_list, size_t n_qdscp,
                  enum ofputil_port_config config,
                  enum ofputil_port_state state, bool is_tunnel,
-                 bool may_enable)
+                 bool may_enable, bool is_layer3)
 {
     size_t i;
     struct xport *xport;
@@ -1119,7 +1121,7 @@ xlate_ofport_set(struct ofproto_dpif *ofproto, struct ofbundle *ofbundle,
 
     xlate_xport_set(xport, odp_port, netdev, cfm, bfd, lldp,
                     stp_port_no, rstp_port, config, state, is_tunnel,
-                    may_enable);
+                    may_enable, is_layer3);
 
     if (xport->peer) {
         xport->peer->peer = NULL;
@@ -2470,7 +2472,7 @@ xlate_normal(struct xlate_ctx *ctx)
     }
 
     /* Learn source MAC. */
-    if (ctx->xin->may_learn) {
+    if (ctx->xin->may_learn && !in_port->is_layer3) {
         update_learning_table(ctx->xbridge, flow, wc, vlan, in_xbundle);
     }
     if (ctx->xin->xcache) {
@@ -2996,7 +2998,7 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
 
     /* If 'struct flow' gets additional metadata, we'll need to zero it out
      * before traversing a patch port. */
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 35);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 36);
     memset(&flow_tnl, 0, sizeof flow_tnl);
 
     if (!xport) {
@@ -3029,6 +3031,16 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
             }
             return;
         }
+    }
+
+    if (xport->is_layer3) {
+        if (flow->base_layer == LAYER_2) {
+            flow->base_layer = LAYER_3;
+            odp_put_pop_eth_action(ctx->odp_actions);
+        }
+    } else if (flow->base_layer == LAYER_3) {
+        flow->base_layer = LAYER_2;
+        odp_put_push_eth_action(ctx->odp_actions, &flow->dl_src, &flow->dl_dst);
     }
 
     if (xport->peer) {
@@ -3646,6 +3658,7 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
                           uint16_t controller_id,
                           const uint8_t *userdata, size_t userdata_len)
 {
+    struct flow *flow = &ctx->xin->flow;
     struct dp_packet_batch batch;
     struct dp_packet *packet;
 
@@ -3656,6 +3669,15 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     }
 
     packet = dp_packet_clone(ctx->xin->packet);
+
+    if (flow->base_layer == LAYER_3) {
+        /* Push ethernet header without setting flow->base_layer to LAYER_2
+         * because packet is a copy of the packet that has no relevance to
+         * subsequent action translation.
+         */
+        odp_put_push_eth_action(ctx->odp_actions, &flow->dl_src, &flow->dl_dst);
+    }
+
     packet_batch_init_packet(&batch, packet);
     odp_execute_actions(NULL, &batch, false,
                         ctx->odp_actions->data, ctx->odp_actions->size, NULL);
