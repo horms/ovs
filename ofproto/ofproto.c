@@ -3194,9 +3194,9 @@ append_port_stat(struct ofport *port, struct list *replies)
 }
 
 static void
-handle_port_request(struct ofconn *ofconn,
-                    const struct ofp_header *request, ofp_port_t port_no,
-                    void (*cb)(struct ofport *, struct list *replies))
+handle_port_request__(struct ofconn *ofconn,
+                      const struct ofp_header *request, ofp_port_t port_no,
+                      void (*cb)(struct ofport *, struct list *replies))
 {
     struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
     struct ofport *port;
@@ -3218,17 +3218,29 @@ handle_port_request(struct ofconn *ofconn,
 }
 
 static enum ofperr
-handle_port_stats_request(struct ofconn *ofconn,
-                          const struct ofp_header *request)
+handle_port_request(struct ofconn *ofconn,
+                    const struct ofp_header *request,
+                    enum ofperr (*decode)(const struct ofp_header *,
+                                          ofp_port_t *),
+                    void (*append)(struct ofport *, struct list *replies))
 {
     ofp_port_t port_no;
     enum ofperr error;
 
-    error = ofputil_decode_port_stats_request(request, &port_no);
+    error = decode(request, &port_no);
     if (!error) {
-        handle_port_request(ofconn, request, port_no, append_port_stat);
+        handle_port_request__(ofconn, request, port_no, append);
     }
     return error;
+}
+
+static enum ofperr
+handle_port_stats_request(struct ofconn *ofconn,
+                          const struct ofp_header *request)
+{
+    return handle_port_request(ofconn, request,
+                               ofputil_decode_port_stats_request,
+                               append_port_stat);
 }
 
 static void
@@ -3241,14 +3253,9 @@ static enum ofperr
 handle_port_desc_stats_request(struct ofconn *ofconn,
                                const struct ofp_header *request)
 {
-    ofp_port_t port_no;
-    enum ofperr error;
-
-    error = ofputil_decode_port_desc_stats_request(request, &port_no);
-    if (!error) {
-        handle_port_request(ofconn, request, port_no, append_port_desc);
-    }
-    return error;
+    return handle_port_request(ofconn, request,
+                               ofputil_decode_port_desc_stats_request,
+                               append_port_desc);
 }
 
 static uint32_t
