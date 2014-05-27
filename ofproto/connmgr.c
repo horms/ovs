@@ -141,6 +141,9 @@ struct ofconn {
 
     /* Active bundles. Contains "struct ofp_bundle"s. */
     struct hmap bundles;
+
+    /* Partial multipart messages. Contains "struct ofmp_req"s. */
+    struct hmap mp_reqs;
 };
 
 static struct ofconn *ofconn_create(struct connmgr *, struct rconn *,
@@ -221,6 +224,16 @@ struct connmgr {
     size_t n_extra_remotes;
     int in_band_queue;
 };
+
+/* Buffer for multipart requests */
+struct ofmp_req {
+    struct hmap_node hmap_node;     /* In struct ofconn's 'mp_reqs' hmap. */
+    struct ofpbuf *front;           /* First message.
+                                     * Remaining messages are linked via its
+                                     * list_node */
+};
+
+static void ofmp_req_destroy(struct ofmp_req *mp_req);
 
 static void update_in_band_remotes(struct connmgr *);
 static void add_snooper(struct connmgr *, struct vconn *);
@@ -1216,6 +1229,7 @@ ofconn_create(struct connmgr *mgr, struct rconn *rconn, enum ofconn_type type,
 
     hmap_init(&ofconn->monitors);
     list_init(&ofconn->updates);
+    hmap_init(&ofconn->mp_reqs);
 
     hmap_init(&ofconn->bundles);
 
@@ -1231,6 +1245,7 @@ ofconn_flush(struct ofconn *ofconn)
     OVS_REQUIRES(ofproto_mutex)
 {
     struct ofmonitor *monitor, *next_monitor;
+    struct ofmp_req *mp_req, *next_mp_req;
     int i;
 
     ofconn_log_flow_mods(ofconn);
@@ -1311,6 +1326,9 @@ ofconn_flush(struct ofconn *ofconn)
                         &ofconn->monitors) {
         ofmonitor_destroy(monitor);
     }
+    HMAP_FOR_EACH_SAFE (mp_req, next_mp_req, hmap_node, &ofconn->mp_reqs) {
+        ofmp_req_destroy(mp_req);
+    }
     rconn_packet_counter_destroy(ofconn->monitor_counter);
     ofconn->monitor_counter = rconn_packet_counter_create();
     ofpbuf_list_delete(&ofconn->updates); /* ...but it should be empty. */
@@ -1329,6 +1347,7 @@ ofconn_destroy(struct ofconn *ofconn)
     ofp_bundle_remove_all(ofconn);
 
     hmap_destroy(&ofconn->monitors);
+    hmap_destroy(&ofconn->mp_reqs);
     list_remove(&ofconn->node);
     rconn_destroy(ofconn->rconn);
     rconn_packet_counter_destroy(ofconn->packet_in_counter);
@@ -1371,6 +1390,143 @@ ofconn_may_recv(const struct ofconn *ofconn)
     return (!ofconn->blocked || ofconn->retry) && count < OFCONN_REPLY_MAX;
 }
 
+static struct ofmp_req *
+ofmp_req_create(void)
+{
+    struct ofmp_req *mp_req;
+
+    mp_req = xmalloc(sizeof *mp_req);
+    mp_req->front = NULL;
+
+    return mp_req;
+}
+
+/* Destroy a buffered multipart request and all its component messages */
+static void
+ofmp_req_destroy(struct ofmp_req *mp_req)
+{
+    if (mp_req->front) {
+        ofpbuf_list_delete(&mp_req->front->list_node);
+    }
+    free(mp_req);
+}
+
+static uint32_t
+ofmp_req_hash(ovs_be32 xid)
+{
+    return hash_int(ntohl(xid), 0);
+}
+
+/* Find the buffer for a multipart message in 'ofconn'
+ * with transaction id 'xid' using 'hash' which is calculated
+ * as ofmpp_req_hash(xid) */
+static struct ofmp_req *
+ofmp_req_find(const struct ofconn *ofconn, ovs_be32 xid, ovs_be32 hash)
+{
+    struct ofmp_req *mp_req;
+
+    HMAP_FOR_EACH_WITH_HASH (mp_req, hmap_node, hash, &ofconn->mp_reqs) {
+        const struct ofp_header *oh = ofpbuf_data(mp_req->front);
+
+        if (xid == oh->xid) {
+            return mp_req;
+        }
+    }
+
+    return NULL;
+}
+
+/* Buffer 'part' as a component of a multipart request 'mp_req' in 'ofconn'
+ * using 'hash' which is calculated as ofmpp_req_hash(xid), where xid
+ * is the transaction id of 'part'.
+ *
+ * If 'mp_req' is NULL then create a new multipart request buffer in
+ * 'ofconn'. */
+static struct ofmp_req *
+ofmp_req_add(struct ofconn *ofconn, struct ofmp_req *mp_req,
+             struct ofpbuf *part, uint32_t hash)
+{
+    if (!mp_req) {
+        mp_req = ofmp_req_create();
+        hmap_insert(&ofconn->mp_reqs, &mp_req->hmap_node, hash);
+        mp_req->front = part;
+    } else {
+        list_push_back(&mp_req->front->list_node, &part->list_node);
+    }
+
+    return mp_req;
+}
+
+/* Disconnect the component messages from the multipart request buffer
+ * 'mp_req' and free memory associated with 'mp_req'. Returns the front
+ * message of the multipart request.
+ *
+ * This should be called once all components of a buffered multipart
+ * request have been received. */
+static struct ofpbuf *
+ofmp_req_finished(struct ofmp_req *mp_req)
+{
+    struct ofpbuf *front;
+
+    front = mp_req->front;
+    mp_req->front = NULL;
+    ofmp_req_destroy(mp_req);
+
+    return front;
+}
+
+/* Filter 'msg' received for 'ofconn' and:
+ * - Return 'msg' if it is not recognised as part of a multi-part request
+ *   or is a multi-part request with only one component message.
+ *   The caller may process the message.
+ * - Buffer the multipart request if it is a part of
+ *   of a multi-part request but is not the last part.
+ *   This indicates to the caller that no further processing should
+ *   occur at this time.
+ * - Otherwise this is the last part of a multi-part request with more
+ *   than one component message. Return the first part of the multi-part
+ *   request. The subsequent parts will are available in the list_node
+ *   field of the message returned. The caller may process all parts of
+ *   the multi-part message. */
+static struct ofpbuf *
+ofmp_req_filter(struct ofconn *ofconn, struct ofpbuf *msg)
+{
+    const struct ofp_header *oh = ofpbuf_data(msg);
+    uint32_t hash = ofmp_req_hash(oh->xid);
+    struct ofmp_req *mp_req;
+    bool more;
+
+    /* If the message is not a multi-part request then
+     * there is nothing to do here. */
+    if (oh->version < OFP13_VERSION || !ofpmsg_is_stat_request(oh)) {
+        return msg;
+    }
+
+    more = ofpmp_more(oh);
+
+    /* Find any previous parts of the multi-part message */
+    mp_req = ofmp_req_find(ofconn, oh->xid, hash);
+
+    if (!mp_req && !more) {
+        /* Singleton multi-part message, it can be processed as-is */
+        return msg;
+    }
+
+    /* Add this msg to the previous parts of the multi-part message */
+    mp_req = ofmp_req_add(ofconn, mp_req, msg, hash);
+
+    /* More to come: leave the parts stored in its mp_req
+     * and do no further processing for now */
+    if (more) {
+        return NULL;
+    }
+
+    /* The last part.
+     * Return the first part which is linked to all the other parts
+     * via its list_node */
+    return ofmp_req_finished(mp_req);
+}
+
 static void
 ofconn_run(struct ofconn *ofconn,
            bool (*handle_openflow)(struct ofconn *,
@@ -1399,11 +1555,17 @@ ofconn_run(struct ofconn *ofconn,
             if (!of_msg) {
                 break;
             }
+            list_init(&of_msg->list_node);
+            of_msg = ofmp_req_filter(ofconn, of_msg);
+            if (!of_msg) {
+                continue;
+            }
             if (mgr->fail_open) {
                 fail_open_maybe_recover(mgr->fail_open);
             }
 
             if (handle_openflow(ofconn, of_msg)) {
+                ofpbuf_list_delete(&of_msg->list_node);
                 ofpbuf_delete(of_msg);
                 ofconn->blocked = NULL;
             } else {
