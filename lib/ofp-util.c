@@ -5272,7 +5272,9 @@ ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
     rq->id = ntohl(nfmr->id);
     rq->flags = nx_to_ofp14_flow_monitor_flags(flags);
     rq->out_port = u16_to_ofp(ntohs(nfmr->out_port));
+    rq->out_group = OFPG_ANY;
     rq->table_id = nfmr->table_id;
+    rq->command = OFPFMC14_ADD;
 
     return nx_pull_match(msg, ntohs(nfmr->match_len), &rq->match, NULL, NULL);
 }
