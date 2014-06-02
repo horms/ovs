@@ -842,7 +842,9 @@ struct ofputil_flow_monitor_request {
     uint32_t id;
     enum ofp14_flow_monitor_flags flags;
     ofp_port_t out_port;
+    uint32_t out_group;
     uint8_t table_id;
+    enum ofp14_flow_monitor_command command;
     struct match match;
 };
 
