@@ -4829,9 +4829,13 @@ ofproto_collect_ofmonitor_refresh_rule(const struct ofmonitor *m,
         return;
     }
 
-    if (!(rule->pending
-          ? ofoperation_has_out_port(rule->pending, m->out_port)
-          : ofproto_rule_has_out_port(rule, m->out_port))) {
+    if (rule->pending) {
+        if (!ofoperation_has_out_port(rule->pending, m->out_port)
+            || ofoperation_has_out_group(rule->pending, m->out_group)) {
+            return;
+        }
+    } else if (!ofproto_rule_has_out_port(rule, m->out_port)
+               || !ofproto_rule_has_out_group(rule, m->out_group)) {
         return;
     }
 
