@@ -4880,12 +4880,23 @@ handle_flow_monitor_request(struct ofconn *ofconn, const struct ofp_header *oh)
             goto error;
         }
 
-        error = ofmonitor_create(&request, ofconn, &m);
-        if (error) {
-            goto error;
+        if (request.command == OFPFMC14_DELETE ||
+            request.command == OFPFMC14_MODIFY) {
+            error = flow_monitor_delete(ofconn, request.id);
+            if (error) {
+                goto error;
+            }
         }
 
-        list_insert(&monitor_list, &m->list_node);
+        if (request.command == OFPFMC14_ADD ||
+            request.command == OFPFMC14_MODIFY) {
+            error = ofmonitor_create(&request, ofconn, &m);
+            if (error) {
+                goto error;
+            }
+
+            list_insert(&monitor_list, &m->list_node);
+        }
     }
 
     rule_collection_init(&rules);
