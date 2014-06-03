@@ -1975,6 +1975,18 @@ OFPST_PORT_DESC reply (xid=0x0):
 ])
 AT_CLEANUP
 
+AT_SETUP([OFPST_FLOW_MONITOR request - OF1.4])
+AT_KEYWORDS([ofp-print OFPT_STATS_REQUEST])
+AT_CHECK([ovs-ofctl ofp-print "\
+05 12 00 30 00 00 00 02 00 10 00 00 00 00 00 00 \
+00 00 00 01 00 00 00 05 00 00 00 08 00 7f 00 00 \
+00 01 00 0a 80 00 0c 02 10 09 00 00 00 00 00 00 \
+"], [0], [dnl
+OFPST_FLOW_MONITOR request (OF1.4) (xid=0x2):
+ command=ADD id=1 flags=initial,add,delete,modify,instructions,no_abbrev,only_own out_port=5 out_group=8 table=0 dl_vlan=9
+])
+AT_CLEANUP
+
 AT_SETUP([OFPST_PORT_DESC reply - OF1.4])
 AT_KEYWORDS([ofp-print OFPT_STATS_REPLY])
 AT_CHECK([ovs-ofctl ofp-print "\
