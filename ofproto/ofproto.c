@@ -4758,7 +4758,8 @@ ofproto_collect_ofmonitor_refresh_rule(const struct ofmonitor *m,
         return;
     }
 
-    if (!ofproto_rule_has_out_port(rule, m->out_port)) {
+    if (!ofproto_rule_has_out_port(rule, m->out_port)
+         || !ofproto_rule_has_out_group(rule, m->out_group)) {
         return;
     }
 
