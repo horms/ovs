@@ -471,6 +471,8 @@ void ofoperation_complete(struct ofoperation *, enum ofperr);
 
 bool ofoperation_has_out_port(const struct ofoperation *, ofp_port_t out_port)
     OVS_REQUIRES(ofproto_mutex);
+bool ofoperation_has_out_group(const struct ofoperation *, uint32_t out_group)
+    OVS_REQUIRES(ofproto_mutex);
 
 /* A group within a "struct ofproto".
  *
