@@ -2710,6 +2710,30 @@ ofoperation_has_out_port(const struct ofoperation *op, ofp_port_t out_port)
     OVS_NOT_REACHED();
 }
 
+/* Returns true if a rule related to 'op' has an OpenFlow OFPAT_OUTPUT or
+ * OFPAT_ENQUEUE action that outputs to 'out_group'. */
+bool
+ofoperation_has_out_group(const struct ofoperation *op, uint32_t out_group)
+    OVS_REQUIRES(ofproto_mutex)
+{
+    if (ofproto_rule_has_out_group(op->rule, out_group)) {
+        return true;
+    }
+
+    switch (op->type) {
+    case OFOPERATION_ADD:
+    case OFOPERATION_DELETE:
+        return false;
+
+    case OFOPERATION_MODIFY:
+    case OFOPERATION_REPLACE:
+        return ofpacts_output_to_group(op->actions->ofpacts,
+                                       op->actions->ofpacts_len, out_group);
+    }
+
+    OVS_NOT_REACHED();
+}
+
 static void
 rule_execute_destroy(struct rule_execute *e)
 {
