@@ -2034,6 +2034,7 @@ ofmonitor_create(const struct ofputil_flow_monitor_request *request,
     m->out_group = request->out_group;
     m->table_id = request->table_id;
     minimatch_init(&m->match, &request->match);
+    list_init(&m->list_node);
 
     *monitorp = m;
     return 0;
@@ -2061,6 +2062,7 @@ ofmonitor_destroy(struct ofmonitor *m)
     if (m) {
         minimatch_destroy(&m->match);
         hmap_remove(&m->ofconn->monitors, &m->ofconn_node);
+        list_remove(&m->list_node);
         free(m);
     }
 }
