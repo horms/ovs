@@ -2184,16 +2184,50 @@ nx_flow_monitor_flags_to_name(uint32_t bit)
     return NULL;
 }
 
+static const char *
+ofp_flow_monitor_flags_to_name(uint32_t bit)
+{
+    enum ofp14_flow_monitor_flags fmf = bit;
+
+    switch (fmf) {
+    case OFPFMF14_INITIAL: return "initial";
+    case OFPFMF14_ADD: return "add";
+    case OFPFMF14_REMOVED: return "delete";
+    case OFPFMF14_MODIFY: return "modify";
+    case OFPFMF14_INSTRUCTIONS: return "instructions";
+    case OFPFMF14_NO_ABBREV: return "no_abbrev";
+    case OFPFMF14_ONLY_OWN: return "only_own";
+    }
+
+    return NULL;
+}
+
+static const char *
+ofp_flow_monitor_command_to_name(enum ofp14_flow_monitor_command command)
+{
+    switch (command) {
+    case OFPFMC14_ADD:
+        return "ADD";
+    case OFPFMC14_MODIFY:
+        return "MODIFY";
+    case OFPFMC14_DELETE:
+        return "DELETE";
+    default:
+        OVS_NOT_REACHED();
+    }
+}
+
 static void
-ofp_print_nxst_flow_monitor_request(struct ds *string,
-                                    const struct ofp_header *oh)
+ofp_print_flow_monitor_request(struct ds *string, const struct ofp_header *oh)
 {
     struct ofpbuf b;
+    enum ofpraw raw;
+
+    ofpraw_decode(&raw, oh);
 
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
     for (;;) {
         struct ofputil_flow_monitor_request request;
-        enum nx_flow_monitor_flags nx_flags;
         int retval;
 
         retval = ofputil_decode_flow_monitor_request(&request, &b);
@@ -2204,14 +2238,32 @@ ofp_print_nxst_flow_monitor_request(struct ds *string,
             return;
         }
 
-        ds_put_format(string, "\n id=%"PRIu32" flags=", request.id);
-        nx_flags = nx_from_ofp14_flow_monitor_flags(request.flags);
-        ofp_print_bit_names(string, nx_flags,
-                            nx_flow_monitor_flags_to_name, ',');
+        ds_put_char(string, '\n');
+
+        if (raw == OFPRAW_OFPST14_FLOW_MONITOR_REQUEST) {
+            ds_put_format(string, " command=%s",
+                          ofp_flow_monitor_command_to_name(request.command));
+        }
+
+        ds_put_format(string, " id=%"PRIu32" flags=", request.id);
+        if (raw == OFPRAW_OFPST14_FLOW_MONITOR_REQUEST) {
+            ofp_print_bit_names(string, request.flags,
+                                ofp_flow_monitor_flags_to_name, ',');
+        } else {
+            enum nx_flow_monitor_flags nx_flags;
+            nx_flags = nx_from_ofp14_flow_monitor_flags(request.flags);
+            ofp_print_bit_names(string, nx_flags,
+                                nx_flow_monitor_flags_to_name, ',');
+        }
 
         if (request.out_port != OFPP_NONE) {
             ds_put_cstr(string, " out_port=");
             ofputil_format_port(request.out_port, string);
+        }
+
+        if (request.out_group != OFPG_ANY) {
+            ds_put_cstr(string, " out_group=");
+            ofputil_format_group(request.out_group, string);
         }
 
         if (request.table_id != 0xff) {
@@ -3025,7 +3077,7 @@ ofp_to_string__(const struct ofp_header *oh, enum ofpraw raw,
         break;
 
     case OFPTYPE_FLOW_MONITOR_STATS_REQUEST:
-        ofp_print_nxst_flow_monitor_request(string, msg);
+        ofp_print_flow_monitor_request(string, msg);
         break;
 
     case OFPTYPE_FLOW_MONITOR_STATS_REPLY:
