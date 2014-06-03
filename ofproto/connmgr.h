@@ -203,6 +203,7 @@ struct ofmonitor {
 
     /* Matching. */
     ofp_port_t out_port;
+    uint32_t out_group;
     uint8_t table_id;
     struct minimatch match;
 };

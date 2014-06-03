@@ -2031,6 +2031,7 @@ ofmonitor_create(const struct ofputil_flow_monitor_request *request,
     m->id = request->id;
     m->flags = request->flags;
     m->out_port = request->out_port;
+    m->out_group = request->out_group;
     m->table_id = request->table_id;
     minimatch_init(&m->match, &request->match);
 
