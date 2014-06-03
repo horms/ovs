@@ -209,6 +209,9 @@ struct ofmonitor {
     uint32_t out_group;
     uint8_t table_id;
     struct minimatch match;
+
+    /* Used temporarily when handling flow monitor requests */
+    struct list list_node;
 };
 
 struct ofputil_flow_monitor_request;

@@ -4922,24 +4922,20 @@ static enum ofperr
 handle_flow_monitor_request(struct ofconn *ofconn, const struct ofp_header *oh)
     OVS_EXCLUDED(ofproto_mutex)
 {
+    struct list monitor_list = LIST_INITIALIZER(&monitor_list);
     struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
-    struct ofmonitor **monitors;
-    size_t n_monitors, allocated_monitors;
     struct rule_collection rules;
     struct list replies;
+    struct ofmonitor *m, *next;
     enum ofperr error;
     struct ofpbuf b;
-    size_t i;
 
     error = 0;
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
-    monitors = NULL;
-    n_monitors = allocated_monitors = 0;
 
     ovs_mutex_lock(&ofproto_mutex);
     for (;;) {
         struct ofputil_flow_monitor_request request;
-        struct ofmonitor *m;
         int retval;
 
         retval = ofputil_decode_flow_monitor_request(&request, &b);
@@ -4961,16 +4957,15 @@ handle_flow_monitor_request(struct ofconn *ofconn, const struct ofp_header *oh)
             goto error;
         }
 
-        if (n_monitors >= allocated_monitors) {
-            monitors = x2nrealloc(monitors, &allocated_monitors,
-                                  sizeof *monitors);
-        }
-        monitors[n_monitors++] = m;
+        list_insert(&monitor_list, &m->list_node);
     }
 
     rule_collection_init(&rules);
-    for (i = 0; i < n_monitors; i++) {
-        ofproto_collect_ofmonitor_initial_rules(monitors[i], &rules);
+    LIST_FOR_EACH_SAFE(m, next, list_node, &monitor_list) {
+        ofproto_collect_ofmonitor_initial_rules(m, &rules);
+        /* This is the last use of monitor_list but m will persist
+         * so detach m from monitor_list. */
+        list_init(&m->list_node);
     }
 
     ofpmp_init(&replies, oh);
@@ -4980,15 +4975,13 @@ handle_flow_monitor_request(struct ofconn *ofconn, const struct ofp_header *oh)
     rule_collection_destroy(&rules);
 
     ofconn_send_replies(ofconn, &replies);
-    free(monitors);
 
     return 0;
 
 error:
-    for (i = 0; i < n_monitors; i++) {
-        ofmonitor_destroy(monitors[i]);
+    LIST_FOR_EACH(m, list_node, &monitor_list) {
+        ofmonitor_destroy(m);
     }
-    free(monitors);
     ovs_mutex_unlock(&ofproto_mutex);
 
     return error;
