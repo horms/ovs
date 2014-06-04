@@ -414,4 +414,81 @@ enum ofp14_flow_monitor_flags {
                                      */
 };
 
+/* OFPMP14_FLOW_MONITOR reply header.
+ *
+ * The body of an OFPMP14_FLOW_MONITOR reply is an array of variable-length
+ * structures, each of which begins with this header.  The 'length' member may
+ * be used to traverse the array, and the 'event' member may be used to
+ * determine the particular structure.
+ *
+ * Every instance is a multiple of 8 bytes long. */
+struct ofp14_flow_update_header {
+    ovs_be16 length;            /* Length of this entry. */
+    ovs_be16 event;             /* One of OFPFME14_*. */
+    /* ...other data depending on 'event'... */
+};
+OFP_ASSERT(sizeof(struct ofp14_flow_update_header) == 4);
+
+/* 'event' values in struct ofp_flow_update_header. */
+enum ofp14_flow_update_event {
+    /* struct ofp_flow_update_full. */
+    OFPFME14_INITIAL = 0,          /* Flow present when flow monitor created. */
+    OFPFME14_ADDED = 1,            /* Flow was added. */
+    OFPFME14_REMOVED = 2,          /* Flow was removed. */
+    OFPFME14_MODIFIED = 3,         /* Flow instructions were changed. */
+
+    /* struct ofp_flow_update_abbrev. */
+    OFPFME14_ABBREV = 4,           /* Abbreviated reply. */
+
+    /* struct ofp_flow_update_header. */
+    OFPFME14_PAUSED = 5,          /* Monitoring paused (out of buffer space). */
+    OFPFME14_RESUMED = 6,         /* Monitoring resumed. */
+};
+
+/* OFPMP14_FLOW_MONITOR reply for OFPFME14_INITIAL, OFPFME14_ADDED,
+ * OFPFME14_REMOVED, and OFPFME14_MODIFIED. */
+struct ofp14_flow_update_full {
+    ovs_be16 length;            /* Length is 32 + match + instructions. */
+    ovs_be16 event;             /* One of OFPFME14_*. */
+    uint8_t table_id;           /* ID of flow's table. */
+    uint8_t reason;             /* OFPRR_* for OFPFME14_REMOVED, else zero. */
+    ovs_be16 idle_timeout;      /* Number of seconds idle before expiration. */
+    ovs_be16 hard_timeout;      /* Number of seconds before expiration. */
+    ovs_be16 priority;          /* Priority of the entry. */
+    uint8_t zeros[4];           /* Reserved, currently zeroed. */
+    ovs_be64 cookie;            /* Opaque controller-issued identifier. */
+    /* Followed by an ofp11_match structure. */
+    /* Followed by instruction set.
+     *     If OFPFMF_INSTRUCTIONS was not specified, or 'event' is
+     *     OFPFME_REMOVED, no instructions are included.
+     */
+    /* struct ofp_instruction instructions[0]; */
+};
+OFP_ASSERT(sizeof(struct ofp14_flow_update_full) == 24);
+
+/* OFPMP14_FLOW_MONITOR reply for OFPFME14_ABBREV.
+ *
+ * When the controller does not specify OFPFMF14_OWN in a monitor request, any
+ * flow tables changes due to the controller's own requests (on the same
+ * OpenFlow channel) will be abbreviated, when possible, to this form, which
+ * simply specifies the 'xid' of the OpenFlow request (e.g. an OFPT_FLOW_MOD)
+ * that caused the change.
+ * Some changes cannot be abbreviated and will be sent in full.
+ */
+struct ofp14_flow_update_abbrev {
+    ovs_be16 length;            /* Length is 8. */
+    ovs_be16 event;             /* OFPFME14_ABBREV. */
+    ovs_be32 xid;               /* Controller-specified xid from flow_mod. */
+};
+OFP_ASSERT(sizeof(struct ofp14_flow_update_abbrev) == 8);
+
+/* OFPMP14_FLOW_MONITOR reply for OFPFME14_PAUSED and OFPFME14_RESUMED.
+ */
+struct ofp14_flow_update_paused {
+    ovs_be16 length;            /* Length is 8. */
+    ovs_be16 event;             /* One of OFPFME14_*. */
+    uint8_t zeros[4];           /* Reserved, currently zeroed. */
+};
+OFP_ASSERT(sizeof(struct ofp14_flow_update_paused) == 8);
+
 #endif /* openflow/openflow-1.4.h */
