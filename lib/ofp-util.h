@@ -855,7 +855,7 @@ void ofputil_append_flow_monitor_request(
 
 /* Abstract nx_flow_update. */
 struct ofputil_flow_update {
-    enum nx_flow_update_event event;
+    enum ofp14_flow_update_event event;
 
     /* Used only for NXFME_ADDED, NXFME_DELETED, NXFME_MODIFIED. */
     enum ofp_flow_removed_reason reason;
