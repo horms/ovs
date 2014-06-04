@@ -4742,7 +4742,8 @@ handle_barrier_request(struct ofconn *ofconn, const struct ofp_header *oh)
 }
 
 static void
-ofproto_compose_flow_refresh_update(const struct rule *rule,
+ofproto_compose_flow_refresh_update(enum ofp_version ofp_version,
+                                    const struct rule *rule,
                                     enum ofp14_flow_monitor_flags flags,
                                     struct list *msgs)
     OVS_REQUIRES(ofproto_mutex)
@@ -4804,13 +4805,14 @@ ofproto_compose_flow_refresh_update(const struct rule *rule,
     fu.ofpacts_len = actions ? actions->ofpacts_len : 0;
 
     if (list_is_empty(msgs)) {
-        ofputil_start_flow_update(OFP10_VERSION, msgs);
+        ofputil_start_flow_update(ofp_version, msgs);
     }
     ofputil_append_flow_update(&fu, msgs);
 }
 
 void
-ofmonitor_compose_refresh_updates(struct rule_collection *rules,
+ofmonitor_compose_refresh_updates(enum ofp_version ofp_version,
+                                  struct rule_collection *rules,
                                   struct list *msgs)
     OVS_REQUIRES(ofproto_mutex)
 {
@@ -4821,33 +4823,55 @@ ofmonitor_compose_refresh_updates(struct rule_collection *rules,
         enum ofp14_flow_monitor_flags flags = rule->monitor_flags;
         rule->monitor_flags = 0;
 
-        ofproto_compose_flow_refresh_update(rule, flags, msgs);
+        ofproto_compose_flow_refresh_update(ofp_version, rule, flags, msgs);
     }
 }
 
 static void
-ofproto_compose_paused_or_resumed(struct list *msgs, bool paused)
+ofproto_compose_paused_or_resumed(enum ofp_version ofp_version,
+                                  struct list *msgs, bool paused)
 {
-    struct ofpbuf *msg;
-    enum ofpraw raw;
-    raw = paused ? OFPRAW_NXT_FLOW_MONITOR_PAUSED
-        : OFPRAW_NXT_FLOW_MONITOR_RESUMED;
-    msg = ofpraw_alloc_xid(raw, OFP10_VERSION, htonl(0), 0);
-    list_push_back(msgs, &msg->list_node);
+    switch (ofp_version) {
+    case OFP10_VERSION: {
+        struct ofpbuf *msg;
+        enum ofpraw raw;
+        raw = paused ? OFPRAW_NXT_FLOW_MONITOR_PAUSED
+            : OFPRAW_NXT_FLOW_MONITOR_RESUMED;
+        msg = ofpraw_alloc_xid(raw, ofp_version, htonl(0), 0);
+        list_push_back(msgs, &msg->list_node);
+        break;
+    }
+    case OFP14_VERSION:
+    case OFP15_VERSION: {
+        struct ofputil_flow_update fu;
+        fu.event = paused ? OFPFME14_PAUSED : OFPFME14_RESUMED;
+        if (list_is_empty(msgs)) {
+            ofputil_start_flow_update(ofp_version, msgs);
+        }
+        ofputil_append_flow_update(&fu, msgs);
+        break;
+    }
+    case OFP11_VERSION:
+    case OFP12_VERSION:
+    case OFP13_VERSION: /* XXX: Use ONF extension */
+    default:
+        OVS_NOT_REACHED();
+    }
 }
 
 void
-ofmonitor_compose_paused(struct list *msgs)
+ofmonitor_compose_paused(enum ofp_version ofp_version, struct list *msgs)
 {
-    ofproto_compose_paused_or_resumed(msgs, true);
+    ofproto_compose_paused_or_resumed(ofp_version, msgs, true);
 }
 
 void
-ofmonitor_compose_resumed(struct rule_collection *rules, struct list *msgs)
+ofmonitor_compose_resumed(enum ofp_version ofp_version,
+                          struct rule_collection *rules, struct list *msgs)
     OVS_REQUIRES(ofproto_mutex)
 {
-    ofmonitor_compose_refresh_updates(rules, msgs);
-    ofproto_compose_paused_or_resumed(msgs, false);
+    ofmonitor_compose_refresh_updates(ofp_version, rules, msgs);
+    ofproto_compose_paused_or_resumed(ofp_version, msgs, false);
 }
 
 static void
@@ -5028,7 +5052,7 @@ handle_flow_monitor_request(struct ofconn *ofconn, const struct ofp_header *oh)
     }
 
     ofpmp_init(&replies, oh);
-    ofmonitor_compose_refresh_updates(&rules, &replies);
+    ofmonitor_compose_refresh_updates(oh->version, &rules, &replies);
     ovs_mutex_unlock(&ofproto_mutex);
 
     rule_collection_destroy(&rules);
