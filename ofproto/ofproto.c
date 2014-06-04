@@ -4823,6 +4823,31 @@ ofmonitor_compose_refresh_updates(struct rule_collection *rules,
 }
 
 static void
+ofproto_compose_paused_or_resumed(struct list *msgs, bool paused)
+{
+    struct ofpbuf *msg;
+    enum ofpraw raw;
+    raw = paused ? OFPRAW_NXT_FLOW_MONITOR_PAUSED
+        : OFPRAW_NXT_FLOW_MONITOR_RESUMED;
+    msg = ofpraw_alloc_xid(raw, OFP10_VERSION, htonl(0), 0);
+    list_push_back(msgs, &msg->list_node);
+}
+
+void
+ofmonitor_compose_paused(struct list *msgs)
+{
+    ofproto_compose_paused_or_resumed(msgs, true);
+}
+
+void
+ofmonitor_compose_resumed(struct rule_collection *rules, struct list *msgs)
+    OVS_REQUIRES(ofproto_mutex)
+{
+    ofmonitor_compose_refresh_updates(rules, msgs);
+    ofproto_compose_paused_or_resumed(msgs, false);
+}
+
+static void
 ofproto_collect_ofmonitor_refresh_rule(const struct ofmonitor *m,
                                        struct rule *rule, uint64_t seqno,
                                        struct rule_collection *rules)
