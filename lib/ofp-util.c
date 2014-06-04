@@ -5480,39 +5480,15 @@ nx_from_ofp14_flow_update_event(enum ofp14_flow_update_event ofp_event,
     return 0;
 }
 
-/* Converts an NXST_FLOW_MONITOR reply (also known as a flow update) in 'msg'
- * into an abstract ofputil_flow_update in 'update'.  The caller must have
- * initialized update->match to point to space allocated for a match.
- *
- * Uses 'ofpacts' to store the abstract OFPACT_* version of the update's
- * actions (except for NXFME_ABBREV, which never includes actions).  The caller
- * must initialize 'ofpacts' and retains ownership of it.  'update->ofpacts'
- * will point into the 'ofpacts' buffer.
- *
- * Multiple flow updates can be packed into a single OpenFlow message.  Calling
- * this function multiple times for a single 'msg' iterates through the
- * updates.  The caller must initially leave 'msg''s layer pointers null and
- * not modify them between calls.
- *
- * Returns 0 if successful, EOF if no updates were left in this 'msg',
- * otherwise an OFPERR_* value. */
-int
-ofputil_decode_flow_update(struct ofputil_flow_update *update,
-                           struct ofpbuf *msg, struct ofpbuf *ofpacts)
+static int
+ofputil_nx_decode_flow_update(struct ofputil_flow_update *update,
+                              struct ofpbuf *msg, struct ofpbuf *ofpacts)
 {
     struct nx_flow_update_header *nfuh;
     enum nx_flow_update_event nevent;
     unsigned int length;
     struct ofp_header *oh;
     enum ofperr error;
-
-    if (!msg->frame) {
-        ofpraw_pull_assert(msg);
-    }
-
-    if (!ofpbuf_size(msg)) {
-        return EOF;
-    }
 
     if (ofpbuf_size(msg) < sizeof(struct nx_flow_update_header)) {
         goto bad_len;
@@ -5599,6 +5575,150 @@ bad_len:
     VLOG_WARN_RL(&bad_ofmsg_rl, "NXST_FLOW_MONITOR reply has %"PRIu32" "
                  "leftover bytes at end", ofpbuf_size(msg));
     return OFPERR_OFPBRC_BAD_LEN;
+}
+
+static int
+ofputil_of14_decode_flow_update(struct ofputil_flow_update *update,
+                                struct ofpbuf *msg, struct ofpbuf *ofpacts)
+{
+    struct ofp14_flow_update_header *ofpfuh;
+    unsigned int length;
+    struct ofp_header *oh;
+
+    if (ofpbuf_size(msg) < sizeof(struct ofp14_flow_update_header)) {
+        goto bad_len;
+    }
+
+    oh = msg->frame;
+
+    ofpfuh = ofpbuf_data(msg);
+    update->event = ntohs(ofpfuh->event);
+    length = ntohs(ofpfuh->length);
+    if (length > ofpbuf_size(msg) || length % 8) {
+        goto bad_len;
+    }
+
+    switch (update->event) {
+    case OFPFME14_ABBREV: {
+        struct ofp14_flow_update_abbrev *ofpfua;
+
+        if (length != sizeof *ofpfua) {
+            goto bad_len;
+        }
+
+        ofpfua = ofpbuf_pull(msg, sizeof *ofpfua);
+        update->xid = ofpfua->xid;
+        return 0;
+    }
+    case OFPFME14_INITIAL:
+    case OFPFME14_ADDED:
+    case OFPFME14_REMOVED:
+    case OFPFME14_MODIFIED: {
+        struct ofp14_flow_update_full *ofpfuf;
+        size_t orig_msg_size = ofpbuf_size(msg);
+        unsigned int instructions_len;
+        enum ofperr error;
+
+        if (length < sizeof *ofpfuf) {
+            goto bad_len;
+        }
+
+        ofpfuf = ofpbuf_pull(msg, sizeof *ofpfuf);
+
+        update->table_id = ofpfuf->table_id;
+        update->reason = ofpfuf->reason;
+        update->idle_timeout = ntohs(ofpfuf->idle_timeout);
+        update->hard_timeout = ntohs(ofpfuf->hard_timeout);
+        update->priority = ntohs(ofpfuf->priority);
+        update->cookie = ofpfuf->cookie;
+
+        error = oxm_pull_match(msg, update->match);
+        if (error) {
+            return error;
+        }
+
+        instructions_len = length - (orig_msg_size - ofpbuf_size(msg));
+        error = ofpacts_pull_openflow_instructions(msg, instructions_len,
+                                                   oh->version, ofpacts);
+        if (error) {
+            return error;
+        }
+
+        update->ofpacts = ofpbuf_data(ofpacts);
+        update->ofpacts_len = ofpbuf_size(ofpacts);
+        return 0;
+    }
+    case OFPFME14_PAUSED:
+    case OFPFME14_RESUMED: {
+        struct ofp14_flow_update_paused *ofpfup;
+
+        if (length < sizeof *ofpfup) {
+            goto bad_len;
+        }
+
+        ofpfup = ofpbuf_pull(msg, sizeof *ofpfup);
+
+        /* The only element of ofpfup that is not in ofpfuh is
+         * a pad, so there there nothing more to do here. */
+        return 0;
+    }
+    default:
+        VLOG_WARN_RL(&bad_ofmsg_rl,
+                     "OFPST14_FLOW_MONITOR_REQUEST reply has bad event "
+                     "%"PRIu16, ntohs(ofpfuh->event));
+        return OFPERR_OFPMOFC_INVALID_MONITOR;
+    }
+
+bad_len:
+    VLOG_WARN_RL(&bad_ofmsg_rl,
+                 "OFPST14_FLOW_MONITOR_REQUEST reply has %"PRIu32" "
+                 "leftover bytes at end", ofpbuf_size(msg));
+    return OFPERR_OFPBRC_BAD_LEN;
+}
+
+/* Converts an OFPST14_FLOW_MONITOR_REQUEST or NXST_FLOW_MONITOR reply
+ * (also known as a flow update) in 'msg' into an abstract
+ * ofputil_flow_update in 'update'.  The caller must have initialized
+ * update->match to point to space allocated for a match.
+ *
+ * Uses 'ofpacts' to store the abstract OFPACT_* version of the update's
+ * actions.  The caller must initialize 'ofpacts' and retains ownership of
+ * it.  'update->ofpacts' will point into the 'ofpacts' buffer.
+ *
+ * Multiple flow updates can be packed into a single OpenFlow message.  Calling
+ * this function multiple times for a single 'msg' iterates through the
+ * updates.  The caller must initially leave 'msg''s layer pointers null and
+ * not modify them between calls.
+ *
+ * Returns 0 if successful, EOF if no updates were left in this 'msg',
+ * otherwise an OFPERR_* value. */
+int
+ofputil_decode_flow_update(struct ofputil_flow_update *update,
+                           struct ofpbuf *msg, struct ofpbuf *ofpacts)
+{
+    enum ofpraw raw;
+    enum ofperr error;
+
+    error = (msg->frame
+             ? ofpraw_decode(&raw, msg->frame)
+             : ofpraw_pull(&raw, msg));
+    if (error) {
+        return error;
+    }
+
+    if (!ofpbuf_size(msg)) {
+        return EOF;
+    }
+
+    if (raw == OFPRAW_OFPST14_FLOW_MONITOR_REPLY) {
+        error = ofputil_of14_decode_flow_update(update, msg, ofpacts);
+    } else if (raw == OFPRAW_NXST_FLOW_MONITOR_REPLY) {
+        error = ofputil_nx_decode_flow_update(update, msg, ofpacts);
+    } else {
+        OVS_NOT_REACHED();
+    }
+
+    return error;
 }
 
 uint32_t
