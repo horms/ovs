@@ -2277,12 +2277,14 @@ ofp_print_flow_monitor_request(struct ds *string, const struct ofp_header *oh)
 }
 
 static void
-ofp_print_nxst_flow_monitor_reply(struct ds *string,
-                                  const struct ofp_header *oh)
+ofp_print_flow_monitor_reply(struct ds *string, const struct ofp_header *oh)
 {
     uint64_t ofpacts_stub[1024 / 8];
     struct ofpbuf ofpacts;
     struct ofpbuf b;
+    enum ofpraw raw;
+
+    ofpraw_decode(&raw, oh);
 
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
     ofpbuf_use_stub(&ofpacts, ofpacts_stub, sizeof ofpacts_stub);
@@ -2304,12 +2306,21 @@ ofp_print_nxst_flow_monitor_reply(struct ds *string,
 
         ds_put_cstr(string, "\n event=");
         switch (update.event) {
+        case OFPFME14_INITIAL:
+            ds_put_cstr(string, "INITIAL");
+            break;
+
         case OFPFME14_ADDED:
             ds_put_cstr(string, "ADDED");
             break;
 
         case OFPFME14_REMOVED:
-            ds_put_format(string, "DELETED reason=%s",
+            if (raw == OFPRAW_OFPST14_FLOW_MONITOR_REPLY) {
+                ds_put_cstr(string, "REMOVED");
+            } else {
+                ds_put_cstr(string, "DELETED");
+            }
+            ds_put_format(string, " reason=%s",
                           ofp_flow_removed_reason_to_string(update.reason,
                                                             reasonbuf,
                                                             sizeof reasonbuf));
@@ -2323,9 +2334,14 @@ ofp_print_nxst_flow_monitor_reply(struct ds *string,
             ds_put_format(string, "ABBREV xid=0x%"PRIx32, ntohl(update.xid));
             continue;
 
-        case OFPFME14_INITIAL:
         case OFPFME14_PAUSED:
+            ds_put_cstr(string, "PAUSED");
+            continue;
+
         case OFPFME14_RESUMED:
+            ds_put_cstr(string, "RESUMED");
+            continue;
+
         default:
             OVS_NOT_REACHED();
         }
@@ -3087,7 +3103,7 @@ ofp_to_string__(const struct ofp_header *oh, enum ofpraw raw,
         break;
 
     case OFPTYPE_FLOW_MONITOR_STATS_REPLY:
-        ofp_print_nxst_flow_monitor_reply(string, msg);
+        ofp_print_flow_monitor_reply(string, msg);
         break;
 
     case OFPTYPE_BUNDLE_CONTROL:
