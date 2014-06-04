@@ -5360,8 +5360,8 @@ ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *rq,
     return error;
 }
 
-void
-ofputil_append_flow_monitor_request(
+static void
+ofputil_append_nx_flow_monitor_request(
     const struct ofputil_flow_monitor_request *rq, struct ofpbuf *msg)
 {
     struct nx_flow_monitor_request *nfmr;
@@ -5382,6 +5382,50 @@ ofputil_append_flow_monitor_request(
     nfmr->out_port = htons(ofp_to_u16(rq->out_port));
     nfmr->match_len = htons(match_len);
     nfmr->table_id = rq->table_id;
+}
+
+static void
+ofputil_append_of14_flow_monitor_request(
+    const struct ofputil_flow_monitor_request *rq, enum ofp_version version,
+    struct ofpbuf *msg)
+{
+    struct ofp14_flow_monitor_request *ofpfmr;
+    size_t start_ofs;
+
+    if (!ofpbuf_size(msg)) {
+        ofpraw_put(OFPRAW_OFPST14_FLOW_MONITOR_REQUEST, version, msg);
+    }
+
+    start_ofs = ofpbuf_size(msg);
+    ofpbuf_put_zeros(msg, sizeof *ofpfmr);
+    oxm_put_match(msg, &rq->match, version);
+
+    ofpfmr = ofpbuf_at_assert(msg, start_ofs, sizeof *ofpfmr);
+    ofpfmr->monitor_id = htonl(rq->id);
+    ofpfmr->flags = htons(rq->flags);
+    ofpfmr->out_port = ofputil_port_to_ofp11(rq->out_port);
+    ofpfmr->out_group = htonl(rq->out_group);
+    ofpfmr->table_id = rq->table_id;
+    ofpfmr->command = rq->command;
+}
+
+void
+ofputil_append_flow_monitor_request(
+    const struct ofputil_flow_monitor_request *rq, enum ofp_version version,
+    struct ofpbuf *msg)
+{
+    switch (version) {
+    case OFP10_VERSION:
+        return ofputil_append_nx_flow_monitor_request(rq, msg);
+    case OFP14_VERSION:
+    case OFP15_VERSION:
+        return ofputil_append_of14_flow_monitor_request(rq, version, msg);
+    case OFP11_VERSION:
+    case OFP12_VERSION:
+    case OFP13_VERSION: /* XXX: Use OF extension! */
+    default:
+        OVS_NOT_REACHED();
+    }
 }
 
 /* Converts an NXST_FLOW_MONITOR reply (also known as a flow update) in 'msg'
