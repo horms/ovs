@@ -238,4 +238,9 @@ void ofmonitor_compose_refresh_updates(struct rule_collection *rules,
                                        struct list *msgs)
     OVS_REQUIRES(ofproto_mutex);
 
+void ofmonitor_compose_paused(struct list *msgs);
+void ofmonitor_compose_resumed(struct rule_collection *rules,
+                               struct list *msgs)
+    OVS_REQUIRES(ofproto_mutex);
+
 #endif /* connmgr.h */

@@ -2191,7 +2191,9 @@ ofmonitor_flush(struct connmgr *mgr)
 
     LIST_FOR_EACH (ofconn, node, &mgr->all_conns) {
         struct ofpbuf *msg, *next;
+        struct list msgs;
 
+        list_init(&msgs);
         LIST_FOR_EACH_SAFE (msg, next, list_node, &ofconn->updates) {
             unsigned int n_bytes;
 
@@ -2199,15 +2201,12 @@ ofmonitor_flush(struct connmgr *mgr)
             ofconn_send(ofconn, msg, ofconn->monitor_counter);
             n_bytes = rconn_packet_counter_n_bytes(ofconn->monitor_counter);
             if (!ofconn->monitor_paused && n_bytes > 128 * 1024) {
-                struct ofpbuf *pause;
-
                 COVERAGE_INC(ofmonitor_pause);
                 ofconn->monitor_paused = monitor_seqno++;
-                pause = ofpraw_alloc_xid(OFPRAW_NXT_FLOW_MONITOR_PAUSED,
-                                         OFP10_VERSION, htonl(0), 0);
-                ofconn_send(ofconn, pause, ofconn->monitor_counter);
+                ofmonitor_compose_paused(&msgs);
             }
         }
+        ofconn_send_replies(ofconn, &msgs);
     }
 }
 
@@ -2216,7 +2215,6 @@ ofmonitor_resume(struct ofconn *ofconn)
     OVS_REQUIRES(ofproto_mutex)
 {
     struct rule_collection rules;
-    struct ofpbuf *resumed;
     struct ofmonitor *m;
     struct list msgs;
 
@@ -2226,11 +2224,7 @@ ofmonitor_resume(struct ofconn *ofconn)
     }
 
     list_init(&msgs);
-    ofmonitor_compose_refresh_updates(&rules, &msgs);
-
-    resumed = ofpraw_alloc_xid(OFPRAW_NXT_FLOW_MONITOR_RESUMED, OFP10_VERSION,
-                               htonl(0), 0);
-    list_push_back(&msgs, &resumed->list_node);
+    ofmonitor_compose_resumed(&rules, &msgs);
     ofconn_send_replies(ofconn, &msgs);
 
     ofconn->monitor_paused = 0;
