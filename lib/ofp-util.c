@@ -5429,6 +5429,57 @@ ofputil_append_flow_monitor_request(
     }
 }
 
+static enum ofperr
+nx_to_ofp14_flow_update_event(enum nx_flow_update_event nx_event,
+                              enum ofp14_flow_update_event *ofp_event)
+{
+    switch (nx_event) {
+    case NXFME_ADDED:
+        *ofp_event = OFPFME14_ADDED;
+        break;
+    case NXFME_DELETED:
+        *ofp_event = OFPFME14_REMOVED;
+        break;
+    case NXFME_MODIFIED:
+        *ofp_event = OFPFME14_MODIFIED;
+        break;
+    case NXFME_ABBREV:
+        *ofp_event = OFPFME14_ABBREV;
+        break;
+    default:
+        return OFPERR_NXBRC_FM_BAD_EVENT;
+    }
+
+    return 0;
+}
+
+static enum ofperr
+nx_from_ofp14_flow_update_event(enum ofp14_flow_update_event ofp_event,
+                                enum nx_flow_update_event *nx_event)
+{
+    switch (ofp_event) {
+    case OFPFME14_INITIAL:
+    case OFPFME14_ADDED:
+        *nx_event = NXFME_ADDED;
+        break;
+    case OFPFME14_REMOVED:
+        *nx_event = NXFME_DELETED;
+        break;
+    case OFPFME14_MODIFIED:
+        *nx_event = NXFME_MODIFIED;
+        break;
+    case OFPFME14_ABBREV:
+        *nx_event = NXFME_ABBREV;
+        break;
+    case OFPFME14_PAUSED:
+    case OFPFME14_RESUMED:
+    default:
+        return OFPERR_NXBRC_FM_BAD_EVENT;
+    }
+
+    return 0;
+}
+
 /* Converts an NXST_FLOW_MONITOR reply (also known as a flow update) in 'msg'
  * into an abstract ofputil_flow_update in 'update'.  The caller must have
  * initialized update->match to point to space allocated for a match.
@@ -5450,8 +5501,10 @@ ofputil_decode_flow_update(struct ofputil_flow_update *update,
                            struct ofpbuf *msg, struct ofpbuf *ofpacts)
 {
     struct nx_flow_update_header *nfuh;
+    enum nx_flow_update_event nevent;
     unsigned int length;
     struct ofp_header *oh;
+    enum ofperr error;
 
     if (!msg->frame) {
         ofpraw_pull_assert(msg);
@@ -5468,13 +5521,22 @@ ofputil_decode_flow_update(struct ofputil_flow_update *update,
     oh = msg->frame;
 
     nfuh = ofpbuf_data(msg);
-    update->event = ntohs(nfuh->event);
+    nevent = ntohs(nfuh->event);
     length = ntohs(nfuh->length);
     if (length > ofpbuf_size(msg) || length % 8) {
         goto bad_len;
     }
 
-    if (update->event == NXFME_ABBREV) {
+    error = nx_to_ofp14_flow_update_event(nevent, &update->event);
+    if (error) {
+        VLOG_WARN_RL(&bad_ofmsg_rl,
+                     "NXST_FLOW_MONITOR reply has bad event %"PRIu16,
+                     ntohs(nfuh->event));
+        return error;
+    }
+
+    switch (update->event) {
+    case OFPFME14_ABBREV: {
         struct nx_flow_update_abbrev *nfua;
 
         if (length != sizeof *nfua) {
@@ -5484,9 +5546,10 @@ ofputil_decode_flow_update(struct ofputil_flow_update *update,
         nfua = ofpbuf_pull(msg, sizeof *nfua);
         update->xid = nfua->xid;
         return 0;
-    } else if (update->event == NXFME_ADDED
-               || update->event == NXFME_DELETED
-               || update->event == NXFME_MODIFIED) {
+    }
+    case OFPFME14_ADDED:
+    case OFPFME14_REMOVED:
+    case OFPFME14_MODIFIED: {
         struct nx_flow_update_full *nfuf;
         unsigned int actions_len;
         unsigned int match_len;
@@ -5524,11 +5587,12 @@ ofputil_decode_flow_update(struct ofputil_flow_update *update,
         update->ofpacts = ofpbuf_data(ofpacts);
         update->ofpacts_len = ofpbuf_size(ofpacts);
         return 0;
-    } else {
-        VLOG_WARN_RL(&bad_ofmsg_rl,
-                     "NXST_FLOW_MONITOR reply has bad event %"PRIu16,
-                     ntohs(nfuh->event));
-        return OFPERR_NXBRC_FM_BAD_EVENT;
+    }
+    case OFPFME14_INITIAL:
+    case OFPFME14_PAUSED:
+    case OFPFME14_RESUMED:
+    default:
+        OVS_NOT_REACHED();
     }
 
 bad_len:
@@ -5575,18 +5639,25 @@ ofputil_append_flow_update(const struct ofputil_flow_update *update,
 {
     enum ofp_version version = ofpmp_version(replies);
     struct nx_flow_update_header *nfuh;
+    enum nx_flow_update_event nevent;
     struct ofpbuf *msg;
     size_t start_ofs;
 
     msg = ofpbuf_from_list(list_back(replies));
     start_ofs = ofpbuf_size(msg);
 
-    if (update->event == NXFME_ABBREV) {
+    switch(update->event) {
+    case OFPFME14_ABBREV: {
         struct nx_flow_update_abbrev *nfua;
 
         nfua = ofpbuf_put_zeros(msg, sizeof *nfua);
         nfua->xid = update->xid;
-    } else {
+        break;
+    }
+    case OFPFME14_INITIAL:
+    case OFPFME14_ADDED:
+    case OFPFME14_REMOVED:
+    case OFPFME14_MODIFIED: {
         struct nx_flow_update_full *nfuf;
         int match_len;
 
@@ -5602,11 +5673,21 @@ ofputil_append_flow_update(const struct ofputil_flow_update *update,
         nfuf->match_len = htons(match_len);
         nfuf->table_id = update->table_id;
         nfuf->cookie = update->cookie;
+        break;
+    }
+    case OFPFME14_PAUSED:
+    case OFPFME14_RESUMED:
+    default:
+       OVS_NOT_REACHED();
     }
 
     nfuh = ofpbuf_at_assert(msg, start_ofs, sizeof *nfuh);
     nfuh->length = htons(ofpbuf_size(msg) - start_ofs);
-    nfuh->event = htons(update->event);
+
+    if (nx_from_ofp14_flow_update_event(update->event, &nevent)) {
+        OVS_NOT_REACHED();
+    }
+    nfuh->event = htons(nevent);
 
     ofpmp_postappend(replies, start_ofs);
 }

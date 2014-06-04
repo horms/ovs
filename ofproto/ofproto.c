@@ -4098,7 +4098,7 @@ add_flow(struct ofproto *ofproto, struct ofputil_flow_mod *fm,
         }
     }
 
-    ofmonitor_report(ofproto->connmgr, rule, NXFME_ADDED, 0,
+    ofmonitor_report(ofproto->connmgr, rule, OFPFME14_ADDED, 0,
                      req ? req->ofconn : NULL, req ? req->xid : 0, NULL);
 
     return req ? send_buffered_packet(req->ofconn, fm->buffer_id, rule) : 0;
@@ -4120,7 +4120,7 @@ modify_flows__(struct ofproto *ofproto, struct ofputil_flow_mod *fm,
     OVS_REQUIRES(ofproto_mutex)
 {
     struct list dead_cookies = LIST_INITIALIZER(&dead_cookies);
-    enum nx_flow_update_event event;
+    enum ofp14_flow_update_event event;
     size_t i;
 
     if (ofproto->ofproto_class->rule_premodify_actions) {
@@ -4136,7 +4136,7 @@ modify_flows__(struct ofproto *ofproto, struct ofputil_flow_mod *fm,
         }
     }
 
-    event = fm->command == OFPFC_ADD ? NXFME_ADDED : NXFME_MODIFIED;
+    event = fm->command == OFPFC_ADD ? OFPFME14_ADDED : OFPFME14_MODIFIED;
     for (i = 0; i < rules->n; i++) {
         struct rule *rule = rules->rules[i];
 
@@ -4195,7 +4195,7 @@ modify_flows__(struct ofproto *ofproto, struct ofputil_flow_mod *fm,
             ofproto->ofproto_class->rule_modify_actions(rule, reset_counters);
         }
 
-        if (event != NXFME_MODIFIED || change_actions || change_cookie) {
+        if (event != OFPFME14_MODIFIED || change_actions || change_cookie) {
             ofmonitor_report(ofproto->connmgr, rule, event, 0,
                              req ? req->ofconn : NULL, req ? req->xid : 0,
                              change_actions ? actions : NULL);
@@ -4311,7 +4311,7 @@ delete_flows__(const struct rule_collection *rules,
 
             ofproto_rule_send_removed(rule, reason);
 
-            ofmonitor_report(ofproto->connmgr, rule, NXFME_DELETED, reason,
+            ofmonitor_report(ofproto->connmgr, rule, OFPFME14_REMOVED, reason,
                              req ? req->ofconn : NULL, req ? req->xid : 0,
                              NULL);
             oftable_remove_rule(rule);
@@ -4707,8 +4707,13 @@ ofproto_compose_flow_refresh_update(const struct rule *rule,
     struct ofputil_flow_update fu;
     struct match match;
 
-    fu.event = (flags & (OFPFMF14_INITIAL | OFPFMF14_ADD)
-                ? NXFME_ADDED : NXFME_MODIFIED);
+    if (flags & OFPFMF14_INITIAL) {
+        fu.event = OFPFME14_INITIAL;
+    } else if (flags & OFPFMF14_ADD) {
+        fu.event = OFPFME14_ADDED;
+    } else {
+        fu.event = OFPFME14_MODIFIED;
+    }
     fu.reason = 0;
     ovs_mutex_lock(&rule->mutex);
     fu.idle_timeout = rule->idle_timeout;
