@@ -5621,20 +5621,35 @@ ofputil_encode_flow_monitor_cancel(uint32_t id)
 }
 
 void
-ofputil_start_flow_update(struct list *replies)
+ofputil_start_flow_update(enum ofp_version ofp_version, struct list *replies)
 {
     struct ofpbuf *msg;
+    enum ofpraw raw;
 
-    msg = ofpraw_alloc_xid(OFPRAW_NXST_FLOW_MONITOR_REPLY, OFP10_VERSION,
-                           htonl(0), 1024);
+    switch (ofp_version) {
+    case OFP10_VERSION:
+        raw = OFPRAW_NXST_FLOW_MONITOR_REPLY;
+        break;
+    case OFP14_VERSION:
+    case OFP15_VERSION:
+        raw = OFPRAW_OFPST14_FLOW_MONITOR_REPLY;
+        break;
+    case OFP11_VERSION:
+    case OFP12_VERSION:
+    case OFP13_VERSION: /* XXX: Use OF extension! */
+    default:
+        OVS_NOT_REACHED();
+    }
+
+    msg = ofpraw_alloc_xid(raw, ofp_version, htonl(0), 1024);
 
     list_init(replies);
     list_push_back(replies, &msg->list_node);
 }
 
-void
-ofputil_append_flow_update(const struct ofputil_flow_update *update,
-                           struct list *replies)
+static void
+ofputil_nx_append_flow_update(const struct ofputil_flow_update *update,
+                              struct list *replies)
 {
     enum ofp_version version = ofpmp_version(replies);
     struct nx_flow_update_header *nfuh;
@@ -5689,6 +5704,87 @@ ofputil_append_flow_update(const struct ofputil_flow_update *update,
     nfuh->event = htons(nevent);
 
     ofpmp_postappend(replies, start_ofs);
+}
+
+static void
+ofputil_of_append_flow_update(const struct ofputil_flow_update *update,
+                              struct list *replies)
+{
+    enum ofp_version version = ofpmp_version(replies);
+    struct ofp14_flow_update_header *ofpfuh;
+    struct ofpbuf *msg;
+    size_t start_ofs;
+
+    msg = ofpbuf_from_list(list_back(replies));
+    start_ofs = ofpbuf_size(msg);
+
+    switch(update->event) {
+    case OFPFME14_ABBREV: {
+        struct ofp14_flow_update_abbrev *ofpfua;
+
+        ofpfua = ofpbuf_put_zeros(msg, sizeof *ofpfua);
+        ofpfua->xid = update->xid;
+        break;
+    }
+    case OFPFME14_INITIAL:
+    case OFPFME14_ADDED:
+    case OFPFME14_REMOVED:
+    case OFPFME14_MODIFIED: {
+        struct ofp14_flow_update_full *ofpfuf;
+
+        ofpbuf_put_zeros(msg, sizeof *ofpfuf);
+        oxm_put_match(msg, update->match, version);
+        ofpacts_put_openflow_instructions(update->ofpacts, update->ofpacts_len,
+                                          msg, version);
+        ofpfuf = ofpbuf_at_assert(msg, start_ofs, sizeof *ofpfuf);
+        ofpfuf->table_id = update->table_id;
+        ofpfuf->reason = update->reason;
+        ofpfuf->idle_timeout = htons(update->idle_timeout);
+        ofpfuf->hard_timeout = htons(update->hard_timeout);
+        ofpfuf->priority = htons(update->priority);
+        ofpfuf->cookie = update->cookie;
+        break;
+    }
+    case OFPFME14_PAUSED:
+    case OFPFME14_RESUMED: {
+        struct ofp14_flow_update_paused *ofpfup;
+
+        ofpfup = ofpbuf_put_zeros(msg, sizeof *ofpfup);
+        /* Other than values present in the header, which is set below,
+         * there is only a pad. So there nothing more to do here. */
+        break;
+    }
+    default:
+       OVS_NOT_REACHED();
+    }
+
+    ofpfuh = ofpbuf_at_assert(msg, start_ofs, sizeof *ofpfuh);
+    ofpfuh->length = htons(ofpbuf_size(msg) - start_ofs);
+    ofpfuh->event = htons(update->event);
+
+    ofpmp_postappend(replies, start_ofs);
+}
+
+void
+ofputil_append_flow_update(const struct ofputil_flow_update *update,
+                           struct list *replies)
+{
+    enum ofp_version version = ofpmp_version(replies);
+
+    switch (version) {
+    case OFP10_VERSION:
+        ofputil_nx_append_flow_update(update, replies);
+        break;
+    case OFP14_VERSION:
+    case OFP15_VERSION:
+        ofputil_of_append_flow_update(update, replies);
+        break;
+    case OFP11_VERSION:
+    case OFP12_VERSION:
+    case OFP13_VERSION: /* XXX: Use OF extension! */
+    default:
+        OVS_NOT_REACHED();
+    }
 }
 
 struct ofpbuf *
