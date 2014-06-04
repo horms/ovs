@@ -2148,7 +2148,7 @@ ofmonitor_destroy(struct ofmonitor *m)
 
 void
 ofmonitor_report(struct connmgr *mgr, struct rule *rule,
-                 enum nx_flow_update_event event,
+                 enum ofp14_flow_update_event event,
                  enum ofp_flow_removed_reason reason,
                  const struct ofconn *abbrev_ofconn, ovs_be32 abbrev_xid)
     OVS_REQUIRES(ofproto_mutex)
@@ -2157,22 +2157,25 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
     struct ofconn *ofconn;
 
     switch (event) {
-    case NXFME_ADDED:
+    case OFPFME14_ADDED:
         update = OFPFMF14_ADD;
         rule->add_seqno = rule->modify_seqno = monitor_seqno++;
         break;
 
-    case NXFME_DELETED:
+    case OFPFME14_REMOVED:
         update = OFPFMF14_REMOVED;
         break;
 
-    case NXFME_MODIFIED:
+    case OFPFME14_MODIFIED:
         update = OFPFMF14_MODIFY;
         rule->modify_seqno = monitor_seqno++;
         break;
 
     default:
-    case NXFME_ABBREV:
+    case OFPFME14_INITIAL:
+    case OFPFME14_ABBREV:
+    case OFPFME14_PAUSED:
+    case OFPFME14_RESUMED:
         OVS_NOT_REACHED();
     }
 
@@ -2183,7 +2186,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
         if (ofconn->monitor_paused) {
             /* Only send NXFME_DELETED notifications for flows that were added
              * before we paused. */
-            if (event != NXFME_DELETED
+            if (event != OFPFME14_REMOVED
                 || rule->add_seqno > ofconn->monitor_paused) {
                 continue;
             }
@@ -2212,7 +2215,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
                 struct match match;
 
                 fu.event = event;
-                fu.reason = event == NXFME_DELETED ? reason : 0;
+                fu.reason = event == OFPFME14_REMOVED ? reason : 0;
                 fu.table_id = rule->table_id;
                 fu.cookie = rule->flow_cookie;
                 minimatch_expand(&rule->cr.match, &match);
@@ -2236,7 +2239,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
             } else if (!ofconn->sent_abbrev_update) {
                 struct ofputil_flow_update fu;
 
-                fu.event = NXFME_ABBREV;
+                fu.event = OFPFME14_ABBREV;
                 fu.xid = abbrev_xid;
                 ofputil_append_flow_update(&fu, &ofconn->updates);
 

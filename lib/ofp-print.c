@@ -2304,24 +2304,30 @@ ofp_print_nxst_flow_monitor_reply(struct ds *string,
 
         ds_put_cstr(string, "\n event=");
         switch (update.event) {
-        case NXFME_ADDED:
+        case OFPFME14_ADDED:
             ds_put_cstr(string, "ADDED");
             break;
 
-        case NXFME_DELETED:
+        case OFPFME14_REMOVED:
             ds_put_format(string, "DELETED reason=%s",
                           ofp_flow_removed_reason_to_string(update.reason,
                                                             reasonbuf,
                                                             sizeof reasonbuf));
             break;
 
-        case NXFME_MODIFIED:
+        case OFPFME14_MODIFIED:
             ds_put_cstr(string, "MODIFIED");
             break;
 
-        case NXFME_ABBREV:
+        case OFPFME14_ABBREV:
             ds_put_format(string, "ABBREV xid=0x%"PRIx32, ntohl(update.xid));
             continue;
+
+        case OFPFME14_INITIAL:
+        case OFPFME14_PAUSED:
+        case OFPFME14_RESUMED:
+        default:
+            OVS_NOT_REACHED();
         }
 
         ds_put_format(string, " table=%"PRIu8, update.table_id);
