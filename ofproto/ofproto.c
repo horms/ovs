@@ -4755,8 +4755,13 @@ ofproto_compose_flow_refresh_update(const struct rule *rule,
         return;
     }
 
-    fu.event = (flags & (OFPFMF14_INITIAL | OFPFMF14_ADD)
-                ? NXFME_ADDED : NXFME_MODIFIED);
+    if (flags & OFPFMF14_INITIAL) {
+        fu.event = OFPFME14_INITIAL;
+    } else if (flags & OFPFMF14_ADD) {
+        fu.event = OFPFME14_ADDED;
+    } else {
+        fu.event = OFPFME14_MODIFIED;
+    }
     fu.reason = 0;
     ovs_mutex_lock(&rule->mutex);
     fu.idle_timeout = rule->idle_timeout;
@@ -6272,20 +6277,20 @@ ofopgroup_complete(struct ofopgroup *group)
               || (op->type == OFOPERATION_MODIFY
                   && !op->actions
                   && rule->flow_cookie == op->flow_cookie))) {
-            enum nx_flow_update_event event_type;
+            enum ofp14_flow_update_event event_type;
 
             switch (op->type) {
             case OFOPERATION_ADD:
             case OFOPERATION_REPLACE:
-                event_type = NXFME_ADDED;
+                event_type = OFPFME14_ADDED;
                 break;
 
             case OFOPERATION_DELETE:
-                event_type = NXFME_DELETED;
+                event_type = OFPFME14_REMOVED;
                 break;
 
             case OFOPERATION_MODIFY:
-                event_type = NXFME_MODIFIED;
+                event_type = OFPFME14_MODIFIED;
                 break;
 
             default:
