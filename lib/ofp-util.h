@@ -877,7 +877,8 @@ struct ofputil_flow_update {
 
 int ofputil_decode_flow_update(struct ofputil_flow_update *,
                                struct ofpbuf *msg, struct ofpbuf *ofpacts);
-void ofputil_start_flow_update(struct list *replies);
+void ofputil_start_flow_update(enum ofp_version ofp_version,
+                               struct list *replies);
 void ofputil_append_flow_update(const struct ofputil_flow_update *,
                                 struct list *replies);
 

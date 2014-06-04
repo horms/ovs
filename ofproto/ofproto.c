@@ -4730,7 +4730,7 @@ ofproto_compose_flow_refresh_update(const struct rule *rule,
     fu.ofpacts_len = actions ? actions->ofpacts_len : 0;
 
     if (list_is_empty(msgs)) {
-        ofputil_start_flow_update(msgs);
+        ofputil_start_flow_update(OFP10_VERSION, msgs);
     }
     ofputil_append_flow_update(&fu, msgs);
 }
