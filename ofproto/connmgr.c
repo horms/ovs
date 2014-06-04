@@ -2205,7 +2205,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
 
         if (flags) {
             if (list_is_empty(&ofconn->updates)) {
-                ofputil_start_flow_update(&ofconn->updates);
+                ofputil_start_flow_update(OFP10_VERSION, &ofconn->updates);
                 ofconn->sent_abbrev_update = false;
             }
 
