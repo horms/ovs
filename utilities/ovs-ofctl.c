@@ -1526,9 +1526,11 @@ ofctl_monitor(int argc, char *argv[])
 {
     struct vconn *vconn;
     int i;
+    enum ofp_version version;
     enum ofputil_protocol usable_protocols;
 
     open_vconn(argv[1], &vconn);
+    version = vconn_get_version(vconn);
     for (i = 2; i < argc; i++) {
         const char *arg = argv[i];
 
@@ -1552,7 +1554,7 @@ ofctl_monitor(int argc, char *argv[])
             }
 
             msg = ofpbuf_new(0);
-            ofputil_append_flow_monitor_request(&fmr, msg);
+            ofputil_append_flow_monitor_request(&fmr, version, msg);
             dump_stats_transaction(vconn, msg);
             fflush(stdout);
         } else {
@@ -1563,8 +1565,6 @@ ofctl_monitor(int argc, char *argv[])
     if (preferred_packet_in_format >= 0) {
         set_packet_in_format(vconn, preferred_packet_in_format);
     } else {
-        enum ofp_version version = vconn_get_version(vconn);
-
         switch (version) {
         case OFP10_VERSION: {
             struct ofpbuf *spif, *reply;

@@ -853,7 +853,8 @@ enum nx_flow_monitor_flags nx_from_ofp14_flow_monitor_flags(
 int ofputil_decode_flow_monitor_request(struct ofputil_flow_monitor_request *,
                                         struct ofpbuf *msg);
 void ofputil_append_flow_monitor_request(
-    const struct ofputil_flow_monitor_request *, struct ofpbuf *msg);
+    const struct ofputil_flow_monitor_request *, enum ofp_version version,
+    struct ofpbuf *msg);
 
 /* Abstract nx_flow_update. */
 struct ofputil_flow_update {
