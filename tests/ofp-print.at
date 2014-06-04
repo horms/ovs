@@ -1987,6 +1987,33 @@ OFPST_FLOW_MONITOR request (OF1.4) (xid=0x2):
 ])
 AT_CLEANUP
 
+AT_SETUP([NXST_FLOW_MONITOR reply - OF1.4])
+AT_KEYWORDS([ofp-print OFPT_STATS_REPLY])
+AT_CHECK([ovs-ofctl ofp-print "\
+05 13 00 b8 00 00 00 02 00 10 00 00 00 00 00 00 \
+00 08 00 04 00 00 00 01 \
+00 30 00 01 01 00 00 05 00 10 00 00 00 00 00 00 \
+12 34 56 78 9a bc de f0 00 01 00 0a 80 00 0c 02 \
+10 09 00 00 00 00 00 00 00 01 00 08 01 00 00 00 \
+00 30 00 02 01 04 00 05 00 10 00 00 00 00 00 00 \
+12 34 56 78 9a bc de f0 00 01 00 0a 80 00 0c 02 \
+10 09 00 00 00 00 00 00 00 01 00 08 01 00 00 00 \
+00 30 00 03 01 00 00 05 00 10 00 00 00 00 00 00 \
+12 34 56 78 9a bc de f0 00 01 00 0a 80 00 0c 02 \
+10 09 00 00 00 00 00 00 00 01 00 08 01 00 00 00 \
+00 08 00 05 00 00 00 00 \
+00 08 00 06 00 00 00 00 \
+"], [0], [dnl
+OFPST_FLOW_MONITOR reply (OF1.4) (xid=0x2):
+ event=ABBREV xid=0x1
+ event=ADDED table=1 idle_timeout=5 hard_timeout=16 cookie=0x123456789abcdef0 dl_vlan=9 actions=goto_table:1
+ event=REMOVED reason=meter_delete table=1 idle_timeout=5 hard_timeout=16 cookie=0x123456789abcdef0 dl_vlan=9 actions=goto_table:1
+ event=MODIFIED table=1 idle_timeout=5 hard_timeout=16 cookie=0x123456789abcdef0 dl_vlan=9 actions=goto_table:1
+ event=PAUSED
+ event=RESUMED
+])
+AT_CLEANUP
+
 AT_SETUP([OFPST_PORT_DESC reply - OF1.4])
 AT_KEYWORDS([ofp-print OFPT_STATS_REPLY])
 AT_CHECK([ovs-ofctl ofp-print "\
