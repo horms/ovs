@@ -126,7 +126,8 @@ struct ofconn {
     /* State of monitors for a single ongoing flow_mod.
      *
      * 'updates' is a list of "struct ofpbuf"s that contain
-     * NXST_FLOW_MONITOR_REPLY messages representing the changes made by the
+     * OFPST14_FLOW_MONITOR_REPLY/NXST_FLOW_MONITOR_REPLY messages
+     * representing the changes made by the
      * current flow_mod.
      *
      * When 'updates' is nonempty, 'sent_abbrev_update' is true if 'updates'
@@ -2139,7 +2140,8 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
 
         if (flags) {
             if (list_is_empty(&ofconn->updates)) {
-                ofputil_start_flow_update(OFP10_VERSION, &ofconn->updates);
+                ofputil_start_flow_update(rconn_get_version(ofconn->rconn),
+                                          &ofconn->updates);
                 ofconn->sent_abbrev_update = false;
             }
 
@@ -2190,6 +2192,7 @@ ofmonitor_flush(struct connmgr *mgr)
     struct ofconn *ofconn;
 
     LIST_FOR_EACH (ofconn, node, &mgr->all_conns) {
+        enum ofp_version ofp_version = rconn_get_version(ofconn->rconn);
         struct ofpbuf *msg, *next;
         struct list msgs;
 
@@ -2203,7 +2206,7 @@ ofmonitor_flush(struct connmgr *mgr)
             if (!ofconn->monitor_paused && n_bytes > 128 * 1024) {
                 COVERAGE_INC(ofmonitor_pause);
                 ofconn->monitor_paused = monitor_seqno++;
-                ofmonitor_compose_paused(&msgs);
+                ofmonitor_compose_paused(ofp_version, &msgs);
             }
         }
         ofconn_send_replies(ofconn, &msgs);
@@ -2214,6 +2217,7 @@ static void
 ofmonitor_resume(struct ofconn *ofconn)
     OVS_REQUIRES(ofproto_mutex)
 {
+    enum ofp_version ofp_version = rconn_get_version(ofconn->rconn);
     struct rule_collection rules;
     struct ofmonitor *m;
     struct list msgs;
@@ -2224,7 +2228,7 @@ ofmonitor_resume(struct ofconn *ofconn)
     }
 
     list_init(&msgs);
-    ofmonitor_compose_resumed(&rules, &msgs);
+    ofmonitor_compose_resumed(ofp_version, &rules, &msgs);
     ofconn_send_replies(ofconn, &msgs);
 
     ofconn->monitor_paused = 0;

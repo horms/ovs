@@ -234,12 +234,14 @@ struct rule_collection;
 void ofmonitor_collect_resume_rules(struct ofmonitor *, uint64_t seqno,
                                     struct rule_collection *)
     OVS_REQUIRES(ofproto_mutex);
-void ofmonitor_compose_refresh_updates(struct rule_collection *rules,
+void ofmonitor_compose_refresh_updates(enum ofp_version ofp_version,
+                                       struct rule_collection *rules,
                                        struct list *msgs)
     OVS_REQUIRES(ofproto_mutex);
 
-void ofmonitor_compose_paused(struct list *msgs);
-void ofmonitor_compose_resumed(struct rule_collection *rules,
+void ofmonitor_compose_paused(enum ofp_version ofp_version, struct list *msgs);
+void ofmonitor_compose_resumed(enum ofp_version ofp_version,
+                               struct rule_collection *rules,
                                struct list *msgs)
     OVS_REQUIRES(ofproto_mutex);
 
