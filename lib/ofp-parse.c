@@ -169,6 +169,34 @@ str_to_ip(const char *str, ovs_be32 *ip)
     return NULL;
 }
 
+/* Parses 'arg' as a group id into '*group_id'.
+ *
+ * Allows the all gropup, expressed as the string "all" or numerically
+ * if 'allow_all' is true.
+ *
+ * 'log_tag' may be included in returned error strings. It must be non-NULL.
+ *
+ * Returns NULL if successful, otherwise a malloc()'d string describing the
+ * error.  The caller is responsible for freeing the returned string. */
+static char * WARN_UNUSED_RESULT
+str_to_group_id(const char *arg, uint32_t *group_id, bool allow_all,
+                const char *log_tag)
+{
+    if(allow_all && !strcmp(arg, "all")) {
+        *group_id = OFPG_ALL;
+    } else {
+        char *error = str_to_u32(arg, group_id);
+        if (error) {
+            return error;
+        }
+        if ((!allow_all || *group_id != OFPG_ALL) && *group_id > OFPG_MAX) {
+            return xasprintf("invalid %s id %s", arg, log_tag);
+        }
+    }
+
+    return NULL;
+}
+
 /* Parses 'arg' as the argument to an "enqueue" action, and appends such an
  * action to 'ofpacts'.
  *
@@ -2116,11 +2144,7 @@ parse_bucket_str(struct ofputil_bucket *bucket, char *str_,
                 error = xasprintf("%s: invalid watch_port", arg);
             }
         } else if (!strcasecmp(act, "watch_group")) {
-            error = str_to_u32(arg, &bucket->watch_group);
-            if (!error && bucket->watch_group > OFPG_MAX) {
-                error = xasprintf("invalid watch_group id %"PRIu32,
-                                  bucket->watch_group);
-            }
+            error = str_to_group_id(arg, &bucket->watch_group, false, act);
         } else {
             error = str_to_ofpact__(pos, act, arg, &ofpacts, n_actions,
                                     usable_protocols);
@@ -2230,19 +2254,7 @@ parse_ofp_group_mod_str__(struct ofputil_group_mod *gm, uint16_t command,
         }
 
         if (!strcmp(name, "group_id")) {
-            if(!strcmp(value, "all")) {
-                gm->group_id = OFPG_ALL;
-            } else {
-                char *error = str_to_u32(value, &gm->group_id);
-                if (error) {
-                    goto out;
-                }
-                if (gm->group_id != OFPG_ALL && gm->group_id > OFPG_MAX) {
-                    error = xasprintf("invalid group id %"PRIu32,
-                                      gm->group_id);
-                    goto out;
-                }
-            }
+            error = str_to_group_id(value, &gm->group_id, true, "group");
         } else if (!strcmp(name, "type")){
             if (!(fields & F_GROUP_TYPE)) {
                 error = xstrdup("type is not needed");
