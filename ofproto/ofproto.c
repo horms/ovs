@@ -2587,7 +2587,7 @@ ofproto_rule_has_out_port(const struct rule *rule, ofp_port_t port)
 }
 
 /* Returns true if 'rule' has group and equals group_id. */
-static bool
+bool
 ofproto_rule_has_out_group(const struct rule *rule, uint32_t group_id)
     OVS_REQUIRES(ofproto_mutex)
 {

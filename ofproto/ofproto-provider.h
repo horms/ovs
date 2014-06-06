@@ -423,6 +423,8 @@ const struct rule_actions *rule_actions_create(const struct ofpact *, size_t);
 void rule_actions_destroy(const struct rule_actions *);
 bool ofproto_rule_has_out_port(const struct rule *, ofp_port_t port)
     OVS_REQUIRES(ofproto_mutex);
+bool ofproto_rule_has_out_group(const struct rule *, uint32_t group_id)
+    OVS_REQUIRES(ofproto_mutex);
 
 /* A set of rules to which an OpenFlow operation applies. */
 struct rule_collection {
