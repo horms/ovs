@@ -1726,6 +1726,7 @@ parse_flow_monitor_request__(struct ofputil_flow_monitor_request *fmr,
     fmr->flags = (OFPFMF14_INITIAL | OFPFMF14_ADD | OFPFMF14_REMOVED |
                   OFPFMF14_MODIFY | OFPFMF14_INSTRUCTIONS);
     fmr->out_port = OFPP_NONE;
+    fmr->out_group = OFPG_ANY;
     fmr->table_id = 0xff;
     match_init_catchall(&fmr->match);
 
