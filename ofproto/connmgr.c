@@ -2201,7 +2201,8 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
                 ofconn->sent_abbrev_update = false;
             }
 
-            if (ofconn != abbrev_ofconn || ofconn->monitor_paused) {
+            if ((flags & OFPFMF14_NO_ABBREV) || ofconn != abbrev_ofconn
+                || ofconn->monitor_paused) {
                 struct ofputil_flow_update fu;
                 struct match match;
 
