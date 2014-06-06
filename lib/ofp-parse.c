@@ -1724,7 +1724,7 @@ parse_flow_monitor_request__(struct ofputil_flow_monitor_request *fmr,
     atomic_add(&id, 1, &fmr->id);
 
     fmr->flags = (OFPFMF14_INITIAL | OFPFMF14_ADD | OFPFMF14_REMOVED |
-                  OFPFMF14_MODIFY | OFPFMF14_NO_ABBREV | OFPFMF14_INSTRUCTIONS);
+                  OFPFMF14_MODIFY | OFPFMF14_INSTRUCTIONS);
     fmr->out_port = OFPP_NONE;
     fmr->table_id = 0xff;
     match_init_catchall(&fmr->match);
@@ -1744,7 +1744,7 @@ parse_flow_monitor_request__(struct ofputil_flow_monitor_request *fmr,
         } else if (!strcmp(name, "!actions")) {
             fmr->flags &= ~OFPFMF14_INSTRUCTIONS;
         } else if (!strcmp(name, "!own")) {
-            fmr->flags &= ~OFPFMF14_NO_ABBREV;
+            fmr->flags |= OFPFMF14_NO_ABBREV;
         } else if (parse_protocol(name, &p)) {
             match_set_dl_type(&fmr->match, htons(p->dl_type));
             if (p->nw_proto) {
