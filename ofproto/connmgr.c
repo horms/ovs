@@ -2120,6 +2120,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
                         && ofpacts_output_to_port(old_actions->ofpacts,
                                                   old_actions->ofpacts_len,
                                                   m->out_port)))
+                && (ofconn == abbrev_ofconn || !(m->flags & OFPFMF14_ONLY_OWN))
                 && cls_rule_is_loose_match(&rule->cr, &m->match)) {
                 flags |= m->flags;
             }
