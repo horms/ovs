@@ -1794,6 +1794,13 @@ parse_flow_monitor_request__(struct ofputil_flow_monitor_request *fmr,
                 }
             } else if (!strcmp(name, "out_port")) {
                 fmr->out_port = u16_to_ofp(atoi(value));
+            } else if (!strcmp(name, "out_group")) {
+                char *error;
+                error = str_to_group_id(value, &fmr->out_group, false, name);
+                if (error) {
+                    return error;
+                }
+                *usable_protocols &= OFPUTIL_P_OF14_UP;
             } else if (mf_from_name(name)) {
                 char *error;
 
