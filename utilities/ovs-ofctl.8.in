@@ -458,6 +458,11 @@ Limits the monitoring to the table with the given \fInumber\fR between
 If set, only flows that output to \fIport\fR are monitored.  The
 \fIport\fR may be an OpenFlow port number or keyword
 (e.g. \fBLOCAL\fR).
+.IP "\fBout_group=\fIgroup\fR"
+If set, only flows that output to \fIgroup\fR are monitored.
+The \fIgroup\fR may be an OpenFlow group number.
+.IP
+Requires OpenFlow 1.4 or later.
 .IP "\fIfield\fB=\fIvalue\fR"
 Monitors only flows that have \fIfield\fR specified as the given
 \fIvalue\fR.  Any syntax valid for matching on \fBdump\-flows\fR may
