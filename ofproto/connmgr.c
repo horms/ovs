@@ -2191,6 +2191,7 @@ ofmonitor_report(struct connmgr *mgr, struct rule *rule,
             if (m->flags & update
                 && (m->table_id == 0xff || m->table_id == rule->table_id)
                 && ofoperation_has_out_port(rule->pending, m->out_port)
+                && ofoperation_has_out_group(rule->pending, m->out_group)
                 && (ofconn == abbrev_ofconn || !(m->flags & OFPFMF14_ONLY_OWN))
                 && cls_rule_is_loose_match(&rule->cr, &m->match)) {
                 flags |= m->flags;
