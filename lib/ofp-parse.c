@@ -1774,6 +1774,9 @@ parse_flow_monitor_request__(struct ofputil_flow_monitor_request *fmr,
             fmr->flags &= ~OFPFMF14_INSTRUCTIONS;
         } else if (!strcmp(name, "!own")) {
             fmr->flags |= OFPFMF14_NO_ABBREV;
+        } else if (!strcmp(name, "!other")) {
+            fmr->flags |= OFPFMF14_ONLY_OWN;
+            *usable_protocols &= OFPUTIL_P_OF14_UP;
         } else if (parse_protocol(name, &p)) {
             match_set_dl_type(&fmr->match, htons(p->dl_type));
             if (p->nw_proto) {
