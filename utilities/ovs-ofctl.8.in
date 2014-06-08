@@ -451,6 +451,13 @@ connection to the switch.  (These could only occur using the
 COMMANDS\fR.)
 .IP "\fB!actions\fR"
 Do not report actions as part of flow updates.
+.IP "\fB!other\fR"
+Only report changes made to the flow table by \fBovs\-ofctl\fR's own
+connection to the switch.  (These could only occur using the
+\fBofctl/send\fR command described below under \fBRUNTIME MANAGEMENT
+COMMANDS\fR.)
+.IP
+Requires OpenFlow 1.4 or later.
 .IP "\fBtable=\fInumber\fR"
 Limits the monitoring to the table with the given \fInumber\fR between
 0 and 254.  By default, all tables are monitored.
