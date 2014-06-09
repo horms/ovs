@@ -834,7 +834,7 @@ int ofputil_pull_queue_get_config_reply(struct ofpbuf *reply,
                                         struct ofputil_queue_config *);
 
 
-/* Abstract {nx,ofp14}_flow_monitor_request. */
+/* Abstract {nx,onf13,ofp14}_flow_monitor_request. */
 struct ofputil_flow_monitor_request {
     uint32_t id;
     enum ofp14_flow_monitor_flags flags;
