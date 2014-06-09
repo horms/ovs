@@ -5837,13 +5837,15 @@ ofputil_start_flow_update(enum ofp_version ofp_version, struct list *replies)
     case OFP10_VERSION:
         raw = OFPRAW_NXST_FLOW_MONITOR_REPLY;
         break;
+    case OFP13_VERSION:
+        raw = OFPRAW_ONFST13_FLOW_MONITOR_REPLY;
+        break;
     case OFP14_VERSION:
     case OFP15_VERSION:
         raw = OFPRAW_OFPST14_FLOW_MONITOR_REPLY;
         break;
     case OFP11_VERSION:
     case OFP12_VERSION:
-    case OFP13_VERSION: /* XXX: Use OF extension! */
     default:
         OVS_NOT_REACHED();
     }
@@ -5980,6 +5982,7 @@ ofputil_append_flow_update(const struct ofputil_flow_update *update,
 
     switch (version) {
     case OFP10_VERSION:
+    case OFP13_VERSION:
         ofputil_nx_append_flow_update(update, replies);
         break;
     case OFP14_VERSION:
@@ -5988,7 +5991,6 @@ ofputil_append_flow_update(const struct ofputil_flow_update *update,
         break;
     case OFP11_VERSION:
     case OFP12_VERSION:
-    case OFP13_VERSION: /* XXX: Use OF extension! */
     default:
         OVS_NOT_REACHED();
     }
