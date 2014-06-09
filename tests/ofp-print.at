@@ -2574,6 +2574,34 @@ OFPT_ROLE_STATUS (OF1.4) (xid=0xa): role=master generation_id=16 reason=configur
 ])
 AT_CLEANUP
 
+AT_SETUP([ONF_FLOW_MONITOR_CANCEL])
+AT_KEYWORDS([ofp-print])
+AT_CHECK([ovs-ofctl ofp-print "\
+04 04 00 14 00 00 00 03 4f 4e 46 00 00 00 07 4e \
+01 02 30 40 \
+"], [0], [dnl
+ONF_FLOW_MONITOR_CANCEL (OF1.3) (xid=0x3): id=16920640
+])
+AT_CLEANUP
+
+AT_SETUP([ONF_FLOW_MONITOR_PAUSED])
+AT_KEYWORDS([ofp-print])
+AT_CHECK([ovs-ofctl ofp-print "\
+04 04 00 10 00 00 00 03 4f 4e 46 00 00 00 07 4f \
+"], [0], [dnl
+ONF_FLOW_MONITOR_PAUSED (OF1.3) (xid=0x3):
+])
+AT_CLEANUP
+
+AT_SETUP([ONF_FLOW_MONITOR_RESUMED])
+AT_KEYWORDS([ofp-print])
+AT_CHECK([ovs-ofctl ofp-print "\
+04 04 00 10 00 00 00 03 4f 4e 46 00 00 00 07 50 \
+"], [0], [dnl
+ONF_FLOW_MONITOR_RESUMED (OF1.3) (xid=0x3):
+])
+AT_CLEANUP
+
 AT_SETUP([NXT_SET_PACKET_IN])
 AT_KEYWORDS([ofp-print])
 AT_CHECK([ovs-ofctl ofp-print "\
