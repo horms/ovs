@@ -5443,6 +5443,32 @@ ofputil_append_nx_flow_monitor_request(
 }
 
 static void
+ofputil_append_onf13_flow_monitor_request(
+    const struct ofputil_flow_monitor_request *rq, struct ofpbuf *msg)
+{
+    struct onf13_flow_monitor_request *onffmr;
+    size_t start_ofs;
+    int match_len;
+
+    if (!ofpbuf_size(msg)) {
+        ofpraw_put(OFPRAW_ONFST13_FLOW_MONITOR_REQUEST, OFP13_VERSION, msg);
+    }
+
+    start_ofs = ofpbuf_size(msg);
+    ofpbuf_put_zeros(msg, sizeof *onffmr);
+    /* nx_put_match() is use to put an OXM match without an
+     * ofp_match_header */
+    match_len = nx_put_match(msg, &rq->match, htonll(0), htonll(0));
+
+    onffmr = ofpbuf_at_assert(msg, start_ofs, sizeof *onffmr);
+    onffmr->id = htonl(rq->id);
+    onffmr->flags = htons(nx_from_ofp14_flow_monitor_flags(rq->flags));
+    onffmr->out_port = ofputil_port_to_ofp11(rq->out_port);
+    onffmr->match_len = htons(match_len);
+    onffmr->table_id = rq->table_id;
+}
+
+static void
 ofputil_append_of14_flow_monitor_request(
     const struct ofputil_flow_monitor_request *rq, enum ofp_version version,
     struct ofpbuf *msg)
@@ -5475,12 +5501,13 @@ ofputil_append_flow_monitor_request(
     switch (version) {
     case OFP10_VERSION:
         return ofputil_append_nx_flow_monitor_request(rq, msg);
+    case OFP13_VERSION:
+        return ofputil_append_onf13_flow_monitor_request(rq, msg);
     case OFP14_VERSION:
     case OFP15_VERSION:
         return ofputil_append_of14_flow_monitor_request(rq, version, msg);
     case OFP11_VERSION:
     case OFP12_VERSION:
-    case OFP13_VERSION: /* XXX: Use OF extension! */
     default:
         OVS_NOT_REACHED();
     }

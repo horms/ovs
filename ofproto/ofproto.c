@@ -4831,16 +4831,18 @@ static void
 ofproto_compose_paused_or_resumed(enum ofp_version ofp_version,
                                   struct list *msgs, bool paused)
 {
+    struct ofpbuf *msg;
+    enum ofpraw raw;
+
     switch (ofp_version) {
-    case OFP10_VERSION: {
-        struct ofpbuf *msg;
-        enum ofpraw raw;
+    case OFP10_VERSION:
         raw = paused ? OFPRAW_NXT_FLOW_MONITOR_PAUSED
             : OFPRAW_NXT_FLOW_MONITOR_RESUMED;
-        msg = ofpraw_alloc_xid(raw, ofp_version, htonl(0), 0);
-        list_push_back(msgs, &msg->list_node);
         break;
-    }
+    case OFP13_VERSION:
+        raw = paused ? OFPRAW_ONF13_FLOW_MONITOR_PAUSED
+            : OFPRAW_ONF13_FLOW_MONITOR_RESUMED;
+        break;
     case OFP14_VERSION:
     case OFP15_VERSION: {
         struct ofputil_flow_update fu;
@@ -4849,14 +4851,17 @@ ofproto_compose_paused_or_resumed(enum ofp_version ofp_version,
             ofputil_start_flow_update(ofp_version, msgs);
         }
         ofputil_append_flow_update(&fu, msgs);
-        break;
+        return;
     }
     case OFP11_VERSION:
     case OFP12_VERSION:
-    case OFP13_VERSION: /* XXX: Use ONF extension */
     default:
         OVS_NOT_REACHED();
     }
+
+    /* Create and send message for NX/ONF13 */
+    msg = ofpraw_alloc_xid(raw, ofp_version, htonl(0), 0);
+    list_push_back(msgs, &msg->list_node);
 }
 
 void
