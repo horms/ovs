@@ -2586,6 +2586,21 @@ ONFST_FLOW_MONITOR request (OF1.3) (xid=0x2):
 ])
 AT_CLEANUP
 
+AT_SETUP([ONFST_FLOW_MONITOR reply - OF1.3])
+AT_KEYWORDS([ofp-print OFPT_STATS_REPLY])
+AT_CHECK([ovs-ofctl ofp-print "\
+04 13 00 40 00 00 00 04 ff ff 00 00 00 00 00 00 \
+4f 4e 46 00 00 00 07 4e 00 20 00 01 00 05 80 00 \
+00 05 00 10 00 06 01 00 12 34 56 78 9a bc de f0 \
+00 00 00 02 00 01 00 00 \
+00 08 00 03 00 01 86 a0 \
+"], [0], [dnl
+ONFST_FLOW_MONITOR reply (OF1.3) (xid=0x4):
+ event=DELETED reason=eviction table=1 idle_timeout=5 hard_timeout=16 cookie=0x123456789abcdef0 in_port=1
+ event=ABBREV xid=0x186a0
+])
+AT_CLEANUP
+
 AT_SETUP([ONF_FLOW_MONITOR_CANCEL])
 AT_KEYWORDS([ofp-print])
 AT_CHECK([ovs-ofctl ofp-print "\
