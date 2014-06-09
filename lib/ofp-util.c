@@ -5797,7 +5797,8 @@ ofputil_decode_flow_update(struct ofputil_flow_update *update,
 
     if (raw == OFPRAW_OFPST14_FLOW_MONITOR_REPLY) {
         error = ofputil_of14_decode_flow_update(update, msg, ofpacts);
-    } else if (raw == OFPRAW_NXST_FLOW_MONITOR_REPLY) {
+    } else if (raw == OFPRAW_ONFST13_FLOW_MONITOR_REPLY
+               || raw == OFPRAW_NXST_FLOW_MONITOR_REPLY) {
         error = ofputil_nx_decode_flow_update(update, msg, ofpacts);
     } else {
         OVS_NOT_REACHED();
