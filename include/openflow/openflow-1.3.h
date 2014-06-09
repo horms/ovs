@@ -472,4 +472,23 @@ struct ofp13_packet_in {
 OFP_ASSERT(sizeof(struct ofp13_packet_in) == 16);
 
 
+/* Header for experimenter multipart messages. */
+struct onf13_experimenter_multipart_msg {
+    struct ofp_header header;
+    ovs_be16 type;                /* OFPMP_EXPERIMENTER.. */
+    ovs_be16 flags;               /* OFPMPF_REQ_* flags. */
+    uint8_t pad[4];
+    ovs_be32 experimenter;        /* ONF_EXPERIMENTER_ID. */
+    ovs_be32 mp_type;             /* One of ONFMP_*. */
+};
+OFP_ASSERT(sizeof(struct onf13_experimenter_multipart_msg) == 24);
+
+/* Header for experimenter requests and replies. */
+struct onf13_experimenter_header {
+    struct ofp_header header;
+    ovs_be32 vendor;              /* ONF_EXPERIMENTER_ID. */
+    ovs_be32 subtype;             /* One of ONFT_*. */
+};
+OFP_ASSERT(sizeof(struct onf13_experimenter_header) == 16);
+
 #endif /* openflow/openflow-1.3.h */
