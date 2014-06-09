@@ -161,7 +161,16 @@ ofphdrs_decode(struct ofphdrs *hdrs,
 
         ovh = (const struct ofp_vendor_header *) oh;
         hdrs->vendor = ntohl(ovh->vendor);
-        if (hdrs->vendor == NX_VENDOR_ID) {
+        if (hdrs->version >= OFP13_VERSION && hdrs->vendor == ONF_VENDOR_ID) {
+            /* Get ONF message subtype (ONF_*). */
+            const struct onf13_experimenter_header *onfeh;
+
+            if (length < sizeof *onfeh) {
+                return OFPERR_OFPBRC_BAD_LEN;
+            }
+            onfeh = (const struct onf13_experimenter_header *) oh;
+            hdrs->subtype = ntohl(onfeh->subtype);
+        } else if (hdrs->vendor == NX_VENDOR_ID) {
             /* Get Nicira message subtype (NXT_*). */
             const struct nicira_header *nh;
 
@@ -232,7 +241,17 @@ ofphdrs_decode(struct ofphdrs *hdrs,
 
             ovsm = (const struct ofp11_vendor_stats_msg *) oh;
             hdrs->vendor = ntohl(ovsm->vendor);
-            if (hdrs->vendor == NX_VENDOR_ID) {
+            if (hdrs->version >= OFP13_VERSION
+                && hdrs->vendor == ONF_VENDOR_ID) {
+                /* Get ONF statistic type (ONFST_*). */
+                const struct onf13_experimenter_multipart_msg *onfemm;
+
+                if (length < sizeof *onfemm) {
+                    return OFPERR_OFPBRC_BAD_LEN;
+                }
+                onfemm = (const struct onf13_experimenter_multipart_msg *) oh;
+                hdrs->subtype = ntohl(onfemm->mp_type);
+            } else if (hdrs->vendor == NX_VENDOR_ID) {
                 /* Get Nicira statistic type (NXST_*). */
                 const struct nicira11_stats_msg *nsm;
 
