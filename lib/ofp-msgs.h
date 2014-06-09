@@ -62,7 +62,8 @@ struct list;
  *
  *    - type: One of OFPT (standard OpenFlow message), OFPST (standard OpenFlow
  *      statistics message), NXT (Nicira extension message), or NXST (Nicira
- *      extension statistics message).
+ *      extension statistics message), ONFST (OMF extension statistics
+ *      message).
  *
  *      As new vendors implement extensions it will make sense to expand the
  *      dictionary of possible types.
@@ -72,10 +73,12 @@ struct list;
  *
  *    - number:
  *         For OFPT, the 'type' in struct ofp_header.
- *         For OFPST, the 'type' in struct ofp_stats_msg or ofp11_stats_msg.
+ *         For OFPST, the 'type' in struct ofp10_stats_msg or ofp11_stats_msg.
  *         For NXT, the 'subtype' in struct nicira_header.
  *         For NXST, the 'subtype' in struct nicira10_stats_msg or
  *           nicira11_stats_msg.
+ *         For ONFST, the 'subtype' in struct onf13_experimenter_multipart_msg.
+ *
  *
  *    - arguments: The types of data that follow the OpenFlow headers (the
  *      message "body").  This can be "void" if the message has no body.
@@ -381,18 +384,40 @@ enum ofpraw {
 
     /* OFPST 1.4+ (16): uint8_t[8][]. */
     OFPRAW_OFPST14_FLOW_MONITOR_REQUEST,
+    /* ONFST 1.3 (1870): uint8_t[8][]. */
+    OFPRAW_ONFST13_FLOW_MONITOR_REQUEST,
     /* NXST 1.0 (2): uint8_t[8][]. */
     OFPRAW_NXST_FLOW_MONITOR_REQUEST,
 
     /* OFPST 1.4+ (16): uint8_t[8][]. */
     OFPRAW_OFPST14_FLOW_MONITOR_REPLY,
+    /* ONFST 1.3 (1870): uint8_t[8][]. */
+    OFPRAW_ONFST13_FLOW_MONITOR_REPLY,
     /* NXST 1.0 (2): uint8_t[8][]. */
     OFPRAW_NXST_FLOW_MONITOR_REPLY,
 
+/* ONF extension messages. */
+
+    /* ONF 1.3+ (1870): struct nx_flow_monitor_cancel. */
+    OFPRAW_ONF13_FLOW_MONITOR_CANCEL,
+    /* NXT 1.0-1.2 (21): struct nx_flow_monitor_cancel. */
+    OFPRAW_NXT_FLOW_MONITOR_CANCEL,
+
+    /* ONF 1.3+ (1871): void. */
+    OFPRAW_ONF13_FLOW_MONITOR_PAUSED,
+    /* NXT 1.0-1.2 (22): void. */
+    OFPRAW_NXT_FLOW_MONITOR_PAUSED,
+
+    /* ONF 1.3+ (1872): void. */
+    OFPRAW_ONF13_FLOW_MONITOR_RESUMED,
+    /* NXT 1.0-1.2 (23): void. */
+    OFPRAW_NXT_FLOW_MONITOR_RESUMED,
+
 /* Nicira extension messages.
  *
- * Nicira extensions that correspond to standard OpenFlow messages are listed
- * alongside the standard versions above. */
+ * Nicira extensions that correspond to standard OpenFlow or ONF extension
+ * messages are listed alongside the standard or ONF extension versions
+ * above. */
 
     /* NXT 1.0 (12): struct nx_set_flow_format. */
     OFPRAW_NXT_SET_FLOW_FORMAT,
@@ -408,15 +433,6 @@ enum ofpraw {
 
     /* NXT 1.0+ (20): struct nx_controller_id. */
     OFPRAW_NXT_SET_CONTROLLER_ID,
-
-    /* NXT 1.0+ (21): struct nx_flow_monitor_cancel. */
-    OFPRAW_NXT_FLOW_MONITOR_CANCEL,
-
-    /* NXT 1.0+ (22): void. */
-    OFPRAW_NXT_FLOW_MONITOR_PAUSED,
-
-    /* NXT 1.0+ (23): void. */
-    OFPRAW_NXT_FLOW_MONITOR_RESUMED,
 };
 
 /* Decoding messages into OFPRAW_* values. */
@@ -607,8 +623,10 @@ enum ofptype {
                                       * OFPRAW_OFPST14_PORT_DESC_REPLY. */
 
     OFPTYPE_FLOW_MONITOR_STATS_REQUEST, /* OFPRAW_OFPST14_FLOW_MONITOR_REQUEST.
+                                         * OFPRAW_ONFST13_FLOW_MONITOR_REQUEST.
                                          * OFPRAW_NXST_FLOW_MONITOR_REQUEST. */
     OFPTYPE_FLOW_MONITOR_STATS_REPLY,   /* OFPRAW_OFPST14_FLOW_MONITOR_REPLY.
+                                         * OFPRAW_ONFST13_FLOW_MONITOR_REPLY.
                                          * OFPRAW_NXST_FLOW_MONITOR_REPLY. */
 
     /* Nicira extensions. */
@@ -619,9 +637,12 @@ enum ofptype {
     OFPTYPE_SET_CONTROLLER_ID,    /* OFPRAW_NXT_SET_CONTROLLER_ID. */
 
     /* Flow monitor extension. */
-    OFPTYPE_FLOW_MONITOR_CANCEL,        /* OFPRAW_NXT_FLOW_MONITOR_CANCEL. */
-    OFPTYPE_FLOW_MONITOR_PAUSED,        /* OFPRAW_NXT_FLOW_MONITOR_PAUSED. */
-    OFPTYPE_FLOW_MONITOR_RESUMED,       /* OFPRAW_NXT_FLOW_MONITOR_RESUMED. */
+    OFPTYPE_FLOW_MONITOR_CANCEL,        /* OFPRAW_ONF13_FLOW_MONITOR_CANCEL.
+                                         * OFPRAW_NXT_FLOW_MONITOR_CANCEL. */
+    OFPTYPE_FLOW_MONITOR_PAUSED,        /* OFPRAW_ONF13_FLOW_MONITOR_PAUSED.
+                                         * OFPRAW_NXT_FLOW_MONITOR_PAUSED. */
+    OFPTYPE_FLOW_MONITOR_RESUMED,       /* OFPRAW_ONF13_FLOW_MONITOR_RESUMED.
+                                         * OFPRAW_NXT_FLOW_MONITOR_RESUMED. */
 };
 
 /* Decoding messages into OFPTYPE_* values. */
