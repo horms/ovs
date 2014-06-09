@@ -677,11 +677,19 @@ ofpraw_put__(enum ofpraw raw, uint8_t version, ovs_be32 xid,
     oh->xid = xid;
 
     if (hdrs->type == OFPT_VENDOR) {
-        struct nicira_header *nh = buf->frame;
+        if (version >= OFP13_VERSION && hdrs->vendor == ONF_VENDOR_ID) {
+            struct onf13_experimenter_header *onfeh = buf->frame;
 
-        ovs_assert(hdrs->vendor == NX_VENDOR_ID);
-        nh->vendor = htonl(hdrs->vendor);
-        nh->subtype = htonl(hdrs->subtype);
+            onfeh->vendor = htonl(hdrs->vendor);
+            onfeh->subtype = htonl(hdrs->subtype);
+        } else if (hdrs->vendor == NX_VENDOR_ID) {
+            struct nicira_header *nh = buf->frame;
+
+            nh->vendor = htonl(hdrs->vendor);
+            nh->subtype = htonl(hdrs->subtype);
+        } else {
+            OVS_NOT_REACHED();
+        }
     } else if (version == OFP10_VERSION
                && (hdrs->type == OFPT10_STATS_REQUEST ||
                    hdrs->type == OFPT10_STATS_REPLY)) {
@@ -716,7 +724,11 @@ ofpraw_put__(enum ofpraw raw, uint8_t version, ovs_be32 xid,
             struct ofp11_vendor_stats_msg *ovsm = buf->frame;
 
             ovsm->vendor = htonl(hdrs->vendor);
-            if (hdrs->vendor == NX_VENDOR_ID) {
+            if (version >= OFP13_VERSION && hdrs->vendor == ONF_VENDOR_ID) {
+                struct onf13_experimenter_multipart_msg *onfemm = buf->frame;
+
+                onfemm->mp_type = htonl(hdrs->subtype);
+            } else if (hdrs->vendor == NX_VENDOR_ID) {
                 struct nicira11_stats_msg *nsm = buf->frame;
 
                 nsm->subtype = htonl(hdrs->subtype);
