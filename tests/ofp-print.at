@@ -2574,6 +2574,18 @@ OFPT_ROLE_STATUS (OF1.4) (xid=0xa): role=master generation_id=16 reason=configur
 ])
 AT_CLEANUP
 
+AT_SETUP([ONFST_FLOW_MONITOR request - OF1.3])
+AT_KEYWORDS([ofp-print OFPT_STATS_REPLY])
+AT_CHECK([ovs-ofctl ofp-print "\
+04 12 00 30 00 00 00 02 ff ff 00 00 00 00 00 00 \
+4f 4e 46 00 00 00 07 4e 00 00 00 01 00 1f 00 06 \
+00 00 00 05 01 00 00 00 80 00 0c 02 10 09 00 00 \
+"], [0], [dnl
+ONFST_FLOW_MONITOR request (OF1.3) (xid=0x2):
+ id=1 flags=initial,add,delete,modify,actions out_port=5 table=1 dl_vlan=9
+])
+AT_CLEANUP
+
 AT_SETUP([ONF_FLOW_MONITOR_CANCEL])
 AT_KEYWORDS([ofp-print])
 AT_CHECK([ovs-ofctl ofp-print "\
