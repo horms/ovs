@@ -491,4 +491,19 @@ struct onf13_experimenter_header {
 };
 OFP_ASSERT(sizeof(struct onf13_experimenter_header) == 16);
 
+
+struct onf13_flow_monitor_request {
+    ovs_be32 id;                  /* Controller-assigned ID for this monitor. */
+    ovs_be16 flags;               /* ONFFMF14_* excluding ONFFMF14_ONLY_OWN. */
+    ovs_be16 match_len;           /* Length of oxm_fields. */
+    ovs_be32 out_port;            /* Required output port, if not OFPP_NONE. */
+    uint8_t table_id;             /* One table’s ID or 0xff for all tables. */
+    uint8_t zeros[3];             /* Align to 64 bits (must be zero). */
+    /* Followed by:
+     *   - Exactly match_len (possibly 0) bytes containing the oxm_fields, then
+     *   - Exactly (match_len + 7)/8*8 - match_len (between 0 and 7) bytes of
+     *      all-zero bytes. */
+};
+OFP_ASSERT(sizeof(struct onf13_flow_monitor_request) == 16);
+
 #endif /* openflow/openflow-1.3.h */
