@@ -884,6 +884,40 @@ ofpmsg_is_stat_request(const struct ofp_header *oh)
 {
     return ofp_is_stat_request(oh->version, oh->type);
 }
+
+/* Return if it's a multpart request message
+ * with more parts to follow */
+bool
+ofpmsg_is_mp_request(const struct ofp_header *oh)
+{
+    bool retval;
+
+    switch (oh->version) {
+    case OFP10_VERSION:
+    case OFP11_VERSION:
+    case OFP12_VERSION:
+        retval = false;
+        break;
+    case OFP13_VERSION:
+    case OFP14_VERSION:
+    case OFP15_VERSION:
+        retval = ofpmsg_is_stat_request(oh);
+        break;
+    default:
+        OVS_NOT_REACHED();
+    }
+
+    return retval;
+}
+
+/* Return if type of a multipart request message
+ * that may be buffered and processed as multiple messages. */
+bool
+ofpmsg_may_buffer_mp_request(enum ofptype type OVS_UNUSED)
+{
+    /* Currently no types are allowed to be buffered. */
+    return false;
+}
 
 static ovs_be16 *ofpmp_flags__(const struct ofp_header *);
 
