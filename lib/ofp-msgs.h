@@ -671,6 +671,8 @@ bool ofpmsg_is_stat_request(const struct ofp_header *);
  * that is, only a multipart reply may have more than one part.  OpenFlow 1.3
  * adds one multipart request.  This code does not yet support multipart
  * requests. */
+bool ofpmsg_is_mp_request(const struct ofp_header *oh);
+bool ofpmsg_may_buffer_mp_request(enum ofptype type);
 
 /* Encoding multipart replies.
  *

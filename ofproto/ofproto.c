@@ -6010,11 +6010,10 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
     if (error) {
         return error;
     }
-    if (oh->version >= OFP13_VERSION && ofpmsg_is_stat_request(oh)
-        && ofpmp_more(oh)) {
-        /* We have no buffer implementation for multipart requests.
-         * Report overflow for requests which consists of multiple
-         * messages. */
+    if (ofpmsg_is_mp_request(oh) && ofpmp_more(oh)
+        && !ofpmsg_may_buffer_mp_request(type)) {
+        /* Report overflow for requests which consist of multiple message
+         * for which multiple message handling is not available. */
         return OFPERR_OFPBRC_MULTIPART_BUFFER_OVERFLOW;
     }
 
