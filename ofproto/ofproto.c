@@ -4906,21 +4906,17 @@ flow_monitor_delete(struct ofconn *ofconn, uint32_t id)
 }
 
 static enum ofperr
-handle_flow_monitor_request(struct ofconn *ofconn, const struct ofp_header *oh)
-    OVS_EXCLUDED(ofproto_mutex)
+handle_one_flow_monitor_request(struct ofconn *ofconn,
+                                const struct ofp_header *oh,
+                                struct list *monitor_list)
+    OVS_REQUIRES(ofproto_mutex)
 {
-    struct list monitor_list = LIST_INITIALIZER(&monitor_list);
     struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
-    struct rule_collection rules;
-    struct list replies;
-    struct ofmonitor *m, *next;
-    enum ofperr error;
+    struct ofmonitor *m;
     struct ofpbuf b;
 
-    error = 0;
     ofpbuf_use_const(&b, oh, ntohs(oh->length));
 
-    ovs_mutex_lock(&ofproto_mutex);
     for (;;) {
         struct ofputil_flow_monitor_request request;
         int retval;
@@ -4929,32 +4925,61 @@ handle_flow_monitor_request(struct ofconn *ofconn, const struct ofp_header *oh)
         if (retval == EOF) {
             break;
         } else if (retval) {
-            error = retval;
-            goto error;
+            return retval;
         }
 
         if (request.table_id != 0xff
             && request.table_id >= ofproto->n_tables) {
-            error = OFPERR_OFPBRC_BAD_TABLE_ID;
-            goto error;
+            return OFPERR_OFPBRC_BAD_TABLE_ID;
         }
 
         if (request.command == OFPFMC14_DELETE ||
             request.command == OFPFMC14_MODIFY) {
-            error = flow_monitor_delete(ofconn, request.id);
+            enum ofperr error = flow_monitor_delete(ofconn, request.id);
             if (error) {
-                goto error;
+                return error;
             }
         }
 
         if (request.command == OFPFMC14_ADD ||
             request.command == OFPFMC14_MODIFY) {
-            error = ofmonitor_create(&request, ofconn, &m);
+            enum ofperr error = ofmonitor_create(&request, ofconn, &m);
             if (error) {
-                goto error;
+                return error;
             }
 
-            list_insert(&monitor_list, &m->list_node);
+            list_insert(monitor_list, &m->list_node);
+        }
+    }
+
+    return 0;
+}
+
+static enum ofperr
+handle_flow_monitor_request(struct ofconn *ofconn, const struct ofpbuf *msg)
+    OVS_EXCLUDED(ofproto_mutex)
+{
+    struct list monitor_list = LIST_INITIALIZER(&monitor_list);
+    const struct ofp_header *oh = ofpbuf_data(msg);
+    struct rule_collection rules;
+    struct list replies;
+    struct ofmonitor *m, *next;
+    enum ofperr error;
+    struct ofpbuf *b;
+
+    error = 0;
+
+    ovs_mutex_lock(&ofproto_mutex);
+
+    /* First part of multi-part request */
+    handle_one_flow_monitor_request(ofconn, oh, &monitor_list);
+
+    /* Any subsequent parts */
+    LIST_FOR_EACH (b, list_node, &msg->list_node) {
+        error = handle_one_flow_monitor_request(ofconn, ofpbuf_data(b),
+                                                &monitor_list);
+        if (error) {
+            goto error;
         }
     }
 
@@ -6025,7 +6050,7 @@ handle_openflow__(struct ofconn *ofconn, const struct ofpbuf *msg)
         return handle_port_desc_stats_request(ofconn, oh);
 
     case OFPTYPE_FLOW_MONITOR_STATS_REQUEST:
-        return handle_flow_monitor_request(ofconn, oh);
+        return handle_flow_monitor_request(ofconn, msg);
 
     case OFPTYPE_METER_STATS_REQUEST:
     case OFPTYPE_METER_CONFIG_STATS_REQUEST:

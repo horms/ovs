@@ -915,8 +915,7 @@ ofpmsg_is_mp_request(const struct ofp_header *oh)
 bool
 ofpmsg_may_buffer_mp_request(enum ofptype type OVS_UNUSED)
 {
-    /* Currently no types are allowed to be buffered. */
-    return false;
+    return type == OFPTYPE_FLOW_MONITOR_STATS_REQUEST;
 }
 
 static ovs_be16 *ofpmp_flags__(const struct ofp_header *);

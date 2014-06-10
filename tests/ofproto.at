@@ -3583,3 +3583,125 @@ OFPT_BARRIER_REPLY (OF1.4):
 
 OVS_VSWITCHD_STOP
 AT_CLEANUP
+
+AT_SETUP([ofproto - multipart flow monitor request (OpenFlow 1.3)])
+AT_KEYWORDS([monitor])
+OVS_VSWITCHD_START
+ADD_OF_PORTS([br0], [1], [2], [3])
+
+# Start a monitor, use the required protocol version
+ovs-ofctl -O OpenFlow13 monitor br0 --detach --no-chdir --pidfile >monitor.log 2>&1
+AT_CAPTURE_FILE([monitor.log])
+
+# Send first part: monitor actions with dl_vlan=7
+ovs-appctl -t ovs-ofctl ofctl/send "\
+04 12 00 30 00 00 00 01 ff ff 00 01 00 00 00 00 \
+4f 4e 46 00 00 00 07 4e 00 00 00 07 00 1f 00 06 \
+ff ff ff ff 00 00 00 00 80 00 0c 02 10 07 00 00 \
+"
+
+# Send second part: monitor actions with dl_vlan=8
+ovs-appctl -t ovs-ofctl ofctl/send "\
+04 12 00 30 00 00 00 01 ff ff 00 01 00 00 00 00 \
+4f 4e 46 00 00 00 07 4e 00 00 00 08 00 1f 00 06 \
+ff ff ff ff 00 00 00 00 80 00 0c 02 10 08 00 00 \
+"
+
+# Send third part: monitor actions with dl_vlan=9
+ovs-appctl -t ovs-ofctl ofctl/send "\
+04 12 00 30 00 00 00 01 ff ff 00 00 00 00 00 00 \
+4f 4e 46 00 00 00 07 4e 00 00 00 09 00 1f 00 06 \
+ff ff ff ff 00 00 00 00 80 00 0c 02 10 09 00 00 \
+"
+
+ovs-appctl -t ovs-ofctl ofctl/barrier
+
+# Create some evnents that should be monitored
+ovs-ofctl -O OpenFlow13 add-flow br0 in_port=0,dl_vlan=7,actions=output:2
+ovs-ofctl -O OpenFlow13 add-flow br0 in_port=0,dl_vlan=8,actions=output:2
+ovs-ofctl -O OpenFlow13 add-flow br0 in_port=0,dl_vlan=9,actions=output:2
+
+# Check default setting
+read -r -d '' expected <<'EOF'
+EOF
+
+AT_CHECK([ofctl_strip < monitor.log ], [], [dnl
+send: ONFST_FLOW_MONITOR request (OF1.3):
+ id=7 flags=initial,add,delete,modify,actions table=0 dl_vlan=7
+send: ONFST_FLOW_MONITOR request (OF1.3):
+ id=8 flags=initial,add,delete,modify,actions table=0 dl_vlan=8
+send: ONFST_FLOW_MONITOR request (OF1.3):
+ id=9 flags=initial,add,delete,modify,actions table=0 dl_vlan=9
+ONFST_FLOW_MONITOR reply (OF1.3):
+OFPT_BARRIER_REPLY (OF1.3):
+ONFST_FLOW_MONITOR reply (OF1.3):
+ event=ADDED table=0 cookie=0 in_port=0,dl_vlan=7 actions=output:2
+ONFST_FLOW_MONITOR reply (OF1.3):
+ event=ADDED table=0 cookie=0 in_port=0,dl_vlan=8 actions=output:2
+ONFST_FLOW_MONITOR reply (OF1.3):
+ event=ADDED table=0 cookie=0 in_port=0,dl_vlan=9 actions=output:2
+])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([ofproto - multipart flow monitor request (OpenFlow 1.4)])
+AT_KEYWORDS([monitor])
+OVS_VSWITCHD_START
+ADD_OF_PORTS([br0], [1], [2], [3])
+
+# Start a monitor, use the required protocol version
+ovs-ofctl -O OpenFlow14 monitor br0 --detach --no-chdir --pidfile >monitor.log 2>&1
+AT_CAPTURE_FILE([monitor.log])
+
+# Send first part: monitor actions with dl_vlan=7
+ovs-appctl -t ovs-ofctl ofctl/send "\
+05 12 00 30 00 00 00 02 00 10 00 01 00 00 00 00 \
+00 00 00 01 ff ff ff ff ff ff ff ff 00 1f 00 00 \
+00 01 00 0a 80 00 0c 02 10 07 00 00 00 00 00 00 \
+"
+
+# Send second part: monitor actions with dl_vlan=8
+ovs-appctl -t ovs-ofctl ofctl/send "\
+05 12 00 30 00 00 00 02 00 10 00 01 00 00 00 00 \
+00 00 00 02 ff ff ff ff ff ff ff ff 00 1f 00 00 \
+00 01 00 0a 80 00 0c 02 10 08 00 00 00 00 00 00 \
+"
+
+# Send third part: monitor actions with dl_vlan=9
+ovs-appctl -t ovs-ofctl ofctl/send "\
+05 12 00 30 00 00 00 02 00 10 00 00 00 00 00 00 \
+00 00 00 03 ff ff ff ff ff ff ff ff 00 1f 00 00 \
+00 01 00 0a 80 00 0c 02 10 09 00 00 00 00 00 00 \
+"
+
+ovs-appctl -t ovs-ofctl ofctl/barrier
+
+# Create some evnents that should be monitored
+ovs-ofctl -O OpenFlow14 add-flow br0 in_port=0,dl_vlan=7,actions=output:2
+ovs-ofctl -O OpenFlow14 add-flow br0 in_port=0,dl_vlan=8,actions=output:2
+ovs-ofctl -O OpenFlow14 add-flow br0 in_port=0,dl_vlan=9,actions=output:2
+
+# Check default setting
+read -r -d '' expected <<'EOF'
+EOF
+
+AT_CHECK([ofctl_strip < monitor.log ], [], [dnl
+send: OFPST_FLOW_MONITOR request (OF1.4):
+ command=ADD id=1 flags=initial,add,delete,modify,instructions table=0 dl_vlan=7
+send: OFPST_FLOW_MONITOR request (OF1.4):
+ command=ADD id=2 flags=initial,add,delete,modify,instructions table=0 dl_vlan=8
+send: OFPST_FLOW_MONITOR request (OF1.4):
+ command=ADD id=3 flags=initial,add,delete,modify,instructions table=0 dl_vlan=9
+OFPST_FLOW_MONITOR reply (OF1.4):
+OFPT_BARRIER_REPLY (OF1.4):
+OFPST_FLOW_MONITOR reply (OF1.4):
+ event=ADDED table=0 cookie=0 in_port=0,dl_vlan=7 actions=output:2
+OFPST_FLOW_MONITOR reply (OF1.4):
+ event=ADDED table=0 cookie=0 in_port=0,dl_vlan=8 actions=output:2
+OFPST_FLOW_MONITOR reply (OF1.4):
+ event=ADDED table=0 cookie=0 in_port=0,dl_vlan=9 actions=output:2
+])
+
+OVS_VSWITCHD_STOP
+AT_CLEANUP
