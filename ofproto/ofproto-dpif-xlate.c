@@ -3014,7 +3014,7 @@ xlate_ff_group(struct xlate_ctx *ctx, struct group_dpif *group)
 }
 
 static void
-xlate_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
+xlate_default_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
 {
     struct flow_wildcards *wc = &ctx->xout->wc;
     struct ofputil_bucket *bucket;
@@ -3038,9 +3038,29 @@ xlate_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
     }
 }
 
-static void
+static bool
+xlate_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
+{
+    const char *selection_method = group_dpif_get_selection_method(group);
+
+    if (selection_method[0] == '\0') {
+        xlate_default_select_group(ctx, group);
+    } else {
+        static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
+
+        VLOG_ERR_RL(&rl, "unsupported select group method \"%s\"",
+                    selection_method);
+        return true;
+    }
+
+    return false;
+}
+
+static bool
 xlate_group_action__(struct xlate_ctx *ctx, struct group_dpif *group)
 {
+    bool error = false;
+
     ctx->in_group = true;
 
     switch (group_dpif_get_type(group)) {
@@ -3049,7 +3069,7 @@ xlate_group_action__(struct xlate_ctx *ctx, struct group_dpif *group)
         xlate_all_group(ctx, group);
         break;
     case OFPGT11_SELECT:
-        xlate_select_group(ctx, group);
+        error = xlate_select_group(ctx, group);
         break;
     case OFPGT11_FF:
         xlate_ff_group(ctx, group);
@@ -3060,6 +3080,8 @@ xlate_group_action__(struct xlate_ctx *ctx, struct group_dpif *group)
     group_dpif_unref(group);
 
     ctx->in_group = false;
+
+    return error;
 }
 
 static bool
@@ -3095,7 +3117,7 @@ xlate_group_action(struct xlate_ctx *ctx, uint32_t group_id)
 
         got_group = group_dpif_lookup(ctx->xbridge->ofproto, group_id, &group);
         if (got_group) {
-            xlate_group_action__(ctx, group);
+            return xlate_group_action__(ctx, group);
         } else {
             return true;
         }
