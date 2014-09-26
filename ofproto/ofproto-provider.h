@@ -43,6 +43,7 @@
 #include "ofp-errors.h"
 #include "ofp-util.h"
 #include "ofproto/ofproto.h"
+#include "openflow/netronome-ext.h"
 #include "ovs-atomic.h"
 #include "ovs-rcu.h"
 #include "ovs-thread.h"
