@@ -2242,3 +2242,29 @@ mf_format_subvalue(const union mf_subvalue *subvalue, struct ds *s)
     }
     ds_put_char(s, '0');
 }
+
+void
+field_array_push_back(enum mf_field_id id, const union mf_value *value,
+                      struct ovs_list *field_array)
+{
+    struct field_array *fa;
+
+    fa = xmalloc(sizeof *fa);
+
+    fa->id = id;
+    fa->value = *value;
+
+    list_init(&fa->list_node);
+    list_push_back(field_array, &fa->list_node);
+}
+
+void
+field_array_delete(struct ovs_list *field_array)
+{
+    struct field_array *fa, *next;
+
+    LIST_FOR_EACH_SAFE (fa, next, list_node, field_array) {
+        list_remove(&fa->list_node);
+        free(fa);
+    }
+}

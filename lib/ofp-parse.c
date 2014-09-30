@@ -1209,6 +1209,7 @@ parse_ofp_group_mod_str__(struct ofputil_group_mod *gm, uint16_t command,
     gm->group_id = OFPG_ANY;
     gm->command_bucket_id = OFPG15_BUCKET_ALL;
     list_init(&gm->buckets);
+    list_init(&gm->props.fields);
     if (command == OFPGC11_DELETE && string[0] == '\0') {
         gm->group_id = OFPG_ALL;
         return NULL;
@@ -1365,7 +1366,7 @@ parse_ofp_group_mod_str__(struct ofputil_group_mod *gm, uint16_t command,
 
     return NULL;
  out:
-    ofputil_bucket_list_destroy(&gm->buckets);
+    ofputil_uninit_group_mod(gm);
     return error;
 }
 
@@ -1380,7 +1381,7 @@ parse_ofp_group_mod_str(struct ofputil_group_mod *gm, uint16_t command,
     free(string);
 
     if (error) {
-        ofputil_bucket_list_destroy(&gm->buckets);
+        ofputil_uninit_group_mod(gm);
     }
     return error;
 }
@@ -1419,6 +1420,9 @@ parse_ofp_group_mod_file(const char *file_name, uint16_t command,
                 if (list_is_empty(&(*gms)[i].buckets)) {
                     (*gms)[i].buckets.next = NULL;
                 }
+                if (list_is_empty(&(*gms)[i].props.fields)) {
+                    (*gms)[i].props.fields.next = NULL;
+                }
             }
             *gms = x2nrealloc(*gms, &allocated_gms, sizeof **gms);
             for (i = 0; i < *n_gms; i++) {
@@ -1426,6 +1430,11 @@ parse_ofp_group_mod_file(const char *file_name, uint16_t command,
                     list_moved(&(*gms)[i].buckets);
                 } else {
                     list_init(&(*gms)[i].buckets);
+                }
+                if ((*gms)[i].props.fields.next) {
+                    list_moved(&(*gms)[i].props.fields);
+                } else {
+                    list_init(&(*gms)[i].props.fields);
                 }
             }
         }
@@ -1435,7 +1444,7 @@ parse_ofp_group_mod_file(const char *file_name, uint16_t command,
             size_t i;
 
             for (i = 0; i < *n_gms; i++) {
-                ofputil_bucket_list_destroy(&(*gms)[i].buckets);
+                ofputil_uninit_group_mod(*gms + i);
             }
             free(*gms);
             *gms = NULL;

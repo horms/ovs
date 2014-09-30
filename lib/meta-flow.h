@@ -22,6 +22,7 @@
 #include <netinet/ip6.h>
 #include "bitmap.h"
 #include "flow.h"
+#include "list.h"
 #include "ofp-errors.h"
 #include "packets.h"
 #include "util.h"
@@ -1546,6 +1547,13 @@ union mf_subvalue {
 };
 BUILD_ASSERT_DECL(sizeof(union mf_value) == sizeof (union mf_subvalue));
 
+/* An array of fields with values */
+struct field_array {
+    struct ovs_list list_node;  /* List of other elements in the array */
+    enum mf_field_id id;        /* MFF_*. */
+    union mf_value value;
+};
+
 /* Finding mf_fields. */
 const struct mf_field *mf_from_name(const char *name);
 
@@ -1623,5 +1631,10 @@ void mf_format(const struct mf_field *,
                const union mf_value *value, const union mf_value *mask,
                struct ds *);
 void mf_format_subvalue(const union mf_subvalue *subvalue, struct ds *s);
+
+/* Field Arrays. */
+void field_array_push_back(enum mf_field_id id, const union mf_value *,
+                           struct ovs_list *);
+void field_array_delete(struct ovs_list *);
 
 #endif /* meta-flow.h */

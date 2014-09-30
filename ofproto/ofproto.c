@@ -2673,6 +2673,7 @@ ofproto_group_unref(struct ofgroup *group)
     if (group && ovs_refcount_unref(&group->ref_count) == 1) {
         group->ofproto->ofproto_class->group_destruct(group);
         ofputil_bucket_list_destroy(&group->buckets);
+        field_array_delete(CONST_CAST(struct ovs_list *, &group->fields));
         group->ofproto->ofproto_class->group_dealloc(group);
     }
 }
@@ -5849,6 +5850,14 @@ init_group(struct ofproto *ofproto, struct ofputil_group_mod *gm,
     list_move(&(*ofgroup)->buckets, &gm->buckets);
     *CONST_CAST(uint32_t *, &(*ofgroup)->n_buckets) =
         list_size(&(*ofgroup)->buckets);
+
+    memcpy(CONST_CAST(char *, (*ofgroup)->selection_method),
+           gm->props.selection_method, NMX_MAX_SELECTION_METHOD_LEN);
+    *CONST_CAST(uint64_t *, &(*ofgroup)->selection_method_param) =
+        gm->props.selection_method_param;
+    list_move(CONST_CAST(struct ovs_list *, &(*ofgroup)->fields),
+              &gm->props.fields);
+    list_init(&gm->props.fields);
 
     /* Construct called BEFORE any locks are held. */
     error = ofproto->ofproto_class->group_construct(*ofgroup);

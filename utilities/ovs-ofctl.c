@@ -2127,7 +2127,7 @@ ofctl_group_mod_file(int argc OVS_UNUSED, char *argv[], uint16_t command)
     }
     ofctl_group_mod__(argv[1], gms, n_gms, usable_protocols);
     for (i = 0; i < n_gms; i++) {
-        ofputil_bucket_list_destroy(&gms[i].buckets);
+        ofputil_uninit_group_mod(gms + i);
     }
     free(gms);
 }
@@ -2148,7 +2148,7 @@ ofctl_group_mod(int argc, char *argv[], uint16_t command)
             ovs_fatal(0, "%s", error);
         }
         ofctl_group_mod__(argv[1], &gm, 1, usable_protocols);
-        ofputil_bucket_list_destroy(&gm.buckets);
+        ofputil_uninit_group_mod(&gm);
     }
 }
 
