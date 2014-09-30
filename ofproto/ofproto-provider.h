@@ -499,6 +499,11 @@ struct ofgroup {
 
     struct ovs_list buckets;        /* Contains "struct ofputil_bucket"s. */
     const uint32_t n_buckets;
+
+    /* NTR selection method */
+    const char selection_method[NTR_MAX_SELECTION_METHOD_LEN];
+    const uint64_t selection_method_param;
+    const struct field_array fields;   /* List of other elements in the array */
 };
 
 bool ofproto_group_lookup(const struct ofproto *ofproto, uint32_t group_id,

@@ -5929,6 +5929,13 @@ init_group(struct ofproto *ofproto, struct ofputil_group_mod *gm,
     *CONST_CAST(uint32_t *, &(*ofgroup)->n_buckets) =
         list_size(&(*ofgroup)->buckets);
 
+    memcpy(CONST_CAST(char *, (*ofgroup)->selection_method),
+           gm->props.selection_method, NTR_MAX_SELECTION_METHOD_LEN);
+    *CONST_CAST(uint64_t *, &(*ofgroup)->selection_method_param) =
+        gm->props.selection_method_param;
+    memcpy(CONST_CAST(struct field_array *, &(*ofgroup)->fields),
+           &gm->props.fields, sizeof gm->props.fields);
+
     /* Construct called BEFORE any locks are held. */
     error = ofproto->ofproto_class->group_construct(*ofgroup);
     if (error) {
