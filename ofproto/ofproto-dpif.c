@@ -4256,6 +4256,18 @@ group_dpif_get_selection_method(const struct group_dpif *group)
 {
     return group->up.selection_method;
 }
+
+uint64_t
+group_dpif_get_selection_method_param(const struct group_dpif *group)
+{
+    return group->up.selection_method_param;
+}
+
+const struct field_array *
+group_dpif_get_fields(const struct group_dpif *group)
+{
+    return &group->up.fields;
+}
 
 /* Sends 'packet' out 'ofport'.
  * May modify 'packet'.

@@ -35,6 +35,7 @@
 #include "dpif.h"
 #include "dynamic-string.h"
 #include "in-band.h"
+#include "jhash.h"
 #include "lacp.h"
 #include "learn.h"
 #include "list.h"
@@ -3088,6 +3089,48 @@ xlate_default_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
     }
 }
 
+static void
+xlate_hash_fields_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
+{
+    struct flow_wildcards *wc = &ctx->xout->wc;
+    uint64_t selection_method_param;
+    struct ofputil_bucket *bucket;
+    const struct field_array *fields;
+    struct flow flow;
+    uint32_t basis;
+    int i;
+
+    fields = group_dpif_get_fields(group);
+    flow = ctx->xin->flow;
+
+    for (i = 0; i < MFF_N_IDS; i++) {
+        if (bitmap_is_set(fields->used.bm, i)) {
+            int j;
+            union mf_value value;
+            const struct mf_field *mf = mf_from_id(i);
+
+            mf_get_value(mf, &flow, &value);
+            /* This seems inefficient but so is apply_mask() */
+            for (j = 0; j < mf->n_bytes; j++) {
+                ((uint8_t *) &value)[j] &= ((uint8_t *) &fields->value[i])[j];
+            }
+            mf_set_flow_value(mf, &value, &flow);
+
+            mf_mask_field(mf, &wc->masks);
+        }
+    }
+
+    selection_method_param = group_dpif_get_selection_method_param(group);
+
+    basis = (uint32_t)(selection_method_param & 0xffffffff);
+    basis = jhash_bytes(&flow, sizeof flow, basis);
+    bucket = group_best_live_bucket(ctx, group, basis);
+    if (bucket) {
+        xlate_group_bucket(ctx, bucket);
+        xlate_group_stats(ctx, group, bucket);
+    }
+}
+
 static bool
 xlate_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
 {
@@ -3095,6 +3138,8 @@ xlate_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
 
     if (selection_method[0] == '\0') {
         xlate_default_select_group(ctx, group);
+    } else if (!strcasecmp("hash", selection_method)) {
+        xlate_hash_fields_select_group(ctx, group);
     } else {
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
 

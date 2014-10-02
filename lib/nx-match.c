@@ -414,7 +414,7 @@ nx_pull_header(struct ofpbuf *b, const struct mf_field **field, bool *masked)
     return error;
 }
 
-static enum ofperr
+enum ofperr
 nx_pull_match_entry(struct ofpbuf *b, bool allow_cookie,
                     const struct mf_field **field,
                     union mf_value *value, union mf_value *mask)
