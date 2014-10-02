@@ -71,6 +71,9 @@ enum ofperr nx_pull_entry(struct ofpbuf *, const struct mf_field **,
                           union mf_value *value, union mf_value *mask);
 enum ofperr nx_pull_header(struct ofpbuf *, const struct mf_field **,
                            bool *masked);
+enum ofperr nx_pull_match_entry(struct ofpbuf *b, bool allow_cookie,
+                                const struct mf_field **field,
+                                union mf_value *value, union mf_value *mask);
 void nx_put_entry(struct ofpbuf *, enum mf_field_id, enum ofp_version,
                   const union mf_value *value, const union mf_value *mask);
 void nx_put_header(struct ofpbuf *, enum mf_field_id, enum ofp_version,

@@ -34,6 +34,7 @@
 #include "dpif.h"
 #include "dynamic-string.h"
 #include "in-band.h"
+#include "jhash.h"
 #include "lacp.h"
 #include "learn.h"
 #include "list.h"
@@ -3038,6 +3039,46 @@ xlate_default_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
     }
 }
 
+static void
+xlate_hash_fields_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
+{
+    struct flow_wildcards *wc = &ctx->xout->wc;
+    uint64_t selection_method_param;
+    struct ofputil_bucket *bucket;
+    const struct ovs_list *fields;
+    const struct field_array *fa;
+    struct flow flow;
+    uint32_t basis;
+
+    fields = group_dpif_get_fields(group);
+    flow = ctx->xin->flow;
+
+    LIST_FOR_EACH (fa, list_node, fields) {
+        int i;
+        union mf_value value;
+        const struct mf_field *mf = mf_from_id(fa->id);
+
+        mf_get_value(mf, &flow, &value);
+        /* This seems inefficient but so is apply_mask() */
+        for (i = 0; i < mf->n_bytes; i++) {
+            ((uint8_t *) &value)[i] &= ((uint8_t *) &fa->value)[i];
+        }
+        mf_set_flow_value(mf, &value, &flow);
+
+        mf_mask_field(mf, &wc->masks);
+    }
+
+    selection_method_param = group_dpif_get_selection_method_param(group);
+
+    basis = (uint32_t)(selection_method_param & 0xffffffff);
+    basis = jhash_bytes(&flow, sizeof flow, basis);
+    bucket = group_best_live_bucket(ctx, group, basis);
+    if (bucket) {
+        xlate_group_bucket(ctx, bucket);
+        xlate_group_stats(ctx, group, bucket);
+    }
+}
+
 static bool
 xlate_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
 {
@@ -3045,6 +3086,8 @@ xlate_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
 
     if (selection_method[0] == '\0') {
         xlate_default_select_group(ctx, group);
+    } else if (!strcasecmp("hash", selection_method)) {
+        xlate_hash_fields_select_group(ctx, group);
     } else {
         static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 1);
 
