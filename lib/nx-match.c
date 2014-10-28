@@ -1068,6 +1068,47 @@ oxm_put_match(struct ofpbuf *b, const struct match *match,
     return match_len;
 }
 
+/* Appends to 'b' the nx_match format that expresses the tlv corresponding
+ * to 'id'. If mask is not all-ones then it is also formated as the value
+ * of the tlv. */
+static void
+nx_format_mask_tlv(struct ds *ds, enum mf_field_id id,
+                   const union mf_value *mask)
+{
+    const struct mf_field *mf = mf_from_id(id);
+
+    ds_put_format(ds, "%s", mf->name);
+
+    if (!is_all_ones(mask, mf->n_bytes)) {
+        ds_put_char(ds, '=');
+        mf_format(mf, mask, NULL, ds);
+    }
+
+    ds_put_char(ds, ',');
+}
+
+/* Appends a string representation of 'fa_' to 'ds'.
+ * The TLVS value of 'fa_' is treated as a mask and
+ * only the name of fields is formated if it is all ones.
+ *
+ * Returns 0 on success, an ofperr value otherwise */
+int
+oxm_format_field_array(struct ds *ds, const struct ovs_list *field_array)
+{
+    size_t start_len = ds->length;
+    const struct field_array *fa;
+
+    LIST_FOR_EACH (fa, list_node, field_array) {
+        nx_format_mask_tlv(ds, fa->id, &fa->value);
+    }
+
+    if (ds->length > start_len) {
+        ds_chomp(ds, ',');
+    }
+
+    return 0;
+}
+
 /* Appends to 'b' a series of OXM TLVs corresponding to the series
  * of enum mf_field_id and value tuples in 'fa_'.
  *
