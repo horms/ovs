@@ -7423,6 +7423,27 @@ ofputil_put_ofp15_bucket(const struct ofputil_bucket *bucket,
 }
 
 static void
+ofputil_put_group_prop_nmx_selection_method(enum ofp_version ofp_version,
+                                            const struct ofputil_group_props *gp,
+                                            const struct ovs_list *fields,
+                                            struct ofpbuf *openflow)
+{
+    struct nmx_group_prop_selection_method *prop;
+    size_t start;
+
+    start = ofpbuf_size(openflow);
+    ofpbuf_put_zeros(openflow, sizeof *prop);
+    oxm_put_field_array(openflow, fields, ofp_version);
+    prop = ofpbuf_at_assert(openflow, start, sizeof *prop);
+    prop->type = htons(OFPGPT15_EXPERIMENTER);
+    prop->experimenter = htonl(NMX_VENDOR_ID);
+    prop->exp_type = htonl(NMXT_SELECTION_METHOD);
+    strcpy(prop->selection_method, gp->selection_method);
+    prop->selection_method_param = htonll(gp->selection_method_param);
+    end_property(openflow, start);
+}
+
+static void
 ofputil_append_ofp11_group_desc_reply(const struct ofputil_group_desc *gds,
                                       const struct ovs_list *buckets,
                                       struct ovs_list *replies,
@@ -7449,6 +7470,7 @@ ofputil_append_ofp11_group_desc_reply(const struct ofputil_group_desc *gds,
 static void
 ofputil_append_ofp15_group_desc_reply(const struct ofputil_group_desc *gds,
                                       const struct ovs_list *buckets,
+                                      const struct ovs_list *fields,
                                       struct ovs_list *replies,
                                       enum ofp_version version)
 {
@@ -7470,6 +7492,12 @@ ofputil_append_ofp15_group_desc_reply(const struct ofputil_group_desc *gds,
     ogds->group_id = htonl(gds->group_id);
     ogds->bucket_list_len =  htons(ofpbuf_size(reply) - start_buckets);
 
+    /* Add group properties */
+    if (gds->props.selection_method[0]) {
+        ofputil_put_group_prop_nmx_selection_method(version, &gds->props,
+                                                    fields, reply);
+    }
+
     ofpmp_postappend(replies, start_ogds);
 }
 
@@ -7479,6 +7507,7 @@ ofputil_append_ofp15_group_desc_reply(const struct ofputil_group_desc *gds,
 void
 ofputil_append_group_desc_reply(const struct ofputil_group_desc *gds,
                                 const struct ovs_list *buckets,
+                                const struct ovs_list *fields,
                                 struct ovs_list *replies)
 {
     enum ofp_version version = ofpmp_version(replies);
@@ -7493,7 +7522,8 @@ ofputil_append_group_desc_reply(const struct ofputil_group_desc *gds,
         break;
 
     case OFP15_VERSION:
-        ofputil_append_ofp15_group_desc_reply(gds, buckets, replies, version);
+        ofputil_append_ofp15_group_desc_reply(gds, buckets, fields, replies,
+                                              version);
         break;
 
     case OFP10_VERSION:
@@ -8125,6 +8155,12 @@ ofputil_encode_ofp15_group_mod(enum ofp_version ofp_version,
     ogm->group_id = htonl(gm->group_id);
     ogm->command_bucket_id = htonl(gm->command_bucket_id);
     ogm->bucket_array_len = htons(ofpbuf_size(b) - start_ogm - sizeof *ogm);
+
+    /* Add group properties */
+    if (gm->props.selection_method[0]) {
+        ofputil_put_group_prop_nmx_selection_method(ofp_version, &gm->props,
+                                                    &gm->props.fields, b);
+    }
 
     id_pool_destroy(bucket_ids);
     return b;

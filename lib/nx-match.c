@@ -1068,6 +1068,43 @@ oxm_put_match(struct ofpbuf *b, const struct match *match,
     return match_len;
 }
 
+/* Appends to 'b' a series of OXM TLVs corresponding to the series
+ * of enum mf_field_id and value tuples in 'fa_'.
+ *
+ * OXM differs slightly among versions of OpenFlow.  Specify the OpenFlow
+ * version in use as 'version'.
+ *
+ * This function can cause 'b''s data to be reallocated.
+ *
+ * Returns the number of bytes appended to 'b'.  May return zero. */
+int
+oxm_put_field_array(struct ofpbuf *b, const struct ovs_list *field_array,
+                    enum ofp_version version)
+{
+    size_t start_len = ofpbuf_size(b);
+    const struct field_array *fa;
+
+    /* Field arrays are only used with the group selection method
+     * property and group properties are only available in OpenFlow * 1.5+.
+     * So the following assertion should never fail.
+     *
+     * If support for older OpenFlow versions is desired then some care
+     * will need to be taken of different TLVs that handle the same
+     * flow fields. In particular:
+     * - VLAN_TCI, VLAN_VID and MFF_VLAN_PCP
+     * - IP_DSCP_MASK and DSCP_SHIFTED
+     * - REGS and XREGS
+     */
+    ovs_assert(version >= OFP15_VERSION);
+
+    LIST_FOR_EACH (fa, list_node, field_array) {
+        nxm_put_unmasked(b, fa->id, version, &fa->value,
+                         mf_from_id(fa->id)->n_bytes);
+    }
+
+    return ofpbuf_size(b) - start_len;
+}
+
 static void
 nx_put_header__(struct ofpbuf *b, uint64_t header, bool masked)
 {

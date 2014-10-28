@@ -61,6 +61,8 @@ enum ofperr oxm_pull_field_array(const void *, size_t fields_len,
 int nx_put_match(struct ofpbuf *, const struct match *,
                  ovs_be64 cookie, ovs_be64 cookie_mask);
 int oxm_put_match(struct ofpbuf *, const struct match *, enum ofp_version);
+int oxm_put_field_array(struct ofpbuf *, const struct ovs_list *,
+                        enum ofp_version version);
 
 /* Decoding and encoding OXM/NXM headers (just a field ID) or entries (a field
  * ID followed by a value and possibly a mask). */

@@ -1095,6 +1095,7 @@ int ofputil_decode_group_desc_reply(struct ofputil_group_desc *,
 
 void ofputil_append_group_desc_reply(const struct ofputil_group_desc *,
                                      const struct ovs_list *buckets,
+                                     const struct ovs_list *fields,
                                      struct ovs_list *replies);
 
 struct ofputil_bundle_ctrl_msg {
