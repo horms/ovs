@@ -5827,7 +5827,12 @@ append_group_desc(struct ofgroup *group, struct ovs_list *replies)
 
     gds.group_id = group->group_id;
     gds.type = group->type;
-    ofputil_append_group_desc_reply(&gds, &group->buckets, replies);
+
+    memcpy(gds.props.selection_method, group->selection_method,
+           NTR_MAX_SELECTION_METHOD_LEN);
+    gds.props.selection_method_param = group->selection_method_param;
+    ofputil_append_group_desc_reply(&gds, &group->buckets,
+                                    &group->fields, replies);
 }
 
 static enum ofperr
