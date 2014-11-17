@@ -933,6 +933,10 @@ flow_get_metadata(const struct flow *flow, struct match *flow_metadata)
     if (!ovs_u128_is_zero(flow->ct_label)) {
         match_set_ct_label(flow_metadata, flow->ct_label);
     }
+
+    if (flow->base_layer != LAYER_2) {
+        match_set_base_layer(flow_metadata, flow->base_layer);
+    }
 }
 
 const char *ct_state_to_string(uint32_t state)

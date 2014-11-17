@@ -369,6 +369,13 @@ match_set_ct_label_masked(struct match *match, ovs_u128 value, ovs_u128 mask)
 }
 
 void
+match_set_base_layer(struct match *match, uint8_t base_layer)
+{
+    match->flow.base_layer = base_layer;
+    match->wc.masks.base_layer = UINT8_MAX;
+}
+
+void
 match_set_dl_type(struct match *match, ovs_be16 dl_type)
 {
     match->wc.masks.dl_type = OVS_BE16_MAX;
