@@ -352,6 +352,8 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_CT_ZONE,	/* u16 connection tracking zone. */
 	OVS_KEY_ATTR_CT_MARK,	/* u32 connection tracking mark */
 	OVS_KEY_ATTR_CT_LABELS,	/* 16-octet connection tracking labels */
+	OVS_KEY_ATTR_PACKET_ETHERTYPE, /* be16 Ethernet type for packet
+					* execution. */
 
 #ifdef __KERNEL__
 	/* Only used within kernel data path. */
