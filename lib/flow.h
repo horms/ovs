@@ -1007,6 +1007,8 @@ pkt_metadata_from_flow(struct pkt_metadata *md, const struct flow *flow)
     md->ct_zone = flow->ct_zone;
     md->ct_mark = flow->ct_mark;
     md->ct_label = flow->ct_label;
+    md->base_layer = flow->base_layer;
+    md->packet_ethertype = flow->dl_type;
 }
 
 static inline bool is_ip_any(const struct flow *flow)

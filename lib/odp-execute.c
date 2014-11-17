@@ -328,6 +328,10 @@ odp_execute_set_action(struct dp_packet *packet, const struct nlattr *a)
         md->recirc_id = nl_attr_get_u32(a);
         break;
 
+    case OVS_KEY_ATTR_PACKET_ETHERTYPE:
+        md->packet_ethertype = nl_attr_get_be16(a);
+        break;
+
     case OVS_KEY_ATTR_UNSPEC:
     case OVS_KEY_ATTR_ENCAP:
     case OVS_KEY_ATTR_ETHERTYPE:
@@ -422,6 +426,11 @@ odp_execute_masked_set_action(struct dp_packet *packet,
     case OVS_KEY_ATTR_RECIRC_ID:
         md->recirc_id = nl_attr_get_u32(a)
             | (md->recirc_id & ~*get_mask(a, uint32_t));
+        break;
+
+    case OVS_KEY_ATTR_PACKET_ETHERTYPE:
+        md->packet_ethertype = nl_attr_get_be16(a)
+            | (md->packet_ethertype & ~*get_mask(a, ovs_be16));
         break;
 
     case OVS_KEY_ATTR_TUNNEL:    /* Masked data not supported for tunnel. */
