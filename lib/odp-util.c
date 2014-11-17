@@ -165,6 +165,7 @@ ovs_key_attr_to_string(enum ovs_key_attr attr, char *namebuf, size_t bufsize)
     case OVS_KEY_ATTR_MPLS: return "mpls";
     case OVS_KEY_ATTR_DP_HASH: return "dp_hash";
     case OVS_KEY_ATTR_RECIRC_ID: return "recirc_id";
+    case OVS_KEY_ATTR_PACKET_ETHERTYPE: return "pkt_eth";
 
     case __OVS_KEY_ATTR_MAX:
     default:
@@ -1493,6 +1494,7 @@ static const struct attr_len_tbl ovs_flow_key_attr_lens[OVS_KEY_ATTR_MAX + 1] = 
     [OVS_KEY_ATTR_CT_ZONE]   = { .len = 2 },
     [OVS_KEY_ATTR_CT_MARK]   = { .len = 4 },
     [OVS_KEY_ATTR_CT_LABELS] = { .len = sizeof(struct ovs_key_ct_labels) },
+    [OVS_KEY_ATTR_PACKET_ETHERTYPE] = { .len = 2 },
 };
 
 /* Returns the correct length of the payload for a flow key attribute of the
@@ -2510,6 +2512,7 @@ format_odp_key_attr(const struct nlattr *a, const struct nlattr *ma,
         break;
     }
     case OVS_KEY_ATTR_ETHERTYPE:
+    case OVS_KEY_ATTR_PACKET_ETHERTYPE:
         ds_put_format(ds, "0x%04"PRIx16, ntohs(nl_attr_get_be16(a)));
         if (!is_exact) {
             ds_put_format(ds, "/0x%04"PRIx16, ntohs(nl_attr_get_be16(ma)));
@@ -4137,6 +4140,13 @@ odp_key_from_pkt_metadata(struct ofpbuf *buf, const struct pkt_metadata *md)
     if (md->in_port.odp_port != ODPP_NONE) {
         nl_msg_put_odp_port(buf, OVS_KEY_ATTR_IN_PORT, md->in_port.odp_port);
     }
+
+    if (md->base_layer == LAYER_2) {
+        nl_msg_put_be16(buf, OVS_KEY_ATTR_PACKET_ETHERTYPE, htons(0));
+    } else {
+        nl_msg_put_be16(buf, OVS_KEY_ATTR_PACKET_ETHERTYPE,
+                        md->packet_ethertype);
+    }
 }
 
 /* Generate packet metadata from the given ODP flow key. */
@@ -4148,9 +4158,12 @@ odp_key_to_pkt_metadata(const struct nlattr *key, size_t key_len,
     size_t left;
     uint32_t wanted_attrs = 1u << OVS_KEY_ATTR_PRIORITY |
         1u << OVS_KEY_ATTR_SKB_MARK | 1u << OVS_KEY_ATTR_TUNNEL |
-        1u << OVS_KEY_ATTR_IN_PORT;
+        1u << OVS_KEY_ATTR_IN_PORT | 1u << OVS_KEY_ATTR_ETHERNET |
+        1u << OVS_KEY_ATTR_IPV4 | 1u << OVS_KEY_ATTR_IPV6;
 
     pkt_metadata_init(md, ODPP_NONE);
+
+    md->base_layer = LAYER_3;
 
     NL_ATTR_FOR_EACH (nla, left, key, key_len) {
         uint16_t type = nl_attr_type(nla);
@@ -4212,6 +4225,18 @@ odp_key_to_pkt_metadata(const struct nlattr *key, size_t key_len,
         case OVS_KEY_ATTR_IN_PORT:
             md->in_port.odp_port = nl_attr_get_odp_port(nla);
             wanted_attrs &= ~(1u << OVS_KEY_ATTR_IN_PORT);
+            break;
+        case OVS_KEY_ATTR_ETHERNET:
+            md->base_layer = LAYER_2;
+            wanted_attrs &= ~(1u << OVS_KEY_ATTR_ETHERNET);
+            break;
+        case OVS_KEY_ATTR_IPV4:
+            md->packet_ethertype = htons(ETH_TYPE_IP);
+            wanted_attrs &= ~(1u << OVS_KEY_ATTR_IPV4);
+            break;
+        case OVS_KEY_ATTR_IPV6:
+            md->packet_ethertype = htons(ETH_TYPE_IPV6);
+            wanted_attrs &= ~(1u << OVS_KEY_ATTR_IPV6);
             break;
         default:
             break;

@@ -974,6 +974,7 @@ sflow_read_set_action(const struct nlattr *attr,
     case OVS_KEY_ATTR_IN_PORT:
     case OVS_KEY_ATTR_ETHERNET:
     case OVS_KEY_ATTR_VLAN:
+    case OVS_KEY_ATTR_PACKET_ETHERTYPE:
         break;
 
     case OVS_KEY_ATTR_MPLS: {
