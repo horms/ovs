@@ -286,16 +286,25 @@ dnl Actions definition listed in both supported formats (w/ actions=)
 AT_SETUP([ofproto - del group (OpenFlow 1.1)])
 OVS_VSWITCHD_START
 AT_DATA([groups.txt], [dnl
+group_id=1231,type=all
+group_id=1232,type=all
+group_id=1233,type=all
 group_id=1234,type=all,bucket=output:10
 group_id=1235,type=all,bucket=actions=output:10
 ])
 AT_CHECK([ovs-ofctl -O OpenFlow11 -vwarn add-groups br0 groups.txt])
 AT_CHECK([ovs-ofctl -O OpenFlow11 -vwarn dump-groups br0 ], [0], [stdout])
-AT_CHECK([STRIP_XIDS stdout], [0], [dnl
-OFPST_GROUP_DESC reply (OF1.1):
+AT_CHECK([STRIP_XIDS stdout | sort], [0], [dnl
+ group_id=1231,type=all
+ group_id=1232,type=all
+ group_id=1233,type=all
  group_id=1234,type=all,bucket=actions=output:10
  group_id=1235,type=all,bucket=actions=output:10
+OFPST_GROUP_DESC reply (OF1.1):
 ])
+AT_CHECK([ovs-ofctl -O OpenFlow11 -vwarn del-groups br0 group_id=1231])
+AT_CHECK([ovs-ofctl -O OpenFlow11 -vwarn del-groups br0 group_id=1232])
+AT_CHECK([ovs-ofctl -O OpenFlow11 -vwarn del-groups br0 group_id=1233])
 AT_CHECK([ovs-ofctl -O OpenFlow11 -vwarn del-groups br0 group_id=1234])
 AT_CHECK([ovs-ofctl -O OpenFlow11 -vwarn dump-groups br0], [0], [stdout])
 AT_CHECK([STRIP_XIDS stdout], [0], [dnl
