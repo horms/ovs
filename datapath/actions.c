@@ -982,12 +982,22 @@ static void process_deferred_actions(struct datapath *dp)
 	action_fifo_init(fifo);
 }
 
+#if LINUX_VERSION_CODE == KERNEL_VERSION(2,6,33)
+#define ovs_this_cpu_read(ptr) this_cpu_read(per_cpu_var(ptr))
+#define ovs_this_cpu_inc(ptr) this_cpu_inc(per_cpu_var(ptr))
+#define ovs_this_cpu_dec(ptr) this_cpu_dec(per_cpu_var(ptr))
+#else
+#define ovs_this_cpu_read(ptr) this_cpu_read(ptr)
+#define ovs_this_cpu_inc(ptr) this_cpu_inc(ptr)
+#define ovs_this_cpu_dec(ptr) this_cpu_dec(ptr)
+#endif
+
 /* Execute a list of actions against 'skb'. */
 int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb,
 			const struct sw_flow_actions *acts,
 			struct sw_flow_key *key)
 {
-	int level = this_cpu_read(exec_actions_level);
+	int level = ovs_this_cpu_read(exec_actions_level);
 	int err;
 
 	if (unlikely(level >= EXEC_ACTIONS_LEVEL_LIMIT)) {
@@ -999,14 +1009,14 @@ int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		return -ELOOP;
 	}
 
-	this_cpu_inc(exec_actions_level);
+	ovs_this_cpu_inc(exec_actions_level);
 	err = do_execute_actions(dp, skb, key,
 				 acts->actions, acts->actions_len);
 
 	if (!level)
 		process_deferred_actions(dp);
 
-	this_cpu_dec(exec_actions_level);
+	ovs_this_cpu_dec(exec_actions_level);
 
 	/* This return status currently does not reflect the errors
 	 * encounted during deferred actions execution. Probably needs to
