@@ -20,6 +20,7 @@ env:
   - KERNEL=3.10.63
   - KERNEL=3.4.105
   - KERNEL=2.6.33.20
+  - KERNEL=2.6.33.1
   - KERNEL=2.6.32.65
 
 script: ./.travis/build.sh $OPTS
