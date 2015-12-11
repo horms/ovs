@@ -5488,7 +5488,8 @@ get_etheraddr(const char *netdev_name, struct eth_addr *ea)
         return error;
     }
     hwaddr_family = ifr.ifr_hwaddr.sa_family;
-    if (hwaddr_family != AF_UNSPEC && hwaddr_family != ARPHRD_ETHER) {
+    if (hwaddr_family != AF_UNSPEC && hwaddr_family != ARPHRD_ETHER &&
+        hwaddr_family != ARPHRD_NONE) {
         VLOG_INFO("%s device has unknown hardware address family %d",
                   netdev_name, hwaddr_family);
         return EINVAL;

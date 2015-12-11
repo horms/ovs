@@ -167,6 +167,9 @@ netdev_tnl_push_ip_header(struct dp_packet *packet,
 
     memcpy(eth, header, size);
 
+    dp_packet_reset_offsets(packet);
+    packet->l3_ofs = sizeof (struct eth_header);
+
     if (netdev_tnl_is_header_ipv6(header)) {
         ip6 = netdev_tnl_ipv6_hdr(eth);
         *ip_tot_size -= IPV6_HEADER_LEN;
@@ -363,10 +366,6 @@ parse_gre_header(struct dp_packet *packet,
         return -EINVAL;
     }
 
-    if (greh->protocol != htons(ETH_TYPE_TEB)) {
-        return -EINVAL;
-    }
-
     hlen = ulen + gre_header_len(greh->flags);
     if (hlen > dp_packet_size(packet)) {
         return -EINVAL;
@@ -396,6 +395,12 @@ parse_gre_header(struct dp_packet *packet,
         options++;
     }
 
+    if (greh->protocol == htons(ETH_TYPE_TEB)) {
+        packet->md.packet_ethertype = htons(0);
+    } else {
+        packet->md.packet_ethertype = greh->protocol;
+    }
+
     return hlen;
 }
 
@@ -420,6 +425,12 @@ netdev_gre_pop_header(struct dp_packet *packet)
     }
 
     dp_packet_reset_packet(packet, hlen);
+
+    if (eth_type_mpls(packet->md.packet_ethertype)) {
+        packet->l2_5_ofs = 0;
+    } else if (packet->md.packet_ethertype) {
+        packet->l3_ofs = 0;
+    }
 
     return packet;
 err:
@@ -459,7 +470,12 @@ netdev_gre_build_header(const struct netdev *netdev,
 
     greh = netdev_tnl_ip_build_header(data, params, IPPROTO_GRE);
 
-    greh->protocol = htons(ETH_TYPE_TEB);
+    if (tnl_cfg->is_layer3) {
+        greh->protocol = params->flow->dl_type;
+    } else {
+        greh->protocol = htons(ETH_TYPE_TEB);
+    }
+
     greh->flags = 0;
 
     options = (ovs_16aligned_be32 *) (greh + 1);

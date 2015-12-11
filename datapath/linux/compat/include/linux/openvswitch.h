@@ -358,6 +358,9 @@ enum ovs_key_attr {
 #ifdef __KERNEL__
 	/* Only used within kernel data path. */
 	OVS_KEY_ATTR_TUNNEL_INFO,  /* struct ovs_tunnel_info */
+#else
+	/* Only used within user-space data path. */
+	OVS_KEY_ATTR_NEXT_BASE_LAYER, /* base layer of encapsulated packet */
 #endif
 	__OVS_KEY_ATTR_MAX
 };

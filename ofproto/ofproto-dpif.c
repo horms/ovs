@@ -1272,6 +1272,8 @@ check_support(struct dpif_backer *backer)
     backer->support.odp.ct_label = check_ct_label(backer);
 
     backer->support.odp.ct_state_nat = check_ct_state_nat(backer);
+
+    backer->support.odp.next_base_layer = backer->support.tnl_push_pop;
 }
 
 static int

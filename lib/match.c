@@ -1067,7 +1067,7 @@ match_format(const struct match *match, struct ds *s, int priority)
 
     int i;
 
-    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 36);
+    BUILD_ASSERT_DECL(FLOW_WC_SEQ == 37);
 
     if (priority != OFP_DEFAULT_PRIORITY) {
         ds_put_format(s, "%spriority=%s%d,",
@@ -1341,6 +1341,10 @@ match_format(const struct match *match, struct ds *s, int priority)
         format_flags_masked(s, "tcp_flags", packet_tcp_flag_to_string,
                             ntohs(f->tcp_flags), TCP_FLAGS(wc->masks.tcp_flags),
                             TCP_FLAGS(OVS_BE16_MAX));
+    }
+
+    if (wc->masks.next_base_layer) {
+        ds_put_format(s, "next_base_layer=%"PRIu8",", f->next_base_layer);
     }
 
     if (s->length > start_len) {

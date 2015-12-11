@@ -104,9 +104,13 @@ netdev_vport_is_patch(const struct netdev *netdev)
 bool
 netdev_vport_is_layer3(const struct netdev *dev)
 {
-    const char *type = netdev_get_type(dev);
+    if (is_vport_class(netdev_get_class(dev))) {
+        struct netdev_vport *vport = netdev_vport_cast(dev);
 
-    return (!strcmp("lisp", type));
+        return vport->tnl_cfg.is_layer3;
+    }
+
+    return false;
 }
 
 static bool
@@ -419,13 +423,14 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args)
     struct netdev_vport *dev = netdev_vport_cast(dev_);
     const char *name = netdev_get_name(dev_);
     const char *type = netdev_get_type(dev_);
-    bool ipsec_mech_set, needs_dst_port, has_csum;
+    bool ipsec_mech_set, needs_dst_port, has_csum, optional_layer3;
     uint16_t dst_proto = 0, src_proto = 0;
     struct netdev_tunnel_config tnl_cfg;
     struct smap_node *node;
 
     has_csum = strstr(type, "gre") || strstr(type, "geneve") ||
                strstr(type, "stt") || strstr(type, "vxlan");
+    optional_layer3 = !strcmp(type, "gre");
     ipsec_mech_set = false;
     memset(&tnl_cfg, 0, sizeof tnl_cfg);
 
@@ -440,6 +445,7 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args)
 
     if (!strcmp(type, "lisp")) {
         tnl_cfg.dst_port = htons(LISP_DST_PORT);
+        tnl_cfg.is_layer3 = true;
     }
 
     if (!strcmp(type, "stt")) {
@@ -551,6 +557,10 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args)
             }
 
             free(str);
+        } else if (!strcmp(node->key, "layer3") && optional_layer3) {
+            if (!strcmp(node->value, "true")) {
+                tnl_cfg.is_layer3 = true;
+            }
         } else {
             VLOG_WARN("%s: unknown %s argument '%s'", name, type, node->key);
         }
@@ -631,6 +641,7 @@ static int
 get_tunnel_config(const struct netdev *dev, struct smap *args)
 {
     struct netdev_vport *netdev = netdev_vport_cast(dev);
+    const char *type = netdev_get_type(dev);
     struct netdev_tunnel_config tnl_cfg;
 
     ovs_mutex_lock(&netdev->mutex);
@@ -684,7 +695,6 @@ get_tunnel_config(const struct netdev *dev, struct smap *args)
 
     if (tnl_cfg.dst_port) {
         uint16_t dst_port = ntohs(tnl_cfg.dst_port);
-        const char *type = netdev_get_type(dev);
 
         if ((!strcmp("geneve", type) && dst_port != GENEVE_DST_PORT) ||
             (!strcmp("vxlan", type) && dst_port != VXLAN_DST_PORT) ||
@@ -696,6 +706,10 @@ get_tunnel_config(const struct netdev *dev, struct smap *args)
 
     if (tnl_cfg.csum) {
         smap_add(args, "csum", "true");
+    }
+
+    if (tnl_cfg.is_layer3 && !strcmp("gre", type)) {
+        smap_add(args, "layer3", "true");
     }
 
     if (!tnl_cfg.dont_fragment) {

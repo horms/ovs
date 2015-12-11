@@ -27,6 +27,7 @@
 #include "hash.h"
 #include "openvswitch/list.h"
 #include "netdev.h"
+#include "netdev-vport.h"
 #include "openvswitch/ofpbuf.h"
 #include "ovs-thread.h"
 #include "odp-util.h"
@@ -53,6 +54,7 @@ struct tnl_port {
     odp_port_t port;
     ovs_be16 tp_port;
     uint8_t nw_proto;
+    bool is_layer3;
     char dev_name[IFNAMSIZ];
     struct ovs_list node;
 };
@@ -83,7 +85,8 @@ tnl_port_free(struct tnl_port_in *p)
 
 static void
 tnl_port_init_flow(struct flow *flow, struct eth_addr mac,
-                   struct in6_addr *addr, uint8_t nw_proto, ovs_be16 tp_port)
+                   struct in6_addr *addr, uint8_t nw_proto, ovs_be16 tp_port,
+                   bool is_layer3)
 {
     memset(flow, 0, sizeof *flow);
 
@@ -98,18 +101,20 @@ tnl_port_init_flow(struct flow *flow, struct eth_addr mac,
 
     flow->nw_proto = nw_proto;
     flow->tp_dst = tp_port;
+    flow->next_base_layer = is_layer3 ? LAYER_3 : LAYER_2;
 }
 
 static void
 map_insert(odp_port_t port, struct eth_addr mac, struct in6_addr *addr,
-           uint8_t nw_proto, ovs_be16 tp_port, const char dev_name[])
+           uint8_t nw_proto, ovs_be16 tp_port, const char dev_name[],
+           bool is_layer3)
 {
     const struct cls_rule *cr;
     struct tnl_port_in *p;
     struct match match;
 
     memset(&match, 0, sizeof match);
-    tnl_port_init_flow(&match.flow, mac, addr, nw_proto, tp_port);
+    tnl_port_init_flow(&match.flow, mac, addr, nw_proto, tp_port, is_layer3);
 
     do {
         cr = classifier_lookup(&cls, CLS_MAX_VERSION, &match.flow, NULL);
@@ -130,6 +135,11 @@ map_insert(odp_port_t port, struct eth_addr mac, struct in6_addr *addr,
          * doesn't make sense to match on UDP port numbers. */
         if (tp_port) {
             match.wc.masks.tp_dst = OVS_BE16_MAX;
+        } else {
+            /* Match base layer for GRE tunnels as it may
+             * be used to differentiate them.
+             */
+            match.wc.masks.next_base_layer = UINT8_MAX;
         }
         if (IN6_IS_ADDR_V4MAPPED(addr)) {
             match.wc.masks.nw_dst = OVS_BE32_MAX;
@@ -149,14 +159,15 @@ map_insert(odp_port_t port, struct eth_addr mac, struct in6_addr *addr,
 
 static void
 map_insert_ipdev__(struct ip_device *ip_dev, char dev_name[],
-                   odp_port_t port, uint8_t nw_proto, ovs_be16 tp_port)
+                   odp_port_t port, uint8_t nw_proto, ovs_be16 tp_port,
+                   bool is_layer3)
 {
     if (ip_dev->n_addr) {
         int i;
 
         for (i = 0; i < ip_dev->n_addr; i++) {
             map_insert(port, ip_dev->mac, &ip_dev->addr[i],
-                       nw_proto, tp_port, dev_name);
+                       nw_proto, tp_port, dev_name, is_layer3);
         }
     }
 }
@@ -181,7 +192,7 @@ tnl_type_to_nw_proto(const char type[])
 
 void
 tnl_port_map_insert(odp_port_t port, ovs_be16 tp_port,
-                    const char dev_name[], const char type[])
+                    const char dev_name[], const char type[], bool is_layer3)
 {
     struct tnl_port *p;
     struct ip_device *ip_dev;
@@ -194,7 +205,8 @@ tnl_port_map_insert(odp_port_t port, ovs_be16 tp_port,
 
     ovs_mutex_lock(&mutex);
     LIST_FOR_EACH(p, node, &port_list) {
-        if (tp_port == p->tp_port && p->nw_proto == nw_proto) {
+        if (tp_port == p->tp_port && p->nw_proto == nw_proto &&
+            p->is_layer3 == is_layer3) {
              goto out;
         }
     }
@@ -203,11 +215,13 @@ tnl_port_map_insert(odp_port_t port, ovs_be16 tp_port,
     p->port = port;
     p->tp_port = tp_port;
     p->nw_proto = nw_proto;
+    p->is_layer3 = is_layer3;
     ovs_strlcpy(p->dev_name, dev_name, sizeof p->dev_name);
     ovs_list_insert(&port_list, &p->node);
 
     LIST_FOR_EACH(ip_dev, node, &addr_list) {
-        map_insert_ipdev__(ip_dev, p->dev_name, p->port, p->nw_proto, p->tp_port);
+        map_insert_ipdev__(ip_dev, p->dev_name, p->port, p->nw_proto,
+                           p->tp_port, p->is_layer3);
     }
 
 out:
@@ -228,12 +242,12 @@ tnl_port_unref(const struct cls_rule *cr)
 
 static void
 map_delete(struct eth_addr mac, struct in6_addr *addr,
-           ovs_be16 tp_port, uint8_t nw_proto)
+           ovs_be16 tp_port, uint8_t nw_proto, bool is_layer3)
 {
     const struct cls_rule *cr;
     struct flow flow;
 
-    tnl_port_init_flow(&flow, mac, addr, nw_proto, tp_port);
+    tnl_port_init_flow(&flow, mac, addr, nw_proto, tp_port, is_layer3);
 
     cr = classifier_lookup(&cls, CLS_MAX_VERSION, &flow, NULL);
     tnl_port_unref(cr);
@@ -242,11 +256,14 @@ map_delete(struct eth_addr mac, struct in6_addr *addr,
 static void
 ipdev_map_delete(struct ip_device *ip_dev, ovs_be16 tp_port, uint8_t nw_proto)
 {
+    bool is_layer3 = netdev_vport_is_layer3(ip_dev->dev);
+
     if (ip_dev->n_addr) {
         int i;
 
         for (i = 0; i < ip_dev->n_addr; i++) {
-            map_delete(ip_dev->mac, &ip_dev->addr[i], tp_port, nw_proto);
+            map_delete(ip_dev->mac, &ip_dev->addr[i], tp_port, nw_proto,
+                       is_layer3);
         }
     }
 }
@@ -342,7 +359,7 @@ tnl_port_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
                const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
-    struct tnl_port *p;
+    struct tnl_port *p, *q;
 
     ds_put_format(&ds, "Listening ports:\n");
     ovs_mutex_lock(&mutex);
@@ -354,7 +371,12 @@ tnl_port_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
     }
 
     LIST_FOR_EACH(p, node, &port_list) {
-        ds_put_format(&ds, "%s (%"PRIu32")\n", p->dev_name, p->port);
+        /* A layer3 and non-layer3 tunnel port may share the same ODP port.
+         * To allow differentiation and avoid displaying otherwise
+         * duplicated ouput append " (layer3)" when showing layer-3
+         * tunnel ports. */
+        ds_put_format(&ds, "%s (%"PRIu32")%s\n", p->dev_name, p->port,
+                      p->is_layer3 ? " (layer3)" : "");
     }
 
 out:
@@ -369,7 +391,8 @@ map_insert_ipdev(struct ip_device *ip_dev)
     struct tnl_port *p;
 
     LIST_FOR_EACH(p, node, &port_list) {
-        map_insert_ipdev__(ip_dev, p->dev_name, p->port, p->nw_proto, p->tp_port);
+        map_insert_ipdev__(ip_dev, p->dev_name, p->port, p->nw_proto,
+                           p->tp_port, p->is_layer3);
     }
 }
 
