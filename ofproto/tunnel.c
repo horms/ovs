@@ -26,6 +26,7 @@
 #include "hash.h"
 #include "hmap.h"
 #include "netdev.h"
+#include "netdev-vport.h"
 #include "odp-util.h"
 #include "openvswitch/ofpbuf.h"
 #include "packets.h"
@@ -194,7 +195,7 @@ tnl_port_add__(const struct ofport_dpif *ofport, const struct netdev *netdev,
     tnl_port_mod_log(tnl_port, "adding");
 
     if (native_tnl) {
-        tnl_port_map_insert(odp_port, cfg->dst_port, name);
+        tnl_port_map_insert(odp_port, cfg->dst_port, name, cfg->is_layer3);
     }
     return true;
 }

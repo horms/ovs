@@ -144,9 +144,13 @@ netdev_vport_is_patch(const struct netdev *netdev)
 bool
 netdev_vport_is_layer3(const struct netdev *dev)
 {
-    const char *type = netdev_get_type(dev);
+    if (is_vport_class(netdev_get_class(dev))) {
+        struct netdev_vport *vport = netdev_vport_cast(dev);
 
-    return (!strcmp("lisp", type));
+        return vport->tnl_cfg.is_layer3;
+    }
+
+    return false;
 }
 
 static bool
@@ -459,13 +463,14 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args)
     struct netdev_vport *dev = netdev_vport_cast(dev_);
     const char *name = netdev_get_name(dev_);
     const char *type = netdev_get_type(dev_);
-    bool ipsec_mech_set, needs_dst_port, has_csum;
+    bool ipsec_mech_set, needs_dst_port, has_csum, optional_layer3;
     uint16_t dst_proto = 0, src_proto = 0;
     struct netdev_tunnel_config tnl_cfg;
     struct smap_node *node;
 
     has_csum = strstr(type, "gre") || strstr(type, "geneve") ||
                strstr(type, "stt") || strstr(type, "vxlan");
+    optional_layer3 = !strcmp(type, "gre");
     ipsec_mech_set = false;
     memset(&tnl_cfg, 0, sizeof tnl_cfg);
 
@@ -480,6 +485,7 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args)
 
     if (!strcmp(type, "lisp")) {
         tnl_cfg.dst_port = htons(LISP_DST_PORT);
+        tnl_cfg.is_layer3 = true;
     }
 
     if (!strcmp(type, "stt")) {
@@ -591,6 +597,10 @@ set_tunnel_config(struct netdev *dev_, const struct smap *args)
             }
 
             free(str);
+        } else if (!strcmp(node->key, "layer3") && optional_layer3) {
+            if (!strcmp(node->value, "true")) {
+                tnl_cfg.is_layer3 = true;
+            }
         } else {
             VLOG_WARN("%s: unknown %s argument '%s'", name, type, node->key);
         }
@@ -671,6 +681,7 @@ static int
 get_tunnel_config(const struct netdev *dev, struct smap *args)
 {
     struct netdev_vport *netdev = netdev_vport_cast(dev);
+    const char *type = netdev_get_type(dev);
     struct netdev_tunnel_config tnl_cfg;
 
     ovs_mutex_lock(&netdev->mutex);
@@ -724,7 +735,6 @@ get_tunnel_config(const struct netdev *dev, struct smap *args)
 
     if (tnl_cfg.dst_port) {
         uint16_t dst_port = ntohs(tnl_cfg.dst_port);
-        const char *type = netdev_get_type(dev);
 
         if ((!strcmp("geneve", type) && dst_port != GENEVE_DST_PORT) ||
             (!strcmp("vxlan", type) && dst_port != VXLAN_DST_PORT) ||
@@ -736,6 +746,10 @@ get_tunnel_config(const struct netdev *dev, struct smap *args)
 
     if (tnl_cfg.csum) {
         smap_add(args, "csum", "true");
+    }
+
+    if (tnl_cfg.is_layer3 && !strcmp("gre", type)) {
+        smap_add(args, "layer3", "true");
     }
 
     if (!tnl_cfg.dont_fragment) {
@@ -944,12 +958,17 @@ ip_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
     return l4;
 }
 
+static ovs_be16
+header_eth_type(const void *header)
+{
+    const struct eth_header *eth = header;
+    return eth->eth_type;
+}
+
 static bool
 is_header_ipv6(const void *header)
 {
-    const struct eth_header *eth;
-    eth = header;
-    return eth->eth_type == htons(ETH_TYPE_IPV6);
+    return header_eth_type(header) == htons(ETH_TYPE_IPV6);
 }
 
 /* Pushes the 'size' bytes of 'header' into the headroom of 'packet',
@@ -973,6 +992,9 @@ push_ip_header(struct dp_packet *packet,
     *ip_tot_size = dp_packet_size(packet) - sizeof (struct eth_header);
 
     memcpy(eth, header, size);
+
+    dp_packet_reset_offsets(packet);
+    packet->l3_ofs = sizeof (struct eth_header);
 
     if (is_header_ipv6(header)) {
         ip6 = ipv6_hdr(eth);
@@ -1137,10 +1159,6 @@ parse_gre_header(struct dp_packet *packet,
         return -EINVAL;
     }
 
-    if (greh->protocol != htons(ETH_TYPE_TEB)) {
-        return -EINVAL;
-    }
-
     hlen = ulen + gre_header_len(greh->flags);
     if (hlen > dp_packet_size(packet)) {
         return -EINVAL;
@@ -1168,6 +1186,12 @@ parse_gre_header(struct dp_packet *packet,
 
     if (greh->flags & htons(GRE_SEQ)) {
         options++;
+    }
+
+    if (greh->protocol == htons(ETH_TYPE_TEB)) {
+        packet->md.packet_ethertype = htons(0);
+    } else {
+        packet->md.packet_ethertype = greh->protocol;
     }
 
     return hlen;
@@ -1204,6 +1228,12 @@ netdev_gre_pop_header(struct dp_packet *packet)
 
     dp_packet_reset_packet(packet, hlen);
 
+    if (eth_type_mpls(packet->md.packet_ethertype)) {
+        packet->l2_5_ofs = 0;
+    } else if (packet->md.packet_ethertype) {
+        packet->l3_ofs = 0;
+    }
+
     return 0;
 }
 
@@ -1220,6 +1250,7 @@ netdev_gre_push_header(struct dp_packet *packet,
         ovs_be16 *csum_opt = (ovs_be16 *) (greh + 1);
         *csum_opt = csum(greh, ip_tot_size);
     }
+    packet->md.packet_ethertype = header_eth_type(data->header);
 }
 
 static int
@@ -1252,7 +1283,11 @@ netdev_gre_build_header(const struct netdev *netdev,
         greh = (struct gre_base_hdr *) (ip + 1);
     }
 
-    greh->protocol = htons(ETH_TYPE_TEB);
+    if (tnl_cfg->is_layer3) {
+        greh->protocol = tnl_flow->dl_type;
+    } else {
+        greh->protocol = htons(ETH_TYPE_TEB);
+    }
     greh->flags = 0;
 
     options = (ovs_16aligned_be32 *) (greh + 1);

@@ -354,6 +354,7 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_CT_LABELS,	/* 16-octet connection tracking labels */
 	OVS_KEY_ATTR_PACKET_ETHERTYPE, /* be16 Ethernet type for packet
 					* execution. */
+	OVS_KEY_ATTR_NEXT_BASE_LAYER, /* base layer of encapsulated packet */
 
 #ifdef __KERNEL__
 	/* Only used within kernel data path. */
