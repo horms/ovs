@@ -2294,6 +2294,19 @@
         </column>
       </group>
 
+      <group title="Tunnel Options: gre">
+        <p>
+          <code>gre</code> interfaces support these options.
+        </p>
+
+        <column name="options" key="layer3" type='{"type": "boolean"}'>
+          <p>
+            Optional.  Packets are sent and received without an Ethernet
+	    header present.
+	  </p>
+        </column>
+      </group>
+
       <group title="Tunnel Options: ipsec_gre only">
         <p>
           Only <code>ipsec_gre</code> interfaces support these options.
