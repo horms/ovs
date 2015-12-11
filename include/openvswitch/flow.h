@@ -23,7 +23,7 @@
 /* This sequence number should be incremented whenever anything involving flows
  * or the wildcarding of flows changes.  This will cause build assertion
  * failures in places which likely need to be updated. */
-#define FLOW_WC_SEQ 36
+#define FLOW_WC_SEQ 37
 
 /* Number of Open vSwitch extension 32-bit registers. */
 #define FLOW_N_REGS 8
@@ -132,6 +132,10 @@ struct flow {
     ovs_be16 tp_dst;            /* TCP/UDP/SCTP destination port/ICMP code. */
     ovs_be32 igmp_group_ip4;    /* IGMP group IPv4 address.
                                  * Keep last for BUILD_ASSERT_DECL below. */
+
+    uint8_t next_base_layer;    /* Fields of encapsulated packet, if any,
+                                 * start at this layer */
+    uint8_t pad4[7];
 };
 BUILD_ASSERT_DECL(sizeof(struct flow) % sizeof(uint64_t) == 0);
 BUILD_ASSERT_DECL(sizeof(struct flow_tnl) % sizeof(uint64_t) == 0);
@@ -139,9 +143,9 @@ BUILD_ASSERT_DECL(sizeof(struct flow_tnl) % sizeof(uint64_t) == 0);
 #define FLOW_U64S (sizeof(struct flow) / sizeof(uint64_t))
 
 /* Remember to update FLOW_WC_SEQ when changing 'struct flow'. */
-BUILD_ASSERT_DECL(offsetof(struct flow, igmp_group_ip4) + sizeof(uint32_t)
-                  == sizeof(struct flow_tnl) + 224
-                  && FLOW_WC_SEQ == 36);
+BUILD_ASSERT_DECL(OFFSETOFEND(struct flow, pad4)
+                  == sizeof(struct flow_tnl) + 232
+                  && FLOW_WC_SEQ == 37);
 
 /* Incremental points at which flow classification may be performed in
  * segments.
