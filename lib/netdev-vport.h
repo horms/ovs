@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "compiler.h"
+#include "openvswitch/types.h"
 
 struct dpif_netlink_vport;
 struct dpif_flow_stats;

@@ -230,9 +230,10 @@ enum ovs_vport_type {
 	OVS_VPORT_TYPE_UNSPEC,
 	OVS_VPORT_TYPE_NETDEV,   /* network device */
 	OVS_VPORT_TYPE_INTERNAL, /* network device implemented by datapath */
-	OVS_VPORT_TYPE_GRE,      /* GRE tunnel. */
+	OVS_VPORT_TYPE_GRE,      /* GRE Tap tunnel (L2 in GRE). */
 	OVS_VPORT_TYPE_VXLAN,	 /* VXLAN tunnel. */
 	OVS_VPORT_TYPE_GENEVE,	 /* Geneve tunnel. */
+	OVS_VPORT_TYPE_GRE_L3,   /* GRE tunnel (L3 in GRE). */
 	OVS_VPORT_TYPE_LISP = 105,  /* LISP tunnel */
 	OVS_VPORT_TYPE_STT = 106, /* STT tunnel */
 	__OVS_VPORT_TYPE_MAX
@@ -354,6 +355,7 @@ enum ovs_key_attr {
 	OVS_KEY_ATTR_CT_LABELS,	/* 16-octet connection tracking labels */
 	OVS_KEY_ATTR_PACKET_ETHERTYPE, /* be16 Ethernet type for packet
 					* execution. */
+	OVS_KEY_ATTR_NEXT_BASE_LAYER, /* base layer of encapsulated packet */
 
 #ifdef __KERNEL__
 	/* Only used within kernel data path. */

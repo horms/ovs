@@ -588,7 +588,7 @@ dpif_ipfix_add_tunnel_port(struct dpif_ipfix *di, struct ofport *ofport,
     dip = xmalloc(sizeof *dip);
     dip->ofport = ofport;
     dip->odp_port = odp_port;
-    if (strcmp(type, "gre") == 0) {
+    if (strcmp(type, "gre") == 0 || strcmp(type, "l3gre") == 0) {
         /* 32-bit key gre */
         dip->tunnel_type = DPIF_IPFIX_TUNNEL_GRE;
         dip->tunnel_key_length = 4;
