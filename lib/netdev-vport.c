@@ -145,7 +145,7 @@ netdev_vport_is_layer3(const struct netdev *dev)
 {
     const char *type = netdev_get_type(dev);
 
-    return (!strcmp("lisp", type));
+    return (!strcmp("lisp", type) || !strcmp("l3gre", type));
 }
 
 static bool
@@ -943,12 +943,17 @@ ip_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
     return l4;
 }
 
+static ovs_be16
+header_eth_type(const void *header)
+{
+    const struct eth_header *eth = header;
+    return eth->eth_type;
+}
+
 static bool
 is_header_ipv6(const void *header)
 {
-    const struct eth_header *eth;
-    eth = header;
-    return eth->eth_type == htons(ETH_TYPE_IPV6);
+    return header_eth_type(header) == htons(ETH_TYPE_IPV6);
 }
 
 /* Pushes the 'size' bytes of 'header' into the headroom of 'packet',
@@ -972,6 +977,9 @@ push_ip_header(struct dp_packet *packet,
     *ip_tot_size = dp_packet_size(packet) - sizeof (struct eth_header);
 
     memcpy(eth, header, size);
+
+    dp_packet_reset_offsets(packet);
+    packet->l3_ofs = sizeof (struct eth_header);
 
     if (is_header_ipv6(header)) {
         ip6 = ipv6_hdr(eth);
@@ -1120,7 +1128,7 @@ gre_header_len(ovs_be16 flags)
 
 static int
 parse_gre_header(struct dp_packet *packet,
-                 struct flow_tnl *tnl)
+                 struct flow_tnl *tnl, bool tap)
 {
     const struct gre_base_hdr *greh;
     ovs_16aligned_be32 *options;
@@ -1136,7 +1144,8 @@ parse_gre_header(struct dp_packet *packet,
         return -EINVAL;
     }
 
-    if (greh->protocol != htons(ETH_TYPE_TEB)) {
+    if ((tap && greh->protocol != htons(ETH_TYPE_TEB)) ||
+        (!tap && greh->protocol == htons(ETH_TYPE_TEB))) {
         return -EINVAL;
     }
 
@@ -1169,6 +1178,10 @@ parse_gre_header(struct dp_packet *packet,
         options++;
     }
 
+    if (!tap) {
+        packet->md.packet_ethertype = greh->protocol;
+    }
+
     return hlen;
 }
 
@@ -1182,7 +1195,7 @@ pkt_metadata_init_tnl(struct pkt_metadata *md)
 }
 
 static int
-netdev_gre_pop_header(struct dp_packet *packet)
+netdev_gre_pop_header__(struct dp_packet *packet, bool tap)
 {
     struct pkt_metadata *md = &packet->md;
     struct flow_tnl *tnl = &md->tunnel;
@@ -1196,12 +1209,37 @@ netdev_gre_pop_header(struct dp_packet *packet)
         return EINVAL;
     }
 
-    hlen = parse_gre_header(packet, tnl);
+    hlen = parse_gre_header(packet, tnl, tap);
     if (hlen < 0) {
         return -hlen;
     }
 
     dp_packet_reset_packet(packet, hlen);
+
+    return 0;
+}
+
+static int
+netdev_gretap_pop_header(struct dp_packet *packet)
+{
+    return netdev_gre_pop_header__(packet, true);
+}
+
+static int
+netdev_gre_pop_header(struct dp_packet *packet)
+{
+    int err;
+
+    err = netdev_gre_pop_header__(packet, false);
+    if (err) {
+        return err;
+    }
+
+    if (eth_type_mpls(packet->md.packet_ethertype)) {
+        packet->l2_5_ofs = 0;
+    } else {
+        packet->l3_ofs = 0;
+    }
 
     return 0;
 }
@@ -1219,12 +1257,13 @@ netdev_gre_push_header(struct dp_packet *packet,
         ovs_be16 *csum_opt = (ovs_be16 *) (greh + 1);
         *csum_opt = csum(greh, ip_tot_size);
     }
+    packet->md.packet_ethertype = header_eth_type(data->header);
 }
 
 static int
-netdev_gre_build_header(const struct netdev *netdev,
-                        struct ovs_action_push_tnl *data,
-                        const struct flow *tnl_flow)
+netdev_gre_build_header__(const struct netdev *netdev,
+                          struct ovs_action_push_tnl *data,
+                          const struct flow *tnl_flow, ovs_be16 proto)
 {
     struct netdev_vport *dev = netdev_vport_cast(netdev);
     struct netdev_tunnel_config *tnl_cfg;
@@ -1251,7 +1290,7 @@ netdev_gre_build_header(const struct netdev *netdev,
         greh = (struct gre_base_hdr *) (ip + 1);
     }
 
-    greh->protocol = htons(ETH_TYPE_TEB);
+    greh->protocol = proto;
     greh->flags = 0;
 
     options = (ovs_16aligned_be32 *) (greh + 1);
@@ -1276,6 +1315,24 @@ netdev_gre_build_header(const struct netdev *netdev,
                        (is_ipv6 ? IPV6_HEADER_LEN : IP_HEADER_LEN);
     data->tnl_type = OVS_VPORT_TYPE_GRE;
     return 0;
+}
+
+static int
+netdev_gretap_build_header(const struct netdev *netdev,
+                        struct ovs_action_push_tnl *data,
+                        const struct flow *tnl_flow)
+{
+    return netdev_gre_build_header__(netdev, data, tnl_flow,
+                                     htons(ETH_TYPE_TEB));
+}
+
+static int
+netdev_gre_build_header(const struct netdev *netdev,
+                        struct ovs_action_push_tnl *data,
+                        const struct flow *tnl_flow)
+{
+    return netdev_gre_build_header__(netdev, data, tnl_flow,
+                                     tnl_flow->dl_type);
 }
 
 static int
@@ -1555,9 +1612,12 @@ netdev_vport_tunnel_register(void)
         TUNNEL_CLASS("geneve", "genev_sys", netdev_geneve_build_header,
                                             push_udp_header,
                                             netdev_geneve_pop_header),
-        TUNNEL_CLASS("gre", "gre_sys", netdev_gre_build_header,
+        TUNNEL_CLASS("gre", "gre_sys", netdev_gretap_build_header,
                                        netdev_gre_push_header,
-                                       netdev_gre_pop_header),
+                                       netdev_gretap_pop_header),
+        TUNNEL_CLASS("l3gre", "l3gre_sys", netdev_gre_build_header,
+                                           netdev_gre_push_header,
+                                           netdev_gre_pop_header),
         TUNNEL_CLASS("ipsec_gre", "gre_sys", NULL, NULL, NULL),
         TUNNEL_CLASS("vxlan", "vxlan_sys", netdev_vxlan_build_header,
                                            push_udp_header,

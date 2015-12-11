@@ -159,7 +159,7 @@ tnl_port_map_insert(odp_port_t port,
 
     ovs_mutex_lock(&mutex);
     LIST_FOR_EACH(p, node, &port_list) {
-        if (udp_port == p->udp_port) {
+        if (udp_port == p->udp_port && udp_port) {
              goto out;
         }
     }

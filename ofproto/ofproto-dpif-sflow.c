@@ -584,7 +584,7 @@ static enum dpif_sflow_tunnel_type
 dpif_sflow_tunnel_type(struct ofport *ofport) {
     const char *type = netdev_get_type(ofport->netdev);
     if (type) {
-	if (strcmp(type, "gre") == 0) {
+	if (strcmp(type, "gre") == 0 || strcmp(type, "l3gre") == 0) {
 	    return DPIF_SFLOW_TUNNEL_GRE;
 	} else if (strcmp(type, "ipsec_gre") == 0) {
 	    return DPIF_SFLOW_TUNNEL_IPSEC_GRE;
