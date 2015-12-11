@@ -584,7 +584,7 @@ static enum dpif_sflow_tunnel_type
 dpif_sflow_tunnel_type(struct ofport *ofport) {
     const char *type = netdev_get_type(ofport->netdev);
     if (type) {
-	if (strcmp(type, "gre") == 0) {
+	if (strcmp(type, "gre") == 0 || strcmp(type, "l3gre") == 0) {
 	    return DPIF_SFLOW_TUNNEL_GRE;
 	} else if (strcmp(type, "ipsec_gre") == 0) {
 	    return DPIF_SFLOW_TUNNEL_IPSEC_GRE;
@@ -1035,6 +1035,7 @@ sflow_read_set_action(const struct nlattr *attr,
     case OVS_KEY_ATTR_CT_MARK:
     case OVS_KEY_ATTR_CT_LABELS:
     case OVS_KEY_ATTR_UNSPEC:
+    case OVS_KEY_ATTR_NEXT_BASE_LAYER:
     case __OVS_KEY_ATTR_MAX:
     default:
         break;

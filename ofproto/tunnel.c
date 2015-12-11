@@ -26,6 +26,7 @@
 #include "hash.h"
 #include "hmap.h"
 #include "netdev.h"
+#include "netdev-vport.h"
 #include "odp-util.h"
 #include "ofpbuf.h"
 #include "packets.h"
@@ -194,7 +195,8 @@ tnl_port_add__(const struct ofport_dpif *ofport, const struct netdev *netdev,
     tnl_port_mod_log(tnl_port, "adding");
 
     if (native_tnl) {
-        tnl_port_map_insert(odp_port, cfg->dst_port, name);
+        tnl_port_map_insert(odp_port, cfg->dst_port, name,
+                            netdev_vport_is_layer3(netdev));
     }
     return true;
 }
@@ -261,7 +263,8 @@ tnl_port_del__(const struct ofport_dpif *ofport) OVS_REQ_WRLOCK(rwlock)
             netdev_get_tunnel_config(tnl_port->netdev);
         struct hmap **map;
 
-        tnl_port_map_delete(cfg->dst_port);
+        tnl_port_map_delete(cfg->dst_port,
+                            netdev_vport_is_layer3(tnl_port->netdev));
         tnl_port_mod_log(tnl_port, "removing");
         map = tnl_match_map(&tnl_port->match);
         hmap_remove(*map, &tnl_port->match_node);

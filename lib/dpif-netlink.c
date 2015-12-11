@@ -760,6 +760,9 @@ get_vport_type(const struct dpif_netlink_vport *vport)
     case OVS_VPORT_TYPE_GRE:
         return "gre";
 
+    case OVS_VPORT_TYPE_GRE_L3:
+        return "l3gre";
+
     case OVS_VPORT_TYPE_VXLAN:
         return "vxlan";
 
@@ -792,6 +795,8 @@ netdev_to_ovs_vport_type(const struct netdev *netdev)
         return OVS_VPORT_TYPE_STT;
     } else if (!strcmp(type, "geneve")) {
         return OVS_VPORT_TYPE_GENEVE;
+    } else if (!strcmp(type, "l3gre")) { /* Must be before search for "gre" */
+        return OVS_VPORT_TYPE_GRE_L3;
     } else if (strstr(type, "gre")) {
         return OVS_VPORT_TYPE_GRE;
     } else if (!strcmp(type, "vxlan")) {
