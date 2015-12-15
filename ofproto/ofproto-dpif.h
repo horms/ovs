@@ -95,6 +95,10 @@ struct dpif_backer_support {
 
     /* Each member represents support for related OVS_KEY_ATTR_* fields. */
     struct odp_support odp;
+
+    /* If true then datpath supports OVS_KEY_ATTR_ETHERTYPE field
+     * and thus execution of L3 packets. */
+    bool packet_ethertype;
 };
 
 bool ofproto_dpif_get_enable_ufid(const struct dpif_backer *backer);
