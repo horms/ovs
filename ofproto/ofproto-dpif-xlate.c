@@ -360,6 +360,8 @@ const char *xlate_strerror(enum xlate_error error)
         return "Recirculation conflict";
     case XLATE_TOO_MANY_MPLS_LABELS:
         return "Too many MPLS labels";
+    case XLATE_BASE_LAYER_CONFLICT:
+        return "Unsupported packet base layer";
     }
     return "Unknown error";
 }
@@ -5138,6 +5140,14 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
      */
 
     memset(&ctx.base_flow.tunnel, 0, sizeof ctx.base_flow.tunnel);
+
+    if (!xbridge->support.packet_ethertype &&
+        ctx.base_flow.base_layer != LAYER_2) {
+        xlate_report(&ctx, "Base layer conflict "
+                     "(execution of Layer3 not supported)!");
+        ctx.error = XLATE_BASE_LAYER_CONFLICT;
+        goto exit;
+    }
 
     ofpbuf_reserve(ctx.odp_actions, NL_A_U32_SIZE);
     if (xin->wc) {

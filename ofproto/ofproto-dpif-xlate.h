@@ -188,6 +188,7 @@ enum xlate_error {
     XLATE_NO_RECIRCULATION_CONTEXT,
     XLATE_RECIRCULATION_CONFLICT,
     XLATE_TOO_MANY_MPLS_LABELS,
+    XLATE_BASE_LAYER_CONFLICT,
 };
 
 const char *xlate_strerror(enum xlate_error error);
