@@ -64,10 +64,10 @@ ofp_packet_to_string(const void *data, size_t len, bool is_layer3)
     size_t l4_size;
 
     dp_packet_use_const(&buf, data, len);
-    flow_extract(&buf, &flow);
     if (is_layer3) {
         buf.l3_ofs = 0;
     }
+    flow_extract(&buf, &flow);
     flow_format(&ds, &flow);
 
     l4_size = dp_packet_l4_size(&buf);
