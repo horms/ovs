@@ -232,16 +232,24 @@ push_eth(struct dp_packet *packet, const struct eth_addr *dst,
     eh->eth_src = *src;
 }
 
-/* Removes Ethernet header, including all VLAN and MPLS headers, from 'packet'.
+/* Removes Ethernet header, including VLAN header, from 'packet'.
  *
  * Previous to calling this function, 'ofpbuf_l3(packet)' must not be NULL */
 void
 pop_eth(struct dp_packet *packet)
 {
+    char *l2_5 = dp_packet_l2_5(packet);;
+    int increment;
+
     ovs_assert(dp_packet_l3(packet) != NULL);
 
-    dp_packet_resize_l2_5(packet, -packet->l3_ofs);
-    dp_packet_set_l2_5(packet, NULL);
+    if (l2_5) {
+        increment = packet->l2_5_ofs;
+    } else {
+        increment = packet->l3_ofs;
+    }
+
+    dp_packet_resize_l2(packet, -increment);
 }
 
 /* Set ethertype of the packet. */

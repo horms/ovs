@@ -58,7 +58,7 @@ static void ofp_print_error(struct ds *, enum ofperr);
 /* Returns a string that represents the contents of the packet in the
  * 'len' bytes starting at 'data'.  The caller must free the returned string.*/
 char *
-ofp_packet_to_string(const void *data, size_t len, bool is_layer3)
+ofp_packet_to_string(const void *data, size_t len, ovs_be16 packet_ethertype)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     struct dp_packet buf;
@@ -66,7 +66,9 @@ ofp_packet_to_string(const void *data, size_t len, bool is_layer3)
     size_t l4_size;
 
     dp_packet_use_const(&buf, data, len);
-    if (is_layer3) {
+    if (packet_ethertype) {
+        /* This is a layer 3 packet */
+        buf.md.packet_ethertype = packet_ethertype;
         buf.l3_ofs = 0;
     }
     flow_extract(&buf, &flow);
@@ -97,6 +99,17 @@ ofp_packet_to_string(const void *data, size_t len, bool is_layer3)
     ds_put_char(&ds, '\n');
 
     return ds_cstr(&ds);
+}
+
+/* Returns a string that represents the contents of the packet in the
+ * 'len' bytes starting at 'data'.  The caller must free the returned string.*/
+char *
+ofp_dp_packet_to_string(const struct dp_packet *p)
+{
+    ovs_assert(!dp_packet_is_l3(p) || ntohs(p->md.packet_ethertype));
+    return ofp_packet_to_string(dp_packet_data(p), dp_packet_size(p),
+                                dp_packet_is_l3(p) ? p->md.packet_ethertype
+                                : htons(0));
 }
 
 static void
@@ -203,7 +216,7 @@ ofp_print_packet_in(struct ds *string, const struct ofp_header *oh,
 
     if (verbosity > 0) {
         char *packet = ofp_packet_to_string(public->packet,
-                                            public->packet_len, false);
+                                            public->packet_len, htons(0));
         ds_put_cstr(string, packet);
         free(packet);
     }
@@ -239,7 +252,8 @@ ofp_print_packet_out(struct ds *string, const struct ofp_header *oh,
     if (po.buffer_id == UINT32_MAX) {
         ds_put_format(string, " data_len=%"PRIuSIZE, po.packet_len);
         if (verbosity > 0 && po.packet_len > 0) {
-            char *packet = ofp_packet_to_string(po.packet, po.packet_len, false);
+            char *packet = ofp_packet_to_string(po.packet, po.packet_len,
+                                                htons(0));
             ds_put_char(string, '\n');
             ds_put_cstr(string, packet);
             free(packet);
@@ -3583,5 +3597,5 @@ ofp_print(FILE *stream, const void *oh, size_t len, int verbosity)
 void
 ofp_print_packet(FILE *stream, const void *data, size_t len)
 {
-    print_and_free(stream, ofp_packet_to_string(data, len, false));
+    print_and_free(stream, ofp_packet_to_string(data, len, htons(0)));
 }

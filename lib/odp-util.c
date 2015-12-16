@@ -4359,6 +4359,8 @@ odp_flow_key_from_flow__(const struct odp_flow_key_parms *parms,
         }
 
         nl_msg_put_be16(buf, OVS_KEY_ATTR_ETHERTYPE, data->dl_type);
+    } else {
+        nl_msg_put_be16(buf, OVS_KEY_ATTR_PACKET_ETHERTYPE, data->dl_type);
     }
 
     if (flow->dl_type == htons(ETH_TYPE_IP)) {
@@ -4605,12 +4607,13 @@ odp_key_to_pkt_metadata(const struct nlattr *key, size_t key_len,
             md->base_layer = LAYER_2;
             wanted_attrs &= ~(1u << OVS_KEY_ATTR_ETHERNET);
             break;
+        case OVS_KEY_ATTR_PACKET_ETHERTYPE:
+            md->packet_ethertype = nl_attr_get_be16(nla);
+            break;
         case OVS_KEY_ATTR_IPV4:
-            md->packet_ethertype = htons(ETH_TYPE_IP);
             wanted_attrs &= ~(1u << OVS_KEY_ATTR_IPV4);
             break;
         case OVS_KEY_ATTR_IPV6:
-            md->packet_ethertype = htons(ETH_TYPE_IPV6);
             wanted_attrs &= ~(1u << OVS_KEY_ATTR_IPV6);
             break;
         default:
@@ -4763,6 +4766,29 @@ check_expectations(uint64_t present_attrs, int out_of_range_attr,
 }
 
 static bool
+parse_ethertype__(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
+                  uint64_t *expected_attrs, struct flow *flow,
+                  const struct flow *src_flow, unsigned attr_idx, bool is_mask)
+{
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(1, 5);
+
+    flow->dl_type = nl_attr_get_be16(attrs[attr_idx]);
+
+    if (!is_mask && ntohs(flow->dl_type) < ETH_TYPE_MIN) {
+        VLOG_ERR_RL(&rl, "invalid Ethertype %"PRIu16" in flow key",
+                    ntohs(flow->dl_type));
+        return false;
+    }
+    if (is_mask && (!src_flow || ntohs(src_flow->dl_type) < ETH_TYPE_MIN) &&
+        flow->dl_type != htons(0xffff)) {
+        return false;
+    }
+    *expected_attrs |= UINT64_C(1) << attr_idx;
+
+    return true;
+}
+
+static bool
 parse_ethertype(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
                 uint64_t present_attrs, uint64_t *expected_attrs,
                 struct flow *flow, const struct flow *src_flow)
@@ -4771,17 +4797,11 @@ parse_ethertype(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
     bool is_mask = flow != src_flow;
 
     if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_ETHERTYPE)) {
-        flow->dl_type = nl_attr_get_be16(attrs[OVS_KEY_ATTR_ETHERTYPE]);
-        if (!is_mask && ntohs(flow->dl_type) < ETH_TYPE_MIN) {
-            VLOG_ERR_RL(&rl, "invalid Ethertype %"PRIu16" in flow key",
-                        ntohs(flow->dl_type));
-            return false;
-        }
-        if (is_mask && ntohs(src_flow->dl_type) < ETH_TYPE_MIN &&
-            flow->dl_type != htons(0xffff)) {
-            return false;
-        }
-        *expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_ETHERTYPE;
+        return parse_ethertype__(attrs, expected_attrs, flow, src_flow,
+                                 OVS_KEY_ATTR_ETHERTYPE, is_mask);
+    } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_PACKET_ETHERTYPE)) {
+        return parse_ethertype__(attrs, expected_attrs, flow, src_flow,
+                                 OVS_KEY_ATTR_PACKET_ETHERTYPE, is_mask);
     } else {
         if (!is_mask) {
             if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_IPV4)) {
@@ -4791,6 +4811,8 @@ parse_ethertype(const struct nlattr *attrs[OVS_KEY_ATTR_MAX + 1],
             } else {
                 flow->dl_type = htons(FLOW_DL_TYPE_NONE);
             }
+        } else if (src_flow->base_layer == LAYER_3) {
+            flow->dl_type = htons(0xffff);
         } else if (ntohs(src_flow->dl_type) < ETH_TYPE_MIN) {
             /* See comments in odp_flow_key_from_flow__(). */
             VLOG_ERR_RL(&rl, "mask expected for non-Ethernet II frame");
@@ -5213,7 +5235,10 @@ odp_flow_key_to_flow__(const struct nlattr *key, size_t key_len,
         put_ethernet_key(eth_key, flow);
         flow->base_layer = LAYER_2;
         expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_ETHERNET;
-    } else {
+    } else if (present_attrs & (UINT64_C(1) << OVS_KEY_ATTR_PACKET_ETHERTYPE)) {
+        flow->base_layer = LAYER_3;
+        expected_attrs |= UINT64_C(1) << OVS_KEY_ATTR_PACKET_ETHERTYPE;
+    } else if (is_mask && src_flow->base_layer == LAYER_3) {
         flow->base_layer = LAYER_3;
     }
 
