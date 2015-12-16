@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 
+#include <openvswitch/types.h>
+
 struct ds;
 struct ofp10_match;
 struct ofp_flow_mod;
@@ -30,6 +32,7 @@ struct ofp_header;
 struct ofputil_flow_stats;
 struct ofputil_table_features;
 struct ofputil_table_stats;
+struct dp_packet;
 
 #ifdef  __cplusplus
 extern "C" {
@@ -42,7 +45,9 @@ void ofp10_match_print(struct ds *, const struct ofp10_match *, int verbosity);
 
 char *ofp_to_string(const void *, size_t, int verbosity);
 char *ofp10_match_to_string(const struct ofp10_match *, int verbosity);
-char *ofp_packet_to_string(const void *data, size_t len, bool is_layer3);
+char *ofp_packet_to_string(const void *data, size_t len,
+			   ovs_be16 packet_ethertype);
+char *ofp_dp_packet_to_string(const struct dp_packet *);
 
 void ofp_print_flow_stats(struct ds *, struct ofputil_flow_stats *);
 void ofp_print_version(const struct ofp_header *, struct ds *);

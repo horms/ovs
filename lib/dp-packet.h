@@ -254,7 +254,7 @@ dp_packet_equal(const struct dp_packet *a, const struct dp_packet *b)
 static inline bool
 dp_packet_is_l3(const struct dp_packet *b)
 {
-    return b->l3_ofs == 0;
+    return b->l3_ofs == 0 || b->l2_5_ofs == 0;
 }
 
 /* Get the start of the Ethernet frame.  Return NULL if 'b' is an l3 packet
