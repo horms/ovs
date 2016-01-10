@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "compiler.h"
+#include "openvswitch/types.h"
 
 struct dpif_netlink_vport;
 struct dpif_flow_stats;
@@ -32,6 +33,7 @@ void netdev_vport_patch_register(void);
 
 bool netdev_vport_is_patch(const struct netdev *);
 bool netdev_vport_is_layer3(const struct netdev *);
+enum base_layer netdev_vport_base_layer_match(const struct netdev *);
 
 char *netdev_vport_patch_peer(const struct netdev *netdev);
 
