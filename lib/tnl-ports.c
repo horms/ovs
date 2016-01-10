@@ -27,6 +27,7 @@
 #include "hash.h"
 #include "list.h"
 #include "netdev.h"
+#include "netdev-vport.h"
 #include "ofpbuf.h"
 #include "ovs-thread.h"
 #include "odp-util.h"
@@ -52,6 +53,7 @@ static struct ovs_list addr_list;
 struct tnl_port {
     odp_port_t port;
     ovs_be16 udp_port;
+    enum base_layer base_layer;
     char dev_name[IFNAMSIZ];
     struct ovs_list node;
 };
@@ -61,6 +63,7 @@ static struct ovs_list port_list;
 struct tnl_port_in {
     struct cls_rule cr;
     odp_port_t portno;
+    bool match_base_layer;
     struct ovs_refcount ref_cnt;
     char dev_name[IFNAMSIZ];
 };
@@ -82,7 +85,8 @@ tnl_port_free(struct tnl_port_in *p)
 
 static void
 tnl_port_init_flow(struct flow *flow, struct eth_addr mac,
-                   struct in6_addr *addr, ovs_be16 udp_port)
+                   struct in6_addr *addr, ovs_be16 udp_port,
+                   enum base_layer base_layer)
 {
     memset(flow, 0, sizeof *flow);
 
@@ -101,18 +105,20 @@ tnl_port_init_flow(struct flow *flow, struct eth_addr mac,
         flow->nw_proto = IPPROTO_GRE;
     }
     flow->tp_dst = udp_port;
+    flow->next_base_layer = base_layer;
 }
 
 static void
 map_insert(odp_port_t port, struct eth_addr mac, struct in6_addr *addr,
-           ovs_be16 udp_port, const char dev_name[])
+           ovs_be16 udp_port, const char dev_name[],
+           enum base_layer base_layer)
 {
     const struct cls_rule *cr;
     struct tnl_port_in *p;
     struct match match;
 
     memset(&match, 0, sizeof match);
-    tnl_port_init_flow(&match.flow, mac, addr, udp_port);
+    tnl_port_init_flow(&match.flow, mac, addr, udp_port, base_layer);
 
     do {
         cr = classifier_lookup(&cls, CLS_MAX_VERSION, &match.flow, NULL);
@@ -142,6 +148,11 @@ map_insert(odp_port_t port, struct eth_addr mac, struct in6_addr *addr,
         match.wc.masks.vlan_tci = OVS_BE16_MAX;
         memset(&match.wc.masks.dl_dst, 0xff, sizeof (struct eth_addr));
 
+        if (base_layer != LAYER_ANY) {
+            match.wc.masks.next_base_layer = UINT8_MAX;
+            p->match_base_layer = true;
+        }
+
         cls_rule_init(&p->cr, &match, 0); /* Priority == 0. */
         ovs_refcount_init(&p->ref_cnt);
         ovs_strlcpy(p->dev_name, dev_name, sizeof p->dev_name);
@@ -151,8 +162,8 @@ map_insert(odp_port_t port, struct eth_addr mac, struct in6_addr *addr,
 }
 
 void
-tnl_port_map_insert(odp_port_t port,
-                    ovs_be16 udp_port, const char dev_name[])
+tnl_port_map_insert(odp_port_t port, ovs_be16 udp_port,
+                    const char dev_name[], enum base_layer base_layer)
 {
     struct tnl_port *p;
     struct ip_device *ip_dev;
@@ -167,6 +178,7 @@ tnl_port_map_insert(odp_port_t port,
     p = xzalloc(sizeof *p);
     p->port = port;
     p->udp_port = udp_port;
+    p->base_layer = base_layer;
     ovs_strlcpy(p->dev_name, dev_name, sizeof p->dev_name);
     list_insert(&port_list, &p->node);
 
@@ -174,11 +186,11 @@ tnl_port_map_insert(odp_port_t port,
         if (ip_dev->addr4 != INADDR_ANY) {
             struct in6_addr addr4 = in6_addr_mapped_ipv4(ip_dev->addr4);
             map_insert(p->port, ip_dev->mac, &addr4,
-                       p->udp_port, p->dev_name);
+                       p->udp_port, p->dev_name, base_layer);
         }
         if (ipv6_addr_is_set(&ip_dev->addr6)) {
             map_insert(p->port, ip_dev->mac, &ip_dev->addr6,
-                       p->udp_port, p->dev_name);
+                       p->udp_port, p->dev_name, base_layer);
         }
     }
 
@@ -199,19 +211,20 @@ tnl_port_unref(const struct cls_rule *cr)
 }
 
 static void
-map_delete(struct eth_addr mac, struct in6_addr *addr, ovs_be16 udp_port)
+map_delete(struct eth_addr mac, struct in6_addr *addr, ovs_be16 udp_port,
+           enum base_layer base_layer)
 {
     const struct cls_rule *cr;
     struct flow flow;
 
-    tnl_port_init_flow(&flow, mac, addr, udp_port);
+    tnl_port_init_flow(&flow, mac, addr, udp_port, base_layer);
 
     cr = classifier_lookup(&cls, CLS_MAX_VERSION, &flow, NULL);
     tnl_port_unref(cr);
 }
 
 void
-tnl_port_map_delete(ovs_be16 udp_port)
+tnl_port_map_delete(ovs_be16 udp_port, enum base_layer base_layer)
 {
     struct tnl_port *p, *next;
     struct ip_device *ip_dev;
@@ -232,10 +245,10 @@ tnl_port_map_delete(ovs_be16 udp_port)
     LIST_FOR_EACH(ip_dev, node, &addr_list) {
         if (ip_dev->addr4 != INADDR_ANY) {
             struct in6_addr addr4 = in6_addr_mapped_ipv4(ip_dev->addr4);
-            map_delete(ip_dev->mac, &addr4, udp_port);
+            map_delete(ip_dev->mac, &addr4, udp_port, base_layer);
         }
         if (ipv6_addr_is_set(&ip_dev->addr6)) {
-            map_delete(ip_dev->mac, &ip_dev->addr6, udp_port);
+            map_delete(ip_dev->mac, &ip_dev->addr6, udp_port, base_layer);
         }
     }
 
@@ -244,15 +257,35 @@ out:
     ovs_mutex_unlock(&mutex);
 }
 
-/* 'flow' is non-const to allow for temporary modifications during the lookup.
- * Any changes are restored before returning. */
+/* 'flow' is non-const to allow for:
+ * - Temporary modifications during the lookup
+ *    these are reverted before returning.
+ * - Setting matching on next_base_layer as required by the port looked up. */
 odp_port_t
 tnl_port_map_lookup(struct flow *flow, struct flow_wildcards *wc)
 {
     const struct cls_rule *cr = classifier_lookup(&cls, CLS_MAX_VERSION, flow,
                                                   wc);
+    enum base_layer next_base_layer_mask;
+    struct tnl_port_in *p;
+    odp_port_t portno;
 
-    return (cr) ? tnl_port_cast(cr)->portno : ODPP_NONE;
+    /* next_base_layer should be matched when looking up tunnel port*/
+    next_base_layer_mask = wc->masks.base_layer;
+    wc->masks.next_base_layer = UINT8_MAX;
+
+    if (!cr) {
+        portno = ODPP_NONE;
+    } else {
+        p = tnl_port_cast(cr);
+        portno = p->portno;
+    }
+
+    if (!cr || !p->match_base_layer) {
+        wc->masks.next_base_layer = next_base_layer_mask;
+    }
+
+    return portno;
 }
 
 static void
@@ -334,11 +367,11 @@ map_insert_ipdev(struct ip_device *ip_dev)
         if (ip_dev->addr4 != INADDR_ANY) {
             struct in6_addr addr4 = in6_addr_mapped_ipv4(ip_dev->addr4);
             map_insert(p->port, ip_dev->mac, &addr4,
-                       p->udp_port, p->dev_name);
+                       p->udp_port, p->dev_name, p->base_layer);
         }
         if (ipv6_addr_is_set(&ip_dev->addr6)) {
             map_insert(p->port, ip_dev->mac, &ip_dev->addr6,
-                       p->udp_port, p->dev_name);
+                       p->udp_port, p->dev_name, p->base_layer);
         }
     }
 }
@@ -387,14 +420,17 @@ static void
 delete_ipdev(struct ip_device *ip_dev)
 {
     struct tnl_port *p;
+    enum base_layer base_layer;
+
+    base_layer = netdev_vport_base_layer_match(ip_dev->dev);
 
     LIST_FOR_EACH(p, node, &port_list) {
         if (ip_dev->addr4 != INADDR_ANY) {
             struct in6_addr addr4 = in6_addr_mapped_ipv4(ip_dev->addr4);
-            map_delete(ip_dev->mac, &addr4, p->udp_port);
+            map_delete(ip_dev->mac, &addr4, p->udp_port, base_layer);
         }
         if (ipv6_addr_is_set(&ip_dev->addr6)) {
-            map_delete(ip_dev->mac, &ip_dev->addr6, p->udp_port);
+            map_delete(ip_dev->mac, &ip_dev->addr6, p->udp_port, base_layer);
         }
     }
 
