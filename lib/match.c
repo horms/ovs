@@ -1309,6 +1309,10 @@ match_format(const struct match *match, struct ds *s, int priority)
                             TCP_FLAGS(OVS_BE16_MAX));
     }
 
+    if (wc->masks.next_base_layer) {
+        ds_put_format(s, "next_base_layer=%"PRIu8",", f->next_base_layer);
+    }
+
     if (s->length > start_len) {
         ds_chomp(s, ',');
     }

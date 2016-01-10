@@ -148,6 +148,20 @@ netdev_vport_is_layer3(const struct netdev *dev)
     return (!strcmp("lisp", type) || !strcmp("l3gre", type));
 }
 
+enum base_layer
+netdev_vport_base_layer_match(const struct netdev *dev)
+{
+    const char *type = netdev_get_type(dev);
+
+    if (!strcmp("l3gre", type)) {
+        return LAYER_3;
+    } else if (strstr("gre", type)) {
+        return LAYER_2;
+    }
+
+    return LAYER_ANY;
+}
+
 static bool
 netdev_vport_needs_dst_port(const struct netdev *dev)
 {

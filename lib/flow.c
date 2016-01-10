@@ -535,9 +535,9 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
     dp_packet_reset_offsets(packet);
 
     if (!is_l3) {
-        /* Initialize packet's layer pointer and offsets. */
-        //miniflow_push_uint8(mf, base_layer, LAYER_2); Its zero!
-        //miniflow_pad_to_64(mf, base_layer);
+        /* No need to store a zero value for base_layer in the miniflow
+         * which would cost an extra word of storage. */
+        BUILD_ASSERT(LAYER_2 == 0);
 
         /* Must have full Ethernet header to proceed. */
         if (OVS_UNLIKELY(size < sizeof(struct eth_header))) {
@@ -820,6 +820,20 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
                 miniflow_push_be16(mf, tp_src, htons(icmp->icmp6_type));
                 miniflow_push_be16(mf, tp_dst, htons(icmp->icmp6_code));
                 miniflow_pad_to_64(mf, tp_dst);
+            }
+        } else if (OVS_LIKELY(nw_proto == IPPROTO_GRE)) {
+            if (OVS_LIKELY(size >= sizeof(struct gre_base_hdr))) {
+                const struct gre_base_hdr *gre = data_pull(&data, &size,
+                                                           sizeof *gre);
+			    if (gre->protocol == htons(ETH_TYPE_TEB)) {
+                    /* No need to store a zero value for next_base_layer
+                     * in the miniflow which would cost an extra word of
+                     * storage. */
+                    BUILD_ASSERT(LAYER_2 == 0);
+                } else {
+                    miniflow_push_uint8(mf, next_base_layer, LAYER_3);
+                    miniflow_pad_to_64(mf, next_base_layer);
+                }
             }
         }
     }
@@ -1435,6 +1449,8 @@ flow_wc_map(const struct flow *flow, struct flowmap *map)
 
         if (OVS_UNLIKELY(flow->nw_proto == IPPROTO_IGMP)) {
             FLOWMAP_SET(map, igmp_group_ip4);
+        } else if (OVS_UNLIKELY(flow->nw_proto == IPPROTO_GRE)) {
+            FLOWMAP_SET(map, next_base_layer);
         } else {
             FLOWMAP_SET(map, tcp_flags);
             FLOWMAP_SET(map, tp_src);
@@ -1453,6 +1469,8 @@ flow_wc_map(const struct flow *flow, struct flowmap *map)
             FLOWMAP_SET(map, nd_target);
             FLOWMAP_SET(map, arp_sha);
             FLOWMAP_SET(map, arp_tha);
+        } else if (OVS_UNLIKELY(flow->nw_proto == IPPROTO_GRE)) {
+            FLOWMAP_SET(map, next_base_layer);
         } else {
             FLOWMAP_SET(map, tcp_flags);
             FLOWMAP_SET(map, tp_src);
