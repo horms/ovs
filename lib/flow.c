@@ -555,7 +555,6 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
             miniflow_push_be16(mf, vlan_tci, vlan_tci);
         }
     } else {
-        /* We assume L3 packets are either IPv4 or IPv6. */
         packet->l3_ofs = 0;
         miniflow_pad_from_64(mf, base_layer);
         miniflow_push_uint8(mf, base_layer, LAYER_3);
