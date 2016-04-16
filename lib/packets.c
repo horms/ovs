@@ -260,6 +260,7 @@ set_ethertype(struct dp_packet *packet, ovs_be16 eth_type)
     struct eth_header *eh = dp_packet_l2(packet);
 
     if (!eh) {
+        packet->md.packet_ethertype = eth_type;
         return;
     }
 
