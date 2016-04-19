@@ -2958,10 +2958,8 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
     }
 
     if (xport->is_layer3) {
-        const struct xport *in_xport;
-
-        in_xport = get_ofp_port(ctx->xbridge, flow->in_port.ofp_port);
-        if (in_xport && !in_xport->is_layer3) {
+        if (flow->base_layer == LAYER_2) {
+            flow->base_layer = LAYER_3;
             odp_put_pop_eth_action(ctx->odp_actions);
         }
     } else if (flow->base_layer == LAYER_3) {
