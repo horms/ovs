@@ -5492,7 +5492,7 @@ odp_put_tnl_push_action(struct ofpbuf *odp_actions,
 
 /* The commit_odp_actions() function and its helpers. */
 
-void
+static void
 commit_set_action(struct ofpbuf *odp_actions, enum ovs_key_attr key_type,
                   const void *key, size_t key_size)
 {
