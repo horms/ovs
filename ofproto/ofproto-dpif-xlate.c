@@ -3599,6 +3599,12 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     struct ofproto_packet_in *pin;
     struct dp_packet *packet;
 
+    if (flow->base_layer == LAYER_3) {
+        flow->base_layer = LAYER_2;
+        odp_put_push_eth_action(ctx->odp_actions, &flow->dl_src,
+                                &flow->dl_dst, flow->dl_type);
+    }
+
     ctx->xout->slow |= SLOW_CONTROLLER;
     xlate_commit_actions(ctx);
     if (!ctx->xin->packet) {
@@ -3606,15 +3612,6 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     }
 
     packet = dp_packet_clone(ctx->xin->packet);
-
-    if (flow->base_layer == LAYER_3) {
-        /* Push ethernet header without setting flow->base_layer to LAYER_2
-         * because packet is a copy of the packet that has no relevance to
-         * subsequent action translation.
-         */
-        odp_put_push_eth_action(ctx->odp_actions, &flow->dl_src,
-                                &flow->dl_dst, flow->dl_type);
-    }
 
     odp_execute_actions(NULL, &packet, 1, false,
                         ctx->odp_actions->data, ctx->odp_actions->size, NULL);
