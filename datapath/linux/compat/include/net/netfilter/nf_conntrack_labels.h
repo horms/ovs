@@ -47,12 +47,14 @@ static inline void rpl_nf_connlabels_put(struct net *net)
 #define nf_connlabels_put rpl_nf_connlabels_put
 
 #else /* CONFIG_NF_CONNTRACK_LABELS */
-static inline int nf_connlabels_get(struct net *net, unsigned int bits)
+static inline int rpl_nf_connlabels_get(struct net *net, unsigned int bits)
 {
 	return -ERANGE;
 }
+#define nf_connlabels_get rpl_nf_connlabels_get
 
-static inline void nf_connlabels_put(struct net *net) { }
+static inline void rpl_nf_connlabels_put(struct net *net) { }
+#define nf_connlabels_put rpl_nf_connlabels_put
 #endif /* CONFIG_NF_CONNTRACK_LABELS */
 #endif /* HAVE_NF_CONNLABELS_GET_TAKES_BIT */
 #endif /* _NF_CONNTRACK_LABELS_WRAPPER_H */
