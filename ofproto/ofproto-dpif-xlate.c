@@ -3050,11 +3050,9 @@ compose_output_action__(struct xlate_ctx *ctx, ofp_port_t ofp_port,
     if (xport->is_layer3) {
         if (flow->base_layer == LAYER_2) {
             flow->base_layer = LAYER_3;
-            odp_put_pop_eth_action(ctx->odp_actions);
         }
     } else if (flow->base_layer == LAYER_3) {
         flow->base_layer = LAYER_2;
-        odp_put_push_eth_action(ctx->odp_actions, &flow->dl_src, &flow->dl_dst);
     }
 
     if (xport->peer) {
@@ -3691,6 +3689,10 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     struct dp_packet_batch batch;
     struct dp_packet *packet;
 
+    if (flow->base_layer == LAYER_3) {
+        flow->base_layer = LAYER_2;
+    }
+
     ctx->xout->slow |= SLOW_CONTROLLER;
     xlate_commit_actions(ctx);
     if (!ctx->xin->packet) {
@@ -3698,14 +3700,6 @@ execute_controller_action(struct xlate_ctx *ctx, int len,
     }
 
     packet = dp_packet_clone(ctx->xin->packet);
-
-    if (flow->base_layer == LAYER_3) {
-        /* Push ethernet header without setting flow->base_layer to LAYER_2
-         * because packet is a copy of the packet that has no relevance to
-         * subsequent action translation.
-         */
-        odp_put_push_eth_action(ctx->odp_actions, &flow->dl_src, &flow->dl_dst);
-    }
 
     packet_batch_init_packet(&batch, packet);
     odp_execute_actions(NULL, &batch, false,

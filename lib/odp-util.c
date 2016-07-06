@@ -5450,13 +5450,13 @@ odp_put_userspace_action(uint32_t pid,
     return userdata_ofs;
 }
 
-void
+static void
 odp_put_pop_eth_action(struct ofpbuf *odp_actions)
 {
     nl_msg_put_flag(odp_actions, OVS_ACTION_ATTR_POP_ETH);
 }
 
-void
+static void
 odp_put_push_eth_action(struct ofpbuf *odp_actions,
                         const struct eth_addr *eth_src,
                         const struct eth_addr *eth_dst)
@@ -5591,13 +5591,6 @@ commit_set_ether_addr_action(const struct flow *flow, struct flow *base_flow,
 {
     struct ovs_key_ethernet key, base, mask;
 
-    /* If we have a L3 --> L2 flow, the push_eth action takes care of setting
-     * the appropriate MAC source and destination addresses, no need to add a
-     * set action. */
-    if (base_flow->base_layer == LAYER_3 && flow->base_layer == LAYER_2) {
-        return;
-    }
-
     get_ethernet_key(flow, &key);
     get_ethernet_key(base_flow, &base);
     get_ethernet_key(&wc->masks, &mask);
@@ -5607,6 +5600,26 @@ commit_set_ether_addr_action(const struct flow *flow, struct flow *base_flow,
         put_ethernet_key(&base, base_flow);
         put_ethernet_key(&mask, &wc->masks);
     }
+}
+
+static void
+commit_ether_action(const struct flow *flow, struct flow *base_flow,
+                    struct ofpbuf *odp_actions, struct flow_wildcards *wc,
+                    bool use_masked)
+{
+    if (flow->base_layer != base_flow->base_layer) {
+        if (flow->base_layer == LAYER_2) {
+            odp_put_push_eth_action(odp_actions, &flow->dl_src, &flow->dl_dst);
+            base_flow->dl_src = flow->dl_src;
+            base_flow->dl_dst = flow->dl_dst;
+        } else {
+            odp_put_pop_eth_action(odp_actions);
+        }
+        base_flow->base_layer =  flow->base_layer;
+    }
+
+    commit_set_ether_addr_action(flow, base_flow, odp_actions, wc,
+                                 use_masked);
 }
 
 static void
@@ -6066,7 +6079,7 @@ commit_odp_actions(const struct flow *flow, struct flow *base,
 {
     enum slow_path_reason slow1, slow2;
 
-    commit_set_ether_addr_action(flow, base, odp_actions, wc, use_masked);
+    commit_ether_action(flow, base, odp_actions, wc, use_masked);
     slow1 = commit_set_nw_action(flow, base, odp_actions, wc, use_masked);
     commit_set_port_action(flow, base, odp_actions, wc, use_masked);
     slow2 = commit_set_icmp_action(flow, base, odp_actions, wc);
