@@ -56,7 +56,7 @@ m4_define([ADD_INT],
     ]
 )
 
-# ADD_VETH([port], [namespace], [ovs-br], [ip_addr] [mac_addr [gateway]])
+# ADD_VETH([port], [namespace], [ovs-br], [ip_addr] [mac_addr [gateway [ofport]]])
 #
 # Add a pair of veth ports. 'port' will be added to name space 'namespace',
 # and "ovs-'port'" will be added to ovs bridge 'ovs-br'.
@@ -64,8 +64,8 @@ m4_define([ADD_INT],
 # The 'port' in 'namespace' will be brought up with static IP address
 # with 'ip_addr' in CIDR notation.
 #
-# Optionally, one can specify the 'mac_addr' for 'port' and the default
-# 'gateway'.
+# Optionally, one can specify the 'mac_addr' for 'port', the default
+# 'gateway' and the 'ofport' number.
 #
 # The existing 'port' or 'ovs-port' will be removed before new ones are added.
 #
@@ -74,8 +74,14 @@ m4_define([ADD_VETH],
       CONFIGURE_VETH_OFFLOADS([$1])
       AT_CHECK([ip link set $1 netns $2])
       AT_CHECK([ip link set dev ovs-$1 up])
-      AT_CHECK([ovs-vsctl add-port $3 ovs-$1 -- \
-                set interface ovs-$1 external-ids:iface-id="$1"])
+      if test -n "$7"; then
+        AT_CHECK([ovs-vsctl add-port $3 ovs-$1 -- \
+                  set interface ovs-$1 external-ids:iface-id="$1" \
+                  ofport_request=$7])
+      else
+        AT_CHECK([ovs-vsctl add-port $3 ovs-$1 -- \
+                  set interface ovs-$1 external-ids:iface-id="$1"])
+      fi
       NS_CHECK_EXEC([$2], [ip addr add $4 dev $1])
       NS_CHECK_EXEC([$2], [ip link set dev $1 up])
       if test -n "$5"; then
@@ -99,7 +105,7 @@ m4_define([ADD_VLAN],
     ]
 )
 
-# ADD_OVS_TUNNEL([type], [bridge], [port], [remote-addr], [overlay-addr])
+# ADD_OVS_TUNNEL([type], [bridge], [port], [remote-addr], [overlay-addr [ofport]])
 #
 # Add an ovs-based tunnel device in the root namespace, with name 'port' and
 # type 'type'. The tunnel device will be configured as point-to-point with the
@@ -107,9 +113,17 @@ m4_define([ADD_VLAN],
 #
 # 'port will be configured with the address 'overlay-addr'.
 #
+# Optionally one can specify the 'ofport' number
+#
 m4_define([ADD_OVS_TUNNEL],
-   [AT_CHECK([ovs-vsctl add-port $2 $3 -- \
-              set int $3 type=$1 options:remote_ip=$4])
+   [if test -n "$6"; then
+      AT_CHECK([ovs-vsctl add-port $2 $3 -- \
+                set int $3 type=$1 options:remote_ip=$4 \
+		ofport_request=$6])
+    else
+      AT_CHECK([ovs-vsctl add-port $2 $3 -- \
+                set int $3 type=$1 options:remote_ip=$4])
+    fi
     AT_CHECK([ip addr add dev $2 $5])
     AT_CHECK([ip link set dev $2 up])
     AT_CHECK([ip link set dev $2 mtu 1450])
@@ -142,6 +156,12 @@ m4_define([ADD_NATIVE_TUNNEL],
 # Strip variant pieces from ping output so the output can be reliably compared.
 #
 m4_define([FORMAT_PING], [grep "transmitted" | sed 's/time.*ms$/time 0ms/'])
+
+# FORMAT_DD([])
+#
+# Strip variant pieces from dd output so the output can be reliably compared.
+#
+m4_define([FORMAT_DD], [sed 's/copied,.*$/copied, .../'])
 
 # FORMAT_CT([ip-addr])
 #

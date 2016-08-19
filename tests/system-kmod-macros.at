@@ -95,3 +95,25 @@ m4_define([CHECK_CONNTRACK_LOCAL_STACK])
 # always supports NAT, so no check is needed.
 #
 m4_define([CHECK_CONNTRACK_NAT])
+
+# CHECK_MPLS()
+#
+# Perform requirements checks for running MPLS tests.
+#
+m4_define([CHECK_MPLS],
+    [AT_SKIP_IF([test $HAVE_PYTHON = no])
+     m4_foreach([mod], [[mpls_router]],
+                [modprobe mod || echo "Module mod not loaded."
+                 on_exit 'modprobe -r mod'
+                ])
+     # Requires Linux v4.7+ and ip route v4.7+
+     AT_CHECK([# Prepare
+               echo 101 > /proc/sys/net/mpls/platform_labels || exit 77 # skip
+               ip -f mpls route del 100
+               # Test
+               ip -f mpls route add 100 dev lo && \
+               # Cleanup \
+               ip -f mpls route del 100 && \
+               echo 0 > /proc/sys/net/mpls/platform_labels || exit 77 #skip])
+    ]
+)

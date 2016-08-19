@@ -33,12 +33,27 @@ ADD_NAMESPACES(at_ns0, at_ns1)
 ADD_VETH(p0, at_ns0, br0, "10.1.1.1/24")
 ADD_VETH(p1, at_ns1, br0, "10.1.1.2/24")
 
+dnl Disable TSO as to exercise software segmentation
+dnl when outputting GSO skbs over GRE from OvS
+AT_CHECK([ethtool -K ovs-p0 tso off])
+
 NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], [dnl
 3 packets transmitted, 3 received, 0% packet loss, time 0ms
 ])
 
+AT_CHECK([yes | dd bs=1k count=32 of=32k.txt], [0], [], stderr)
+AT_CHECK([cat stderr | FORMAT_DD], [0], [dnl
+32+0 records in
+32+0 records out
+32768 bytes (33 kB) copied, ...
+])
 NETNS_DAEMONIZE([at_ns1], [[$PYTHON $srcdir/test-l7.py]], [http0.pid])
-NS_CHECK_EXEC([at_ns0], [wget 10.1.1.2 -t 3 -T 1 --retry-connrefused -v -o wget0.log])
+NS_CHECK_EXEC([at_ns0], [wget 10.1.1.2/32k.txt -t 3 -T 1 --retry-connrefused -v -o wget0.log])
+
+dnl Use the absence of retransmitted segments as a proxy for functioning TSO
+NS_CHECK_EXEC([at_ns1], [netstat -s | grep retransmited], [0], [dnl
+    0 segments retransmited
+])
 
 OVS_TRAFFIC_VSWITCHD_STOP
 AT_CLEANUP
@@ -64,6 +79,69 @@ NS_CHECK_EXEC([at_ns0], [ping -s 1600 -q -c 3 -i 0.3 -w 2 10.2.2.2 | FORMAT_PING
 ])
 NS_CHECK_EXEC([at_ns0], [ping -s 3200 -q -c 3 -i 0.3 -w 2 10.2.2.2 | FORMAT_PING], [0], [dnl
 3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+OVS_TRAFFIC_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([datapath - http over mpls between two ports])
+CHECK_MPLS()
+OVS_TRAFFIC_VSWITCHD_START()
+
+ADD_NAMESPACES(at_ns0, at_ns1)
+
+dnl Set up underlay
+ADD_VETH(p0, at_ns0, br0, "172.31.1.1/24", [], [], 2)
+ADD_VETH(p1, at_ns1, br0, "172.31.1.2/24", [], [], 3)
+
+dnl Set up MPLS overlay
+dnl IP is encapsulated in MPLS when sent from and recieved from ns0
+dnl OvS, sitting between ns0 and ns1 pushes MPLS onto IP recieved from ns1
+dnl befor sending to ns0, and pops MPLS recieved from ns0 and sends the
+dnl resulting IP packets to ns1
+NS_CHECK_EXEC([at_ns1], [ip addr add 10.1.1.2/24 dev p1])
+
+dnl push MPLS LSE on packets from p1 (ns1) to p0 (ns0)
+AT_CHECK([ovs-ofctl add-flow br0 "in_port=3,ip,nw_src=10.1.1.2,actions=push_mpls:0x8847,set_field:101->mpls_label,output:2"])
+
+dnl pop MPLS LSE from packets from p0 (ns0) to p1 (ns1)
+AT_CHECK([ovs-ofctl add-flow br0 "in_port=2,dl_type=0x8847,mpls_label=100,actions=pop_mpls:0x0800,output:3"])
+
+dnl Default to normal rule
+AT_CHECK([ovs-ofctl add-flow br0 "actions=normal"])
+
+dnl Allow MPLS forwarding of packets received on p0 in ns0
+NS_CHECK_EXEC([at_ns0], [echo 1 > /proc/sys/net/mpls/conf/p0/input])
+dnl Larger than MPLS label to be routed by ns0 (101)
+NS_CHECK_EXEC([at_ns0], [echo 102 > /proc/sys/net/mpls/platform_labels])
+
+dnl Set up route to encapsulate 10.1.1.0/24 packets in MPLS
+NS_CHECK_EXEC([at_ns0], [ip route add 10.1.1.0/24 encap mpls 100 via inet 172.31.1.2 dev p0])
+
+dnl Set up route to decapsulate MPLS label 101 and deliver locally
+NS_CHECK_EXEC([at_ns0], [ip -f mpls route add 101 dev lo])
+
+dnl Set loopback interface up for local delivery
+NS_CHECK_EXEC([at_ns0], [ip link set up dev lo])
+
+dnl Test ping
+NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2 | FORMAT_PING], [0], [dnl
+3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+dnl Test http
+AT_CHECK([yes | dd bs=1k count=32 of=32k.txt], [0], [], stderr)
+AT_CHECK([cat stderr | FORMAT_DD], [0], [dnl
+32+0 records in
+32+0 records out
+32768 bytes (33 kB) copied, ...
+])
+NETNS_DAEMONIZE([at_ns1], [[$PYTHON $srcdir/test-l7.py]], [http0.pid])
+NS_CHECK_EXEC([at_ns0], [wget 10.1.1.2/32k.txt -t 3 -T 1 --retry-connrefused -v -o wget0.log])
+
+dnl Use the absence of retransmitted segments as a proxy for functioning GSO
+NS_CHECK_EXEC([at_ns1], [netstat -s | grep retransmited], [0], [dnl
+    0 segments retransmited
 ])
 
 OVS_TRAFFIC_VSWITCHD_STOP
@@ -204,6 +282,151 @@ NS_CHECK_EXEC([at_ns0], [ping -s 1600 -q -c 3 -i 0.3 -w 2 10.1.1.100 | FORMAT_PI
 ])
 NS_CHECK_EXEC([at_ns0], [ping -s 3200 -q -c 3 -i 0.3 -w 2 10.1.1.100 | FORMAT_PING], [0], [dnl
 3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+AT_CHECK([yes | dd bs=1k count=32 of=32k.txt], [0], [], stderr)
+AT_CHECK([cat stderr | FORMAT_DD], [0], [dnl
+32+0 records in
+32+0 records out
+32768 bytes (33 kB) copied, ...
+])
+NETNS_DAEMONIZE([at_ns1], [[$PYTHON $srcdir/test-l7.py]], [http0.pid])
+NS_CHECK_EXEC([at_ns0], [wget 10.1.1.2/32k.txt -t 3 -T 1 --retry-connrefused -v -o wget0.log])
+
+OVS_TRAFFIC_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([datapath - http over gre tunnel])
+OVS_CHECK_GRE()
+
+OVS_TRAFFIC_VSWITCHD_START()
+ADD_BR([br-underlay])
+
+AT_CHECK([ovs-ofctl add-flow br0 "actions=normal"])
+AT_CHECK([ovs-ofctl add-flow br-underlay "actions=normal"])
+
+ADD_NAMESPACES(at_ns0, at_ns1)
+
+dnl Set up underlay link from host into the at_ns0 namespace using veth pair.
+ADD_VETH(p0, at_ns0, br-underlay, "172.31.1.1/24")
+AT_CHECK([ip addr add dev br-underlay "172.31.1.100/24"])
+AT_CHECK([ip link set dev br-underlay up])
+
+dnl Set up tunnel endpoints on OVS outside the at_ns0 namespace and
+dnl with a native linux device inside the namespace.
+ADD_OVS_TUNNEL([gre], [br0], [at_gre0], [172.31.1.1], [10.1.1.100/24])
+ADD_NATIVE_TUNNEL([gretap], [ns_gre0], [at_ns0], [172.31.1.100], [10.1.1.1/24])
+
+dnl Add veth pair connected to to br0 and at_ns1 namespace
+ADD_VETH(p1, at_ns1, br0, "10.1.1.2/24")
+
+dnl Disable TSO as to exercise software segmentation
+dnl when outputting GSO skbs over GRE from OvS
+AT_CHECK([ethtool -K ovs-p0 tso off])
+
+dnl First check the underlay
+NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 172.31.1.100 | FORMAT_PING], [0], [dnl
+3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+dnl Next check the overlay
+NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.1.2  | FORMAT_PING], [0], [dnl
+3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+dnl Now check HTTP transfer
+AT_CHECK([yes | dd bs=1k count=32 of=32k.txt], [0], [], stderr)
+AT_CHECK([cat stderr | FORMAT_DD], [0], [dnl
+32+0 records in
+32+0 records out
+32768 bytes (33 kB) copied, ...
+])
+NETNS_DAEMONIZE([at_ns1], [[$PYTHON $srcdir/test-l7.py]], [http0.pid])
+NS_CHECK_EXEC([at_ns0], [wget 10.1.1.2/32k.txt -t 3 -T 1 --retry-connrefused -v -o wget0.log])
+
+dnl Use the absence of retransmitted segments as a proxy for functioning TSO
+NS_CHECK_EXEC([at_ns1], [netstat -s | grep retransmited], [0], [dnl
+    0 segments retransmited
+])
+
+OVS_TRAFFIC_VSWITCHD_STOP
+AT_CLEANUP
+
+AT_SETUP([datapath - http over mpls over gre tunnel])
+OVS_CHECK_GRE()
+OVS_CHECK_MPLS()
+
+OVS_TRAFFIC_VSWITCHD_START()
+ADD_BR([br-underlay])
+
+ADD_NAMESPACES(at_ns0, at_ns1)
+
+dnl Set up underlay link from host into the at_ns0 namespace using veth pair.
+ADD_VETH(p0, at_ns0, br-underlay, "172.31.1.1/24")
+AT_CHECK([ip addr add dev br-underlay "172.31.1.100/24"])
+AT_CHECK([ip link set dev br-underlay up])
+
+dnl Set up tunnel endpoints on OVS outside the at_ns0 namespace and
+dnl with a native linux device inside the namespace.
+ADD_OVS_TUNNEL([gre], [br0], [at_gre0], [172.31.1.1], [10.1.1.100/24], 2)
+ADD_NATIVE_TUNNEL([gretap], [ns_gre0], [at_ns0], [172.31.1.100], [10.1.1.1/24])
+
+dnl Add veth pair connected to to br0 and at_ns1 namespace
+ADD_VETH(p1, at_ns1, br0, "10.1.1.2/24", [], [], 3)
+
+dnl Set up MPLS overlay
+dnl IP is encapsulated in MPLS when sent from and recieved from ns0
+dnl OvS, sitting between ns0 and ns1 pushes MPLS onto IP recieved from ns1
+dnl befor sending to ns0, and pops MPLS recieved from ns0 and sends the
+dnl resulting IP packets to ns1
+NS_CHECK_EXEC([at_ns1], [ip addr add 10.1.2.2/24 dev p1])
+
+dnl push MPLS LSE on packets from p1 (ns1) to p0 (ns0)
+AT_CHECK([ovs-ofctl add-flow br0 "in_port=3,ip,nw_src=10.1.2.2,actions=push_mpls:0x8847,set_field:101->mpls_label,output:2"])
+
+dnl pop MPLS LSE from packets from p0 (ns0) to p1 (ns1)
+AT_CHECK([ovs-ofctl add-flow br0 "in_port=2,dl_type=0x8847,mpls_label=100,actions=pop_mpls:0x0800,output:3"])
+
+AT_CHECK([ovs-ofctl add-flow br0 "actions=normal"])
+AT_CHECK([ovs-ofctl add-flow br-underlay "actions=normal"])
+
+dnl Allow MPLS forwarding of packets received on p0 in ns0
+NS_CHECK_EXEC([at_ns0], [echo 1 > /proc/sys/net/mpls/conf/ns_gre0/input])
+dnl Larger than MPLS label to be routed by ns0 (101)
+NS_CHECK_EXEC([at_ns0], [echo 102 > /proc/sys/net/mpls/platform_labels])
+
+dnl Set up route to encapsulate 10.1.2.0/24 packets in MPLS
+NS_CHECK_EXEC([at_ns0], [ip route add 10.1.2.0/24 encap mpls 100 via inet 10.1.1.2 dev ns_gre0])
+
+dnl Set up route to decapsulate MPLS label 101 and deliver locally
+NS_CHECK_EXEC([at_ns0], [ip -f mpls route add 101 dev lo])
+
+dnl Set loopback interface up for local delivery
+NS_CHECK_EXEC([at_ns0], [ip link set up dev lo])
+
+dnl First check the underlay
+NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 172.31.1.100 | FORMAT_PING], [0], [dnl
+3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+dnl Next check the overlay
+NS_CHECK_EXEC([at_ns0], [ping -q -c 3 -i 0.3 -w 2 10.1.2.2  | FORMAT_PING], [0], [dnl
+3 packets transmitted, 3 received, 0% packet loss, time 0ms
+])
+
+dnl Now check HTTP transfer
+AT_CHECK([yes | dd bs=1k count=32 of=32k.txt], [0], [], stderr)
+AT_CHECK([cat stderr | FORMAT_DD], [0], [dnl
+32+0 records in
+32+0 records out
+32768 bytes (33 kB) copied, ...
+])
+NETNS_DAEMONIZE([at_ns1], [[$PYTHON $srcdir/test-l7.py]], [http0.pid])
+NS_CHECK_EXEC([at_ns0], [wget 10.1.2.2/32k.txt -t 3 -T 1 --retry-connrefused -v -o wget0.log])
+
+dnl Use the absence of retransmitted segments as a proxy for functioning GSO
+NS_CHECK_EXEC([at_ns1], [netstat -s | grep retransmited], [0], [dnl
+    0 segments retransmited
 ])
 
 OVS_TRAFFIC_VSWITCHD_STOP
