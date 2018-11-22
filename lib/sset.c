@@ -23,6 +23,7 @@
 static uint32_t
 hash_name__(const char *name, size_t length)
 {
+	/*test*/
     return hash_bytes(name, length, 0);
 }
 
