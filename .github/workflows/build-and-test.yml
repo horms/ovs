@@ -148,12 +148,16 @@ jobs:
     - name: build
       run:  PATH="$PATH:$HOME/bin" ./.ci/linux-build.sh
 
+    - name: move deb packages
+      if:   matrix.deb_package != ''
+      run:  mv ../*.deb .
+
     - name: upload deb packages
       if:   matrix.deb_package != ''
       uses: actions/upload-artifact@v2
       with:
         name: deb-packages
-        path: '/home/runner/work/ovs/*.deb'
+        path: '${GITHUB_WORKSPACE}/*.deb'
 
     - name: copy logs on failure
       if: failure() || cancelled()
