@@ -1133,10 +1133,20 @@ static inline bool is_garp(const struct flow *flow,
                            struct flow_wildcards *wc)
 {
     if (is_arp(flow)) {
-        return (FLOW_WC_GET_AND_MASK_WC(flow, wc, nw_src) ==
-                FLOW_WC_GET_AND_MASK_WC(flow, wc, nw_dst));
-    }
+        if (!eth_addr_is_broadcast(FLOW_WC_GET_AND_MASK_WC(flow, wc, dl_dst))) {
+            return false;
+        }
 
+        if (wc) {
+            WC_MASK_FIELD(wc, nw_proto);
+        }
+
+        if (flow->nw_proto == ARP_OP_REQUEST ||
+            flow->nw_proto == ARP_OP_REPLY) {
+            return (FLOW_WC_GET_AND_MASK_WC(flow, wc, nw_src) ==
+                    FLOW_WC_GET_AND_MASK_WC(flow, wc, nw_dst));
+        }
+    }
     return false;
 }
 

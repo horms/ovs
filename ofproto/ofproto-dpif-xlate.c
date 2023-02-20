@@ -2543,34 +2543,6 @@ output_normal(struct xlate_ctx *ctx, const struct xbundle *out_xbundle,
     memcpy(&ctx->xin->flow.vlans, &old_vlans, sizeof(old_vlans));
 }
 
-/* A VM broadcasts a gratuitous ARP to indicate that it has resumed after
- * migration.  Older Citrix-patched Linux DomU used gratuitous ARP replies to
- * indicate this; newer upstream kernels use gratuitous ARP requests. */
-static bool
-is_gratuitous_arp(const struct flow *flow, struct flow_wildcards *wc)
-{
-    if (flow->dl_type != htons(ETH_TYPE_ARP)) {
-        return false;
-    }
-
-    memset(&wc->masks.dl_dst, 0xff, sizeof wc->masks.dl_dst);
-    if (!eth_addr_is_broadcast(flow->dl_dst)) {
-        return false;
-    }
-
-    memset(&wc->masks.nw_proto, 0xff, sizeof wc->masks.nw_proto);
-    if (flow->nw_proto == ARP_OP_REPLY) {
-        return true;
-    } else if (flow->nw_proto == ARP_OP_REQUEST) {
-        memset(&wc->masks.nw_src, 0xff, sizeof wc->masks.nw_src);
-        memset(&wc->masks.nw_dst, 0xff, sizeof wc->masks.nw_dst);
-
-        return flow->nw_src == flow->nw_dst;
-    } else {
-        return false;
-    }
-}
-
 /* Determines whether packets in 'flow' within 'xbridge' should be forwarded or
  * dropped.  Returns true if they may be forwarded, false if they should be
  * dropped.
@@ -2619,7 +2591,7 @@ is_admissible(struct xlate_ctx *ctx, struct xport *in_port,
             mac = mac_learning_lookup(xbridge->ml, flow->dl_src, vlan);
             if (mac
                 && mac_entry_get_port(xbridge->ml, mac) != in_xbundle->ofbundle
-                && (!is_gratuitous_arp(flow, ctx->wc)
+                && (!is_garp(flow, ctx->wc)
                     || mac_entry_is_grat_arp_locked(mac))) {
                 ovs_rwlock_unlock(&xbridge->ml->rwlock);
                 xlate_report(ctx, OFT_DETAIL,
@@ -3062,7 +3034,7 @@ xlate_normal(struct xlate_ctx *ctx)
     }
 
     /* Learn source MAC. */
-    bool is_grat_arp = is_gratuitous_arp(flow, wc);
+    bool is_grat_arp = is_garp(flow, wc);
     if (ctx->xin->allow_side_effects
         && flow->packet_type == htonl(PT_ETH)
         && in_port && in_port->pt_mode != NETDEV_PT_LEGACY_L3
