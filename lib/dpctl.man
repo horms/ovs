@@ -382,6 +382,14 @@ Prints whether TCP sequence checking is enabled or disabled on \fIdp\fR.  Only
 supported for the userspace datapath.
 .
 .TP
+\*(DX\fBct\-sweep\-set\-next\-run\fR [\fIdp\fR] \fIms\fR
+Sets the next sweep interval. Only supported for the userspace datapath.
+.
+.TP
+\*(DX\fBct\-sweep\-get\-next\-run\fR [\fIdp\fR]
+Prints the current sweep interval. Only supported for the userspace datapath.
+.
+.TP
 \*(DX\fBct\-set\-limits\fR [\fIdp\fR] [\fBdefault=\fIdefault_limit\fR] [\fBzone=\fIzone\fR,\fBlimit=\fIlimit\fR]...
 Sets the maximum allowed number of connections in a connection tracking
 zone.  A specific \fIzone\fR may be set to \fIlimit\fR, and multiple zones
