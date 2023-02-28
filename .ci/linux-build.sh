@@ -159,7 +159,7 @@ fi
 
 OPTS="${EXTRA_OPTS} ${OPTS} $*"
 
-if [ "$TESTSUITE" ]; then
+if [ "$TESTSUITE" = 'test' ]; then
     # 'distcheck' will reconfigure with required options.
     # Now we only need to prepare the Makefile without sparse-wrapped CC.
     configure_ovs
@@ -169,6 +169,10 @@ if [ "$TESTSUITE" ]; then
         TESTSUITEFLAGS=-j4 RECHECK=yes
 else
     build_ovs
+    if [ -n "$TESTSUITE" ]; then
+        sudo -E PATH="$PATH" make "$TESTSUITE" TESTSUITEFLAGS="$TEST_OPTS" \
+            RECHECK=yes
+    fi
 fi
 
 exit 0

@@ -17,6 +17,7 @@ jobs:
       OPTS:        ${{ matrix.opts }}
       SANITIZERS:  ${{ matrix.sanitizers }}
       TESTSUITE:   ${{ matrix.testsuite }}
+      TEST_OPTS:   ${{ matrix.test_opts }}
 
     name: linux ${{ join(matrix.*, ' ') }}
     runs-on: ubuntu-22.04
@@ -86,6 +87,10 @@ jobs:
             m32:          m32
             opts:         --disable-ssl
 
+          - compiler:     gcc
+            testsuite:    check-offloads
+            test_opts:    "-k !github_offloads_skip"
+
     steps:
     - name: checkout
       uses: actions/checkout@v3
@@ -147,7 +152,10 @@ jobs:
         # So, we're just archiving everything here to avoid any issues.
         mkdir logs
         cp config.log ./logs/
-        cp -r ./*/_build/sub/tests/testsuite.* ./logs/ || true
+        sudo chown -R $USER ./tests/testsuite.* \
+                            ./tests/system-offloads-testsuite.* || true
+        cp -r ./tests/testsuite.* ./logs/ || true
+        cp -r ./tests/system-offloads-testsuite.* ./logs/ || true
         tar -czvf logs.tgz logs/
 
     - name: upload logs on failure

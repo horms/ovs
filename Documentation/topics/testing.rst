@@ -114,6 +114,22 @@ And from another window, one can execute ovs-xxx commands like::
 
 Once done with investigation, press ENTER to perform cleanup operation.
 
+GitHub actions
+++++++++++++++
+The OVS GitHub repository also runs some of these unit tests through GitHub
+actions. These tests are defined in the
+``ovs/.github/workflows/build-and-test.yml`` file.
+
+Based on the GitHub runners available, not all tests will work. In these cases,
+the AT_KEYWORDS() macro can be used. For example, to skip a
+``make check-offloads`` test, use the ``github_offloads_skip`` keyword.
+
+Only use these keywords if no other way to skip the test is available.
+
+To see a list of currently skipped tests, you can do something like::
+
+    $ make check-offloads TESTSUITEFLAGS="-l" | grep -B 1 github_offloads_skip
+
 .. _testing-coverage:
 
 Coverage
