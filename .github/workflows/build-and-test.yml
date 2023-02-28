@@ -9,18 +9,17 @@ jobs:
         automake libtool gcc bc libjemalloc2 libjemalloc-dev    \
         libssl-dev llvm-dev libelf-dev libnuma-dev libpcap-dev  \
         ninja-build selinux-policy-dev libbpf-dev
-      ASAN:        ${{ matrix.asan }}
-      UBSAN:       ${{ matrix.ubsan }}
       CC:          ${{ matrix.compiler }}
       DPDK:        ${{ matrix.dpdk }}
       DPDK_SHARED: ${{ matrix.dpdk_shared }}
       LIBS:        ${{ matrix.libs }}
       M32:         ${{ matrix.m32 }}
       OPTS:        ${{ matrix.opts }}
+      SANITIZERS:  ${{ matrix.sanitizers }}
       TESTSUITE:   ${{ matrix.testsuite }}
 
     name: linux ${{ join(matrix.*, ' ') }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 30
 
     strategy:
@@ -36,10 +35,7 @@ jobs:
             testsuite:    test
           - compiler:     clang
             testsuite:    test
-            asan:         asan
-          - compiler:     clang
-            testsuite:    test
-            ubsan:        ubsan
+            sanitizers:   sanitizers
 
           - compiler:     gcc
             testsuite:    test
