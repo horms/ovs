@@ -61,7 +61,8 @@ int ofputil_decode_meter_config(struct ofpbuf *,
                                 struct ofputil_meter_config *,
                                 struct ofpbuf *bands);
 void ofputil_format_meter_config(struct ds *,
-                                 const struct ofputil_meter_config *);
+                                 const struct ofputil_meter_config *,
+                                 int);
 
 struct ofputil_meter_mod {
     uint16_t command;
@@ -78,6 +79,11 @@ char *parse_ofp_meter_mod_str(struct ofputil_meter_mod *, const char *string,
                               enum ofputil_protocol *usable_protocols)
     OVS_WARN_UNUSED_RESULT;
 void ofputil_format_meter_mod(struct ds *, const struct ofputil_meter_mod *);
+
+char *parse_ofp_meter_mod_file(const char *file_name, int command,
+                               struct ofputil_meter_mod **mms, size_t *n_mms,
+                               enum ofputil_protocol *usable_protocols)
+    OVS_WARN_UNUSED_RESULT;
 
 struct ofputil_meter_stats {
     uint32_t meter_id;

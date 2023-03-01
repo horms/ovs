@@ -157,6 +157,9 @@ static int print_pcap = 0;
 /* --raw: Makes "ofp-print" read binary data from stdin. */
 static int raw = 0;
 
+/* --oneline: show meter config in a single line. */
+static int oneline = 0;
+
 static const struct ovs_cmdl_command *get_all_commands(void);
 
 OVS_NO_RETURN static void usage(void);
@@ -245,6 +248,7 @@ parse_options(int argc, char *argv[])
         {"pcap", no_argument, &print_pcap, 1},
         {"raw", no_argument, &raw, 1},
         {"read-only", no_argument, NULL, OPT_READ_ONLY},
+        {"oneline", no_argument, &oneline, 1},
         DAEMON_LONG_OPTIONS,
         OFP_VERSION_LONG_OPTIONS,
         VLOG_LONG_OPTIONS,
@@ -475,9 +479,10 @@ usage(void)
            "  dump-group-stats SWITCH [GROUP]  print group statistics\n"
            "  queue-get-config SWITCH [PORT]  print queue config for PORT\n"
            "  add-meter SWITCH METER      add meter described by METER\n"
+           "  add-meters SWITCH FILE      add meters from FILE\n"
            "  mod-meter SWITCH METER      modify specific METER\n"
            "  del-meters SWITCH [METER]   delete meters matching METER\n"
-           "  dump-meters SWITCH [METER]  print METER configuration\n"
+           "  dump-meters SWITCH [METER]  print METER entries\n"
            "  meter-stats SWITCH [METER]  print meter statistics\n"
            "  meter-features SWITCH       print meter features\n"
            "  add-tlv-map SWITCH MAP      add TLV option MAPpings\n"
@@ -515,6 +520,7 @@ usage(void)
            "  --rsort[=field]             sort in descending order\n"
            "  --names                     show port names instead of numbers\n"
            "  --no-names                  show port numbers, but not names\n"
+           "  --oneline                   show meter bands in a single line\n"
            "  --unixctl=SOCKET            set control socket name\n"
            "  --color[=always|never|auto] control use of color in output\n"
            "  -h, --help                  display this help message\n"
@@ -1443,7 +1449,7 @@ set_protocol_for_flow_dump(struct vconn *vconn,
     if (usable_protocols & allowed_protocols) {
         ovs_fatal(0, "switch does not support any of the usable flow "
                   "formats (%s)", usable_s);
-} else {
+    } else {
         char *allowed_s = ofputil_protocols_to_string(allowed_protocols);
         ovs_fatal(0, "none of the usable flow formats (%s) is among the "
                   "allowed flow formats (%s)", usable_s, allowed_s);
@@ -4080,57 +4086,107 @@ ofctl_diff_flows(struct ovs_cmdl_context *ctx)
 }
 
 static void
-ofctl_meter_mod__(const char *bridge, const char *str, int command)
+ofctl_meter_mod__(const char *remote, struct ofputil_meter_mod *mms,
+                  size_t n_mms, enum ofputil_protocol usable_protocols)
 {
-    struct ofputil_meter_mod mm;
+    struct ofputil_meter_mod *mm;
     struct vconn *vconn;
     enum ofputil_protocol protocol;
-    enum ofputil_protocol usable_protocols;
     enum ofp_version version;
+    struct ofpbuf *request;
+    size_t i;
 
-    memset(&mm, 0, sizeof mm);
+    protocol = open_vconn_for_flow_mod(remote, &vconn, usable_protocols);
+    version = ofputil_protocol_to_ofp_version(protocol);
+
+     for (i = 0; i < n_mms; i++) {
+        mm = &mms[i];
+        request = ofputil_encode_meter_mod(version, mm);
+        transact_noreply(vconn, request);
+        free(mm->meter.bands);
+    }
+
+    vconn_close(vconn);
+}
+
+static void
+ofctl_meter_mod_file(int argc OVS_UNUSED, char *argv[], int command)
+{
+    enum ofputil_protocol usable_protocols;
+    struct ofputil_meter_mod *mms = NULL;
+    size_t n_mms = 0;
+    char *error;
+
+    if (command == OFPMC13_ADD) {
+        /* Allow the file to specify a mix of commands. If none specified at
+         * the beginning of any given line, then the default is OFPMC13_ADD, so
+         * this is backwards compatible. */
+        command = -2;
+    }
+    error = parse_ofp_meter_mod_file(argv[2], command,
+                                     &mms, &n_mms, &usable_protocols);
+    if (error) {
+        ovs_fatal(0, "%s", error);
+    }
+    ofctl_meter_mod__(argv[1], mms, n_mms, usable_protocols);
+    free(mms);
+}
+
+static void
+ofctl_meter_mod(int argc, char *argv[], uint16_t command)
+{
+    if (argc > 2 && !strcmp(argv[2], "-")) {
+        ofctl_meter_mod_file(argc, argv, command);
+    } else {
+        enum ofputil_protocol usable_protocols;
+        struct ofputil_meter_mod mm;
+        char *error;
+        memset(&mm, 0, sizeof mm);
+        error = parse_ofp_meter_mod_str(&mm, argc > 2 ? argv[2] : "", command,
+                                        &usable_protocols);
+        if (error) {
+            ovs_fatal(0, "%s", error);
+        }
+        ofctl_meter_mod__(argv[1], &mm, 1, usable_protocols);
+    }
+}
+static struct vconn *
+prepare_dump_meters(const char *bridge, const char *str,
+                    struct ofputil_meter_mod *mm,
+                    enum ofputil_protocol *protocolp)
+{
+    struct vconn *vconn;
+    enum ofputil_protocol usable_protocols;
+    enum ofputil_protocol protocol;
+
     if (str) {
         char *error;
-        error = parse_ofp_meter_mod_str(&mm, str, command, &usable_protocols);
+        error = parse_ofp_meter_mod_str(mm, str, -1, &usable_protocols);
         if (error) {
             ovs_fatal(0, "%s", error);
         }
     } else {
         usable_protocols = OFPUTIL_P_OF13_UP;
-        mm.command = command;
-        mm.meter.meter_id = OFPM13_ALL;
+        mm->meter.meter_id = OFPM13_ALL;
     }
 
-    protocol = open_vconn_for_flow_mod(bridge, &vconn, usable_protocols);
-    version = ofputil_protocol_to_ofp_version(protocol);
-    transact_noreply(vconn, ofputil_encode_meter_mod(version, &mm));
-    free(mm.meter.bands);
-    vconn_close(vconn);
+    protocol = open_vconn(bridge, &vconn);
+    *protocolp = set_protocol_for_flow_dump(vconn, protocol, usable_protocols);
+    return vconn;
 }
+
 
 static void
 ofctl_meter_request__(const char *bridge, const char *str,
                       enum ofputil_meter_request_type type)
 {
     struct ofputil_meter_mod mm;
-    struct vconn *vconn;
-    enum ofputil_protocol usable_protocols;
     enum ofputil_protocol protocol;
+    struct vconn *vconn;
     enum ofp_version version;
 
     memset(&mm, 0, sizeof mm);
-    if (str) {
-        char *error;
-        error = parse_ofp_meter_mod_str(&mm, str, -1, &usable_protocols);
-        if (error) {
-            ovs_fatal(0, "%s", error);
-        }
-    } else {
-        usable_protocols = OFPUTIL_P_OF13_UP;
-        mm.meter.meter_id = OFPM13_ALL;
-    }
-
-    protocol = open_vconn_for_flow_mod(bridge, &vconn, usable_protocols);
+    vconn = prepare_dump_meters(bridge, str, &mm, &protocol);
     version = ofputil_protocol_to_ofp_version(protocol);
     dump_transaction(vconn, ofputil_encode_meter_request(version, type,
                                                          mm.meter.meter_id));
@@ -4138,30 +4194,188 @@ ofctl_meter_request__(const char *bridge, const char *str,
     vconn_close(vconn);
 }
 
-
 static void
 ofctl_add_meter(struct ovs_cmdl_context *ctx)
 {
-    ofctl_meter_mod__(ctx->argv[1], ctx->argv[2], OFPMC13_ADD);
+    ofctl_meter_mod(ctx->argc, ctx->argv, OFPMC13_ADD);
+}
+
+static void
+ofctl_add_meters(struct ovs_cmdl_context *ctx)
+{
+    ofctl_meter_mod_file(ctx->argc, ctx->argv, OFPMC13_ADD);
 }
 
 static void
 ofctl_mod_meter(struct ovs_cmdl_context *ctx)
 {
-    ofctl_meter_mod__(ctx->argv[1], ctx->argv[2], OFPMC13_MODIFY);
+    ofctl_meter_mod(ctx->argc, ctx->argv, OFPMC13_MODIFY);
 }
 
 static void
 ofctl_del_meters(struct ovs_cmdl_context *ctx)
 {
-    ofctl_meter_mod__(ctx->argv[1], ctx->argc > 2 ? ctx->argv[2] : NULL, OFPMC13_DELETE);
+    ofctl_meter_mod(ctx->argc, ctx->argv, OFPMC13_DELETE);
+}
+
+static void
+ofctl_dump_meters__(struct ovs_cmdl_context *ctx)
+{
+    ofctl_meter_request__(ctx->argv[1], ctx->argc > 2 ? ctx->argv[2] : NULL,
+                          OFPUTIL_METER_CONFIG);
+}
+
+static int
+recv_meter_stats_reply(struct vconn *vconn, ovs_be32 send_xid,
+                       struct ofpbuf **replyp,
+                       struct ofputil_meter_config *mc, struct ofpbuf *bands)
+{
+    static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(5, 5);
+    struct ofpbuf *reply = *replyp;
+
+    for (;;) {
+        int retval;
+        bool more;
+
+        if (!reply) {
+            enum ofptype type;
+            enum ofperr error;
+
+            do {
+                error = vconn_recv_block(vconn, &reply);
+                if (error) {
+                    return error;
+                }
+            } while (((struct ofp_header *) reply->data)->xid != send_xid);
+
+            error = ofptype_decode(&type, reply->data);
+            if (error || type != OFPTYPE_METER_CONFIG_STATS_REPLY) {
+                VLOG_WARN_RL(&rl, "received bad reply: %s",
+                             ofp_to_string(reply->data, reply->size,
+                                           NULL, NULL, 1));
+                return EPROTO;
+            }
+        }
+
+        /* Pull an individual meter reply out of the message. */
+        retval = ofputil_decode_meter_config(reply, mc, bands);
+        switch (retval) {
+        case 0:
+            *replyp = reply;
+            return 0;
+
+        case EOF:
+            more = ofpmp_more(reply->header);
+            ofpbuf_delete(reply);
+            reply = NULL;
+            if (!more) {
+                *replyp = NULL;
+                return EOF;
+            }
+            break;
+
+        default:
+            VLOG_WARN_RL(&rl, "parse error in reply (%s)",
+                         ofperr_to_string(retval));
+            return EPROTO;
+        }
+    }
+}
+
+static int
+vconn_dump_meters(struct vconn *vconn,
+                 struct ofpbuf *request,
+                 struct ofputil_meter_config **mcsp, size_t *n_mcsp)
+{
+    struct ofputil_meter_config *mcs = NULL;
+    size_t n_mcs = 0;
+    size_t allocated_mcs = 0;
+
+    const struct ofp_header *oh = request->data;
+    ovs_be32 send_xid = oh->xid;
+    int error = vconn_send_block(vconn, request);
+    if (error) {
+        goto exit;
+    }
+
+    struct ofpbuf *reply = NULL;
+    struct ofpbuf bands;
+    ofpbuf_init(&bands, 64);
+    for (;;) {
+        if (n_mcs >= allocated_mcs) {
+            mcs = x2nrealloc(mcs, &allocated_mcs, sizeof *mcs);
+        }
+
+        struct ofputil_meter_config *mc = &mcs[n_mcs];
+        error = recv_meter_stats_reply(vconn, send_xid, &reply, mc, &bands);
+        if (error) {
+            if (error == EOF) {
+                error = 0;
+            }
+            break;
+        }
+        mc->bands = xmemdup(mc->bands, mc->n_bands * sizeof(mc->bands[0]));
+        n_mcs++;
+    }
+    ofpbuf_uninit(&bands);
+    ofpbuf_delete(reply);
+
+    if (error) {
+        for (size_t i = 0; i < n_mcs; i++) {
+            free(CONST_CAST(struct ofputil_meter_band *, mcs[i].bands));
+        }
+        free(mcs);
+
+        mcs = NULL;
+        n_mcs = 0;
+    }
+
+exit:
+    *mcsp = mcs;
+    *n_mcsp = n_mcs;
+    return error;
 }
 
 static void
 ofctl_dump_meters(struct ovs_cmdl_context *ctx)
 {
-    ofctl_meter_request__(ctx->argv[1], ctx->argc > 2 ? ctx->argv[2] : NULL,
-                          OFPUTIL_METER_CONFIG);
+    if (!oneline) {
+        ofctl_dump_meters__(ctx);
+    } else {
+        struct ofputil_meter_mod mm;
+        struct vconn *vconn;
+        enum ofputil_protocol protocol;
+        enum ofp_version version;
+
+        memset(&mm, 0, sizeof mm);
+        const char *bridge = ctx->argv[1];
+        const char *str = ctx->argc > 2 ? ctx->argv[2] : NULL;
+
+        vconn = prepare_dump_meters(bridge, str, &mm, &protocol);
+        version = ofputil_protocol_to_ofp_version(protocol);
+        struct ofpbuf *request = ofputil_encode_meter_request(version,
+                        OFPUTIL_METER_CONFIG, mm.meter.meter_id);
+
+        struct ofputil_meter_config *mcs;
+        size_t n_mtrs;
+        run(vconn_dump_meters(vconn, request, &mcs, &n_mtrs),
+            "dump meters");
+
+        struct ds s = DS_EMPTY_INITIALIZER;
+        for (size_t i = 0; i < n_mtrs; i ++) {
+            ds_clear(&s);
+            ofputil_format_meter_config(&s, &mcs[i], 1);
+            printf("%s\n", ds_cstr(&s));
+        }
+        ds_destroy(&s);
+
+        for (size_t i = 0; i < n_mtrs; i ++) {
+            free(CONST_CAST(struct ofputil_meter_band *, mcs[i].bands));
+        }
+        free(mcs);
+        free(mm.meter.bands);
+        vconn_close(vconn);
+    }
 }
 
 static void
@@ -5068,15 +5282,17 @@ static const struct ovs_cmdl_command all_commands[] = {
       2, 2, ofctl_diff_flows, OVS_RW },
     { "add-meter", "switch meter",
       2, 2, ofctl_add_meter, OVS_RW },
+    { "add-meters", "switch file",
+      2, 2, ofctl_add_meters, OVS_RW },
     { "mod-meter", "switch meter",
       2, 2, ofctl_mod_meter, OVS_RW },
-    { "del-meter", "switch meter",
+    { "del-meter", "switch [meter]",
       1, 2, ofctl_del_meters, OVS_RW },
     { "del-meters", "switch",
       1, 2, ofctl_del_meters, OVS_RW },
     { "dump-meter", "switch meter",
       1, 2, ofctl_dump_meters, OVS_RO },
-    { "dump-meters", "switch",
+    { "dump-meters", "switch [meter]",
       1, 2, ofctl_dump_meters, OVS_RO },
     { "meter-stats", "switch [meter]",
       1, 2, ofctl_meter_stats, OVS_RO },

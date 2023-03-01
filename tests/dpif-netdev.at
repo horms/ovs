@@ -298,6 +298,15 @@ meter=2 kbps burst stats bands=
 type=drop rate=1 burst_size=2
 ])
 
+AT_CHECK([ovs-ofctl -O OpenFlow13 dump-meters br0 --oneline], [0], [dnl
+meter=1 pktps burst stats bands= type=drop rate=1 burst_size=1
+meter=2 kbps burst stats bands= type=drop rate=1 burst_size=2
+])
+
+AT_CHECK([ovs-ofctl -O OpenFlow13 dump-meters br0 meter=1 --oneline], [0], [dnl
+meter=1 pktps burst stats bands= type=drop rate=1 burst_size=1
+])
+
 ovs-appctl time/warp 5000
 for i in `seq 1 7`; do
   AT_CHECK(
