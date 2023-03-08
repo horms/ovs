@@ -2279,6 +2279,7 @@ OVS_TRAFFIC_VSWITCHD_STOP
 AT_CLEANUP
 
 AT_SETUP([conntrack - force commit])
+AT_KEYWORDS([github_offloads_skip])
 CHECK_CONNTRACK()
 OVS_TRAFFIC_VSWITCHD_START()
 AT_CHECK([ovs-appctl vlog/set dpif:dbg dpif_netdev:dbg ofproto_dpif_upcall:dbg])
@@ -7228,6 +7229,7 @@ OVS_TRAFFIC_VSWITCHD_STOP
 AT_CLEANUP
 
 AT_SETUP([conntrack - Multiple ICMP traverse])
+AT_KEYWORDS([github_offloads_skip])
 dnl This tracks sending ICMP packets via conntrack multiple times for the
 dnl same packet
 CHECK_CONNTRACK()
