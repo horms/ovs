@@ -191,6 +191,7 @@ AT_CLEANUP
 
 AT_SETUP([offloads - check interface meter offloading -  offloads disabled])
 AT_KEYWORDS([dp-meter])
+AT_KEYWORDS([github_offloads_skip])
 AT_SKIP_IF([test $HAVE_NC = "no"])
 OVS_TRAFFIC_VSWITCHD_START()
 
@@ -240,6 +241,7 @@ AT_CLEANUP
 
 AT_SETUP([offloads - check interface meter offloading -  offloads enabled])
 AT_KEYWORDS([offload-meter])
+AT_KEYWORDS([github_offloads_skip])
 AT_SKIP_IF([test $SUPPORT_TC_INGRESS_PPS = "no"])
 AT_SKIP_IF([test $HAVE_NC = "no"])
 OVS_TRAFFIC_VSWITCHD_START([], [], [-- set Open_vSwitch . other_config:hw-offload=true])
@@ -348,6 +350,7 @@ AT_CLEANUP
 
 
 AT_SETUP([offloads - check_pkt_len action - offloads enabled])
+AT_KEYWORDS([github_offloads_skip])
 OVS_TRAFFIC_VSWITCHD_START([], [], [-- set Open_vSwitch . other_config:hw-offload=true])
 
 ADD_NAMESPACES(at_ns1, at_ns2, at_ns3, at_ns4)
