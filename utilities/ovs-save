@@ -139,6 +139,9 @@ save_flows () {
         echo "ovs-ofctl -O $ofp_version add-groups ${bridge} \
               \"$workdir/$bridge.groups.dump\" ${bundle}"
 
+        echo "ovs-ofctl -O $ofp_version add-meters ${bridge} \
+              \"$workdir/$bridge.meters.dump\""
+
         echo "ovs-ofctl -O $ofp_version replace-flows ${bridge} \
               \"$workdir/$bridge.flows.dump\" ${bundle}"
 
@@ -146,6 +149,11 @@ save_flows () {
             sed -e '/^OFPST_GROUP_DESC/d' \
                 -e '/^NXST_GROUP_DESC/d' > \
                 "$workdir/$bridge.groups.dump"
+
+        ovs-ofctl -O $ofp_version dump-meters "$bridge" --oneline | \
+            sed -e '/^OFPST_METER_CONFIG/d' \
+                -e '/^NXST_METER_CONFIG/d' > \
+                "$workdir/$bridge.meters.dump"
 
         ovs-ofctl -O $ofp_version dump-flows --no-names --no-stats "$bridge" | \
             sed -e '/NXST_FLOW/d' \
