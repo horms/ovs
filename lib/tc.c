@@ -3341,13 +3341,16 @@ nl_msg_put_flower_acts(struct ofpbuf *request, struct tc_flower *flower)
                     }
                     action->jump_action = JUMP_ACTION_STOP;
                 } else {
-                    if (ingress) {
-                        nl_msg_put_act_mirred(request, ifindex, action_pc,
-                                              TCA_INGRESS_MIRROR);
+                    int out_action;
+
+                    if (action_pc == TC_ACT_STOLEN) {
+                        out_action = TCA_EGRESS_REDIR;
                     } else {
-                        nl_msg_put_act_mirred(request, ifindex, action_pc,
-                                              TCA_EGRESS_MIRROR);
+                        out_action = TCA_EGRESS_MIRROR;
                     }
+
+                    nl_msg_put_act_mirred(request, ifindex, action_pc,
+                                          out_action);
                 }
                 nl_msg_put_act_cookie(request, &flower->act_cookie);
                 nl_msg_put_act_flags(request);
