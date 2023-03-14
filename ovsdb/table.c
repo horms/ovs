@@ -158,7 +158,7 @@ ovsdb_table_schema_from_json(const struct json *json, const char *name,
         n_max_rows = UINT_MAX;
     }
 
-    if (shash_is_empty(json_object(columns))) {
+    if (!columns || shash_is_empty(json_object(columns))) {
         return ovsdb_syntax_error(json, NULL,
                                   "table must have at least one column");
     }

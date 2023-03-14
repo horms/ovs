@@ -152,15 +152,24 @@ void sfl_agent_tick(SFLAgent *agent, time_t now)
 
 SFLReceiver *sfl_agent_addReceiver(SFLAgent *agent)
 {
-    SFLReceiver *rcv = (SFLReceiver *)sflAlloc(agent, sizeof(SFLReceiver));
-    sfl_receiver_init(rcv, agent);
-    /* add to end of list - to preserve the receiver index numbers for existing receivers */
-    {
-	SFLReceiver *r, *prev = NULL;
-	for(r = agent->receivers; r != NULL; prev = r, r = r->nxt);
-	if(prev) prev->nxt = rcv;
-	else agent->receivers = rcv;
-	rcv->nxt = NULL;
+    SFLReceiver *rcv = (SFLReceiver *) sflAlloc(agent, sizeof(SFLReceiver));
+    if (rcv) {
+        sfl_receiver_init(rcv, agent);
+        /* add to end of list - to preserve the receiver index numbers for
+         * existing receivers
+         */
+        {
+            SFLReceiver *r, *prev = NULL;
+            for (r = agent->receivers; r != NULL; prev = r, r = r->nxt) {
+                /* nothing to do */
+            }
+            if (prev) {
+                prev->nxt = rcv;
+            } else {
+                agent->receivers = rcv;
+            }
+            rcv->nxt = NULL;
+        }
     }
     return rcv;
 }
@@ -202,23 +211,35 @@ SFLSampler *sfl_agent_addSampler(SFLAgent *agent, SFLDataSource_instance *pdsi)
     /* either we found the insert point, or reached the end of the list...*/
 
     {
-	SFLSampler *newsm = (SFLSampler *)sflAlloc(agent, sizeof(SFLSampler));
-	sfl_sampler_init(newsm, agent, pdsi);
-	if(prev) prev->nxt = newsm;
-	else agent->samplers = newsm;
-	newsm->nxt = sm;
+        SFLSampler *newsm = (SFLSampler *) sflAlloc(agent, sizeof(SFLSampler));
+        if (newsm) {
+            memset(newsm, 0, sizeof(*newsm));
+            sfl_sampler_init(newsm, agent, pdsi);
+            if (prev) {
+                prev->nxt = newsm;
+            } else {
+                agent->samplers = newsm;
+            }
+            newsm->nxt = sm;
 
-	/* see if we should go in the ifIndex jumpTable */
-	if(SFL_DS_CLASS(newsm->dsi) == 0) {
-	    SFLSampler *test = sfl_agent_getSamplerByIfIndex(agent, SFL_DS_INDEX(newsm->dsi));
-	    if(test && (SFL_DS_INSTANCE(newsm->dsi) < SFL_DS_INSTANCE(test->dsi))) {
-		/* replace with this new one because it has a lower ds_instance number */
-		sfl_agent_jumpTableRemove(agent, test);
-		test = NULL;
-	    }
-	    if(test == NULL) sfl_agent_jumpTableAdd(agent, newsm);
-	}
-	return newsm;
+            /* see if we should go in the ifIndex jumpTable */
+            if (SFL_DS_CLASS(newsm->dsi) == 0) {
+                SFLSampler *test = sfl_agent_getSamplerByIfIndex(agent,
+                                    SFL_DS_INDEX(newsm->dsi));
+                if (test && (SFL_DS_INSTANCE(newsm->dsi)
+                            < SFL_DS_INSTANCE(test->dsi))) {
+                    /* replace with this new one because it has a lower
+                     * ds_instance number
+                     */
+                    sfl_agent_jumpTableRemove(agent, test);
+                    test = NULL;
+                }
+                if (test == NULL) {
+                    sfl_agent_jumpTableAdd(agent, newsm);
+                }
+            }
+        }
+        return newsm;
     }
 }
 
@@ -241,12 +262,18 @@ SFLPoller *sfl_agent_addPoller(SFLAgent *agent,
     }
     /* either we found the insert point, or reached the end of the list... */
     {
-	SFLPoller *newpl = (SFLPoller *)sflAlloc(agent, sizeof(SFLPoller));
-	sfl_poller_init(newpl, agent, pdsi, magic, getCountersFn);
-	if(prev) prev->nxt = newpl;
-	else agent->pollers = newpl;
-	newpl->nxt = pl;
-	return newpl;
+        SFLPoller *newpl = (SFLPoller *) sflAlloc(agent, sizeof(SFLPoller));
+        if (newpl) {
+            memset(newpl, 0, sizeof(*newpl));
+            sfl_poller_init(newpl, agent, pdsi, magic, getCountersFn);
+            if (prev) {
+                prev->nxt = newpl;
+            } else {
+                agent->pollers = newpl;
+            }
+            newpl->nxt = pl;
+        }
+        return newpl;
     }
 }
 

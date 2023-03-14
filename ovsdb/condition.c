@@ -47,7 +47,15 @@ ovsdb_clause_from_json(const struct ovsdb_table_schema *ts,
 
         /* Column and arg fields are not being used with boolean functions.
          * Use dummy values */
-        clause->column = ovsdb_table_schema_get_column(ts, "_uuid");
+        const struct ovsdb_column *uuid_column;
+        uuid_column = ovsdb_table_schema_get_column(ts, "_uuid");
+        if (uuid_column) {
+            clause->column = uuid_column;
+        } else {
+            return ovsdb_syntax_error(json,
+                                      "unknown column",
+                                      "No column _uuid in table schema.");
+        }
         clause->index = clause->column->index;
         ovsdb_datum_init_default(&clause->arg, &clause->column->type);
         return NULL;

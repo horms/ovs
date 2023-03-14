@@ -195,7 +195,7 @@ root_set_size(const struct ovsdb_schema *schema)
 struct ovsdb_error *
 ovsdb_schema_from_json(const struct json *json, struct ovsdb_schema **schemap)
 {
-    struct ovsdb_schema *schema;
+    struct ovsdb_schema *schema = NULL;
     const struct json *name, *tables, *version_json, *cksum;
     struct ovsdb_error *error;
     struct shash_node *node;
@@ -215,78 +215,86 @@ ovsdb_schema_from_json(const struct json *json, struct ovsdb_schema **schemap)
         return error;
     }
 
-    if (version_json) {
-        version = json_string(version_json);
-        if (!ovsdb_is_valid_version(version)) {
-            return ovsdb_syntax_error(json, NULL, "schema version \"%s\" not "
-                                      "in format x.y.z", version);
-        }
-    } else {
-        /* Backward compatibility with old databases. */
-        version = "";
-    }
-
-    schema = ovsdb_schema_create(json_string(name), version,
-                                 cksum ? json_string(cksum) : "");
-    SHASH_FOR_EACH (node, json_object(tables)) {
-        struct ovsdb_table_schema *table;
-
-        if (node->name[0] == '_') {
-            error = ovsdb_syntax_error(json, NULL, "names beginning with "
-                                       "\"_\" are reserved");
-        } else if (!ovsdb_parser_is_id(node->name)) {
-            error = ovsdb_syntax_error(json, NULL, "name must be a valid id");
+    if (name && tables) {
+        if (version_json) {
+            version = json_string(version_json);
+            if (!ovsdb_is_valid_version(version)) {
+                return ovsdb_syntax_error(json, NULL,
+                                          "schema version \"%s\" not "
+                                          "in format x.y.z", version);
+            }
         } else {
-            error = ovsdb_table_schema_from_json(node->data, node->name,
-                                                 &table);
-        }
-        if (error) {
-            ovsdb_schema_destroy(schema);
-            return error;
+            /* Backward compatibility with old databases. */
+            version = "";
         }
 
-        shash_add(&schema->tables, table->name, table);
-    }
+        schema = ovsdb_schema_create(json_string(name), version,
+                                    cksum ? json_string(cksum) : "");
+        SHASH_FOR_EACH (node, json_object(tables)) {
+            struct ovsdb_table_schema *table;
 
-    /* "isRoot" was not part of the original schema definition.  Before it was
-     * added, there was no support for garbage collection.  So, for backward
-     * compatibility, if the root set is empty then assume that every table is
-     * in the root set. */
-    if (root_set_size(schema) == 0) {
-        SHASH_FOR_EACH (node, &schema->tables) {
-            struct ovsdb_table_schema *table = node->data;
-
-            table->is_root = true;
-        }
-    }
-
-    /* Validate that all refTables refer to the names of tables that exist.
-     *
-     * Also force certain columns to be persistent, as explained in
-     * ovsdb_schema_check_ref_table().  This requires 'is_root' to be known, so
-     * this must follow the loop updating 'is_root' above. */
-    SHASH_FOR_EACH (node, &schema->tables) {
-        struct ovsdb_table_schema *table = node->data;
-        struct shash_node *node2;
-
-        SHASH_FOR_EACH (node2, &table->columns) {
-            struct ovsdb_column *column = node2->data;
-
-            error = ovsdb_schema_check_ref_table(column, &schema->tables,
-                                                 &column->type.key, "key");
-            if (!error) {
-                error = ovsdb_schema_check_ref_table(column, &schema->tables,
-                                                     &column->type.value,
-                                                     "value");
+            if (node->name[0] == '_') {
+                error = ovsdb_syntax_error(json, NULL, "names beginning with "
+                                        "\"_\" are reserved");
+            } else if (!ovsdb_parser_is_id(node->name)) {
+                error = ovsdb_syntax_error(json, NULL,
+                                           "name must be a valid id");
+            } else {
+                error = ovsdb_table_schema_from_json(node->data, node->name,
+                                                    &table);
             }
             if (error) {
                 ovsdb_schema_destroy(schema);
                 return error;
             }
+
+            shash_add(&schema->tables, table->name, table);
         }
     }
 
-    *schemap = schema;
+    if (schema) {
+        /* "isRoot" was not part of the original schema definition.  Before it
+        * was added, there was no support for garbage collection.  So, for
+        * backward compatibility, if the root set is empty then assume that
+        * every table is in the root set. */
+        if (root_set_size(schema) == 0) {
+            SHASH_FOR_EACH (node, &schema->tables) {
+                struct ovsdb_table_schema *table = node->data;
+
+                table->is_root = true;
+            }
+        }
+
+        /* Validate that all refTables refer to the names of tables that exist.
+        *
+        * Also force certain columns to be persistent, as explained in
+        * ovsdb_schema_check_ref_table().  This requires 'is_root' to be
+        * known, so this must follow the loop updating 'is_root' above. */
+        SHASH_FOR_EACH (node, &schema->tables) {
+            struct ovsdb_table_schema *table = node->data;
+            struct shash_node *node2;
+
+            SHASH_FOR_EACH (node2, &table->columns) {
+                struct ovsdb_column *column = node2->data;
+
+                error = ovsdb_schema_check_ref_table(column, &schema->tables,
+                                                    &column->type.key, "key");
+                if (!error) {
+                    error = ovsdb_schema_check_ref_table(column,
+                                                        &schema->tables,
+                                                        &column->type.value,
+                                                        "value");
+                }
+                if (error) {
+                    ovsdb_schema_destroy(schema);
+                    return error;
+                }
+            }
+        }
+
+        *schemap = schema;
+    }
+
     return NULL;
 }
 

@@ -250,8 +250,11 @@ parse_options(int argc, char *argv[], struct shash *local_options)
             exit(EXIT_SUCCESS);
 
         case 't':
-            if (!str_to_uint(optarg, 10, &timeout) || !timeout) {
-                ctl_fatal("value %s on -t or --timeout is invalid", optarg);
+            if (optarg) {
+                if (!str_to_uint(optarg, 10, &timeout) || !timeout) {
+                    ctl_fatal("value %s on -t or --timeout is invalid",
+                              optarg);
+                }
             }
             break;
 
@@ -1065,42 +1068,46 @@ vtep_ctl_context_populate_cache(struct ctl_context *ctx)
             continue;
         }
         ps = shash_find_data(&vtepctl_ctx->pswitches, ps_cfg->name);
-        for (j = 0; j < ps_cfg->n_ports; j++) {
-            struct vteprec_physical_port *port_cfg = ps_cfg->ports[j];
-            struct vtep_ctl_port *port;
-            size_t k;
+        if (ps) {
+            for (j = 0; j < ps_cfg->n_ports; j++) {
+                struct vteprec_physical_port *port_cfg = ps_cfg->ports[j];
+                struct vtep_ctl_port *port;
+                size_t k;
 
-            port = shash_find_data(&vtepctl_ctx->ports, port_cfg->name);
-            if (port) {
-                if (port_cfg == port->port_cfg) {
-                    VLOG_WARN("%s: port is in multiple physical switches "
-                              "(%s and %s)",
-                              port_cfg->name, ps->name, port->ps->name);
-                } else {
-                    /* Log as an error because this violates the database's
-                     * uniqueness constraints, so the database server shouldn't
-                     * have allowed it. */
-                    VLOG_ERR("%s: database contains duplicate port name",
-                             port_cfg->name);
-                }
-                continue;
-            }
-
-            port = add_port_to_cache(vtepctl_ctx, ps, port_cfg);
-
-            for (k = 0; k < port_cfg->n_vlan_bindings; k++) {
-                struct vtep_ctl_lswitch *ls;
-                char *vlan;
-
-                vlan = xasprintf("%"PRId64, port_cfg->key_vlan_bindings[k]);
-                if (shash_find(&port->bindings, vlan)) {
-                    ctl_fatal("multiple bindings for vlan %s", vlan);
+                port = shash_find_data(&vtepctl_ctx->ports, port_cfg->name);
+                if (port) {
+                    if (port_cfg == port->port_cfg) {
+                        VLOG_WARN("%s: port is in multiple physical switches "
+                                "(%s and %s)",
+                                port_cfg->name, ps->name, port->ps->name);
+                    } else {
+                        /* Log as an error because this violates the database's
+                        * uniqueness constraints, so the database server
+                        * shouldn't have allowed it. */
+                        VLOG_ERR("%s: database contains duplicate port name",
+                                port_cfg->name);
+                    }
+                    continue;
                 }
 
-                ls_cfg = port_cfg->value_vlan_bindings[k];
-                ls = find_lswitch(vtepctl_ctx, ls_cfg->name, true);
+                port = add_port_to_cache(vtepctl_ctx, ps, port_cfg);
+                if (port) {
+                    for (k = 0; k < port_cfg->n_vlan_bindings; k++) {
+                        struct vtep_ctl_lswitch *ls;
+                        char *vlan;
 
-                shash_add_nocopy(&port->bindings, vlan, ls);
+                        vlan = xasprintf("%"PRId64,
+                                         port_cfg->key_vlan_bindings[k]);
+                        if (shash_find(&port->bindings, vlan)) {
+                            ctl_fatal("multiple bindings for vlan %s", vlan);
+                        }
+
+                        ls_cfg = port_cfg->value_vlan_bindings[k];
+                        ls = find_lswitch(vtepctl_ctx, ls_cfg->name, true);
+
+                        shash_add_nocopy(&port->bindings, vlan, ls);
+                    }
+                }
             }
         }
     }
@@ -1892,8 +1899,10 @@ del_mcast_entry(struct ctl_context *ctx,
             vteprec_mcast_macs_remote_delete(mcast_mac->remote_cfg);
         }
 
-        free(node->data);
-        shash_delete(mcast_shash, node);
+        if (node) {
+            free(node->data);
+            shash_delete(mcast_shash, node);
+        }
     } else {
         if (local) {
             vteprec_mcast_macs_local_set_locator_set(mcast_mac->local_cfg,

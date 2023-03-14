@@ -522,7 +522,12 @@ ovsdb_file_txn_add_row(struct ovsdb_file_txn *ftxn,
     }
 
     if (row) {
-        struct ovsdb_table *table = new ? new->table : old->table;
+        struct ovsdb_table *table = NULL;
+        if (new) {
+            table = new->table;
+        } else if (old) {
+            table = old->table;
+        }
         char uuid[UUID_LEN + 1];
 
         if (table != ftxn->table) {
@@ -533,14 +538,23 @@ ovsdb_file_txn_add_row(struct ovsdb_file_txn *ftxn,
 
             /* Create JSON object for transaction on this table. */
             ftxn->table_json = json_object_create();
-            ftxn->table = table;
-            json_object_put(ftxn->json, table->schema->name, ftxn->table_json);
+            if (table) {
+                ftxn->table = table;
+                json_object_put(ftxn->json, table->schema->name,
+                                ftxn->table_json);
+            }
         }
 
         /* Add row to transaction for this table. */
-        snprintf(uuid, sizeof uuid,
-                 UUID_FMT, UUID_ARGS(ovsdb_row_get_uuid(new ? new : old)));
-        json_object_put(ftxn->table_json, uuid, row);
+        if (new) {
+            snprintf(uuid, sizeof uuid,
+                     UUID_FMT, UUID_ARGS(ovsdb_row_get_uuid(new)));
+            json_object_put(ftxn->table_json, uuid, row);
+        } else if (old) {
+            snprintf(uuid, sizeof uuid,
+                     UUID_FMT, UUID_ARGS(ovsdb_row_get_uuid(old)));
+            json_object_put(ftxn->table_json, uuid, row);
+        }
     }
 }
 

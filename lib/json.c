@@ -342,8 +342,12 @@ json_object(const struct json *json)
 bool
 json_boolean(const struct json *json)
 {
-    ovs_assert(json->type == JSON_TRUE || json->type == JSON_FALSE);
-    return json->type == JSON_TRUE;
+    if (json) {
+        ovs_assert(json->type == JSON_TRUE || json->type == JSON_FALSE);
+        return json->type == JSON_TRUE;
+    } else {
+        return false;
+    }
 }
 
 double
@@ -497,13 +501,15 @@ json_hash_object(const struct shash *object, size_t basis)
     size_t n, i;
 
     nodes = shash_sort(object);
-    n = shash_count(object);
-    for (i = 0; i < n; i++) {
-        const struct shash_node *node = nodes[i];
-        basis = hash_string(node->name, basis);
-        basis = json_hash(node->data, basis);
+    if (nodes) {
+        n = shash_count(object);
+        for (i = 0; i < n; i++) {
+            const struct shash_node *node = nodes[i];
+            basis = hash_string(node->name, basis);
+            basis = json_hash(node->data, basis);
+        }
+        free(nodes);
     }
-    free(nodes);
     return basis;
 }
 
@@ -1654,11 +1660,13 @@ json_serialize_object(const struct shash *object, struct json_serializer *s)
         size_t n, i;
 
         nodes = shash_sort(object);
-        n = shash_count(object);
-        for (i = 0; i < n; i++) {
-            json_serialize_object_member(i, nodes[i], s);
+        if (nodes) {
+            n = shash_count(object);
+            for (i = 0; i < n; i++) {
+                json_serialize_object_member(i, nodes[i], s);
+            }
+            free(nodes);
         }
-        free(nodes);
     } else {
         struct shash_node *node;
         size_t i;
