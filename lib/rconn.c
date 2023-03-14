@@ -1427,6 +1427,7 @@ is_admitted_msg(const struct ofpbuf *b)
     case OFPTYPE_IPFIX_FLOW_STATS_REPLY:
     case OFPTYPE_CT_FLUSH_ZONE:
     case OFPTYPE_CT_FLUSH:
+    case OFPTYPE_CT_SET_ZONE_LIMIT:
     default:
         return true;
     }

@@ -5622,6 +5622,27 @@ ct_del_zone_timeout_policy(const char *datapath_type, uint16_t zone_id)
 }
 
 static void
+ct_set_zone_limit(const struct ofproto *ofproto_, const uint16_t zone_id,
+                  const uint32_t limit)
+{
+    struct ofproto_dpif *ofproto = ofproto_dpif_cast(ofproto_);
+    struct ovs_list zone_limits = OVS_LIST_INITIALIZER(&zone_limits);
+
+    ct_dpif_push_zone_limit(&zone_limits, zone_id, limit, 0);
+    int err = ct_dpif_set_limits(ofproto->backer->dpif, NULL, &zone_limits);
+    if (err) {
+        VLOG_ERR_RL(&rl, "failed to set zone limit id=%"PRIu16", "
+                          "limit=%"PRIu32" (%s)", zone_id, limit,
+                          ovs_strerror(err));
+    } else {
+        VLOG_DBG("configured zone limit for zone=%"PRIu16", limit=%"PRIu32"",
+                zone_id, limit);
+    }
+  
+    ct_dpif_free_zone_limits(&zone_limits); 
+}
+
+static void
 get_datapath_cap(const char *datapath_type, struct smap *cap)
 {
     struct odp_support odp;
@@ -6910,4 +6931,5 @@ const struct ofproto_class ofproto_dpif_class = {
     ct_flush,                   /* ct_flush */
     ct_set_zone_timeout_policy,
     ct_del_zone_timeout_policy,
+    ct_set_zone_limit,          /* ct_set_zone_limit */
 };

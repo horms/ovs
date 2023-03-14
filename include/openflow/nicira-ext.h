@@ -1101,4 +1101,14 @@ struct nx_ct_flush {
 };
 OFP_ASSERT(sizeof(struct nx_ct_flush) == 8);
 
+/* NXT_CT_SET_ZONE_LIMIT.
+ *
+ * Sets connection tracking table zone limit. */
+struct nx_ct_zone_limit {
+    uint8_t zero[2];       /* Must be zero. */
+    ovs_be16 zone_id;      /* Connection tracking zone. */
+    ovs_be32 limit;        /* Drop limit. */
+};
+OFP_ASSERT(sizeof(struct nx_ct_zone_limit) == 8);
+
 #endif /* openflow/nicira-ext.h */

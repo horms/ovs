@@ -968,6 +968,15 @@ ofp_print_nxt_ct_flush(struct ds *string, const struct ofp_header *oh)
 }
 
 static enum ofperr
+ofp_print_nxt_ct_set_zone_limit(struct ds *string,
+                                const struct nx_ct_zone_limit *nzl)
+{
+    ds_put_format(string, " zone_id=%"PRIu16, ntohs(nzl->zone_id));
+    ds_put_format(string, " limit=%"PRIu32, ntohl(nzl->limit));
+    return 0;
+}
+
+static enum ofperr
 ofp_to_string__(const struct ofp_header *oh,
                 const struct ofputil_port_map *port_map,
                 const struct ofputil_table_map *table_map, enum ofpraw raw,
@@ -1204,6 +1213,8 @@ ofp_to_string__(const struct ofp_header *oh,
         return ofp_print_nxt_ct_flush_zone(string, ofpmsg_body(oh));
     case OFPTYPE_CT_FLUSH:
         return ofp_print_nxt_ct_flush(string, oh);
+    case OFPTYPE_CT_SET_ZONE_LIMIT:
+        return ofp_print_nxt_ct_set_zone_limit(string, ofpmsg_body(oh));
     }
 
     return 0;
