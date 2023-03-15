@@ -65,6 +65,16 @@ netdev_gtpu_build_header(const struct netdev *netdev,
                          struct ovs_action_push_tnl *data,
                          const struct netdev_tnl_build_header_params *p);
 
+struct dp_packet *netdev_srv6_pop_header(struct dp_packet *packet);
+
+void netdev_srv6_push_header(const struct netdev *netdev,
+                             struct dp_packet *packet,
+                             const struct ovs_action_push_tnl *data);
+
+int netdev_srv6_build_header(const struct netdev *netdev,
+                             struct ovs_action_push_tnl *data,
+                             const struct netdev_tnl_build_header_params *p);
+
 void
 netdev_tnl_push_udp_header(const struct netdev *netdev,
                            struct dp_packet *packet,

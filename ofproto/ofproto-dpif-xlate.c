@@ -3632,6 +3632,9 @@ propagate_tunnel_data_to_flow(struct xlate_ctx *ctx, struct eth_addr dmac,
     case OVS_VPORT_TYPE_BAREUDP:
         nw_proto = IPPROTO_UDP;
         break;
+    case OVS_VPORT_TYPE_SRV6:
+        nw_proto = IPPROTO_IPIP;
+        break;
     case OVS_VPORT_TYPE_LISP:
     case OVS_VPORT_TYPE_STT:
     case OVS_VPORT_TYPE_UNSPEC:

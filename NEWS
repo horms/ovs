@@ -17,6 +17,8 @@ Post-v3.1.0
        in order to create OVSDB sockets with access mode of 0770.
    - QoS:
      * Added new configuration option 'jitter' for a linux-netem QoS type.
+   - SRv6 Tunnel Protocol
+     * Only support for userspace datapath.
 
 
 v3.1.0 - 16 Feb 2023
