@@ -1618,7 +1618,9 @@ extract_l3_ipv6(struct conn_key *key, const void *data, size_t size,
     uint8_t nw_frag = 0;
 
     const struct ovs_16aligned_ip6_frag *frag_hdr;
-    if (!parse_ipv6_ext_hdrs(&data, &size, &nw_proto, &nw_frag, &frag_hdr)) {
+    const struct ip6_rt_hdr *rt_hdr;
+    if (!parse_ipv6_ext_hdrs(&data, &size, &nw_proto, &nw_frag, &frag_hdr,
+                             &rt_hdr)) {
         return false;
     }
 
