@@ -453,6 +453,22 @@ def test_odp_fields(input_string, expected):
             ],
         ),
         (
+            "actions:tnl_push(header(srv6(segments_left=0,segs=2001:cafe::92)))",  # noqa: E501
+            [
+                KeyValue(
+                    "tnl_push",
+                    {
+                        "header": {
+                            "srv6": {
+                                "segments_left": 0,
+                                "segs": "2001:cafe::92",
+                            }
+                        }
+                    },
+                ),
+            ],
+        ),
+        (
             "actions:clone(1),clone(clone(push_vlan(vid=12,pcp=0),2),1)",
             [
                 KeyValue("clone", [{"output": {"port": 1}}]),
