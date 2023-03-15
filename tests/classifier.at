@@ -418,6 +418,7 @@ ovs-ofctl: "conjunction" actions may be used along with "note" but not any other
 OVS_VSWITCHD_STOP
 AT_CLEANUP
 
+AT_BANNER([flow classifier abnormal packet])
 # Flow classifier a packet with excess of padding.
 AT_SETUP([flow classifier - packet with extra padding])
 OVS_VSWITCHD_START
@@ -449,6 +450,47 @@ padding=$(printf '%*s' 130984 | tr ' ' '0')
 AT_CHECK([ovs-appctl ofproto/trace br0 in_port=1 ${packet}${padding}], [0], [stdout])
 AT_CHECK([tail -2 stdout], [0],
   [Megaflow: recirc_id=0,eth,ip,in_port=1,nw_dst=1.1.1.2,nw_frag=no
+Datapath actions: 2
+])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+dnl Flow classifier a packet with invalid total-length field of ipv4 header
+AT_SETUP([flow classifier - packet with invalid total-length field of ipv4 header])
+OVS_VSWITCHD_START
+add_of_ports br0 1 2
+AT_DATA([flows.txt], [dnl
+priority=5,ip,ip_dst=1.1.1.1,actions=1
+priority=5,ip,ip_dst=1.1.1.2,actions=2
+priority=0,actions=drop
+])
+AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
+packet=00000000000000000000000008004500003c00010000401176ac0101010101010102003500350008fb4f
+AT_CHECK([ovs-appctl ofproto/trace br0 in_port=1 $packet] , [0], [stdout])
+dnl the problem flow,
+dnl Megaflow: recirc_id=0,eth,ip,in_port=1,nw_dst=0.0.0.0/8,nw_frag=no
+dnl Datapath actions: drop
+AT_CHECK([tail -2 stdout], [0],
+  [Megaflow: recirc_id=0,eth,ip,in_port=1,nw_dst=1.1.1.2,nw_frag=no
+Datapath actions: 2
+])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
+
+dnl Flow classifier a packet with invalid payload-length field of ipv4 header
+AT_SETUP([flow classifier - packet with invalid payload-length field of ipv6 header])
+OVS_VSWITCHD_START
+add_of_ports br0 1 2
+AT_DATA([flows.txt], [dnl
+priority=5,ipv6,ipv6_dst=1::1,actions=1
+priority=5,ipv6,ipv6_dst=1::2,actions=2
+priority=0,actions=drop
+])
+AT_CHECK([ovs-ofctl add-flows br0 flows.txt])
+packet=00000000000000000000000086dd60000000001e11400001000000000000000000000000000100010000000000000000000000000002003500350008ff6f
+AT_CHECK([ovs-appctl ofproto/trace br0 in_port=1 $packet] , [0], [stdout])
+AT_CHECK([tail -2 stdout], [0],
+  [Megaflow: recirc_id=0,eth,ipv6,in_port=1,ipv6_dst=1::2,nw_frag=no
 Datapath actions: 2
 ])
 OVS_VSWITCHD_STOP

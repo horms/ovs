@@ -662,9 +662,8 @@ ipv4_sanity_check(const struct ip_header *nh, size_t size,
         return false;
     }
 
-    tot_len = ntohs(nh->ip_tot_len);
-    if (OVS_UNLIKELY(tot_len > size || ip_len > tot_len ||
-                size - tot_len > UINT16_MAX)) {
+    tot_len = MIN(size, ntohs(nh->ip_tot_len));
+    if (OVS_UNLIKELY(ip_len > tot_len || size - tot_len > UINT16_MAX)) {
         COVERAGE_INC(miniflow_extract_ipv4_pkt_len_error);
         return false;
     }
@@ -700,7 +699,7 @@ ipv6_sanity_check(const struct ovs_16aligned_ip6_hdr *nh, size_t size)
         return false;
     }
 
-    plen = ntohs(nh->ip6_plen);
+    plen = MIN(size - sizeof *nh, ntohs(nh->ip6_plen));
     if (OVS_UNLIKELY(plen + IPV6_HEADER_LEN > size)) {
         COVERAGE_INC(miniflow_extract_ipv6_pkt_len_error);
         return false;
@@ -920,7 +919,7 @@ miniflow_extract(struct dp_packet *packet, struct miniflow *dst)
         }
         data_pull(&data, &size, sizeof *nh);
 
-        plen = ntohs(nh->ip6_plen);
+        plen = MIN(size, ntohs(nh->ip6_plen));
         dp_packet_set_l2_pad_size(packet, size - plen);
         size = plen;   /* Never pull padding. */
 
@@ -1197,7 +1196,7 @@ parse_tcp_flags(struct dp_packet *packet,
         }
         data_pull(&data, &size, sizeof *nh);
 
-        plen = ntohs(nh->ip6_plen); /* Never pull padding. */
+        plen = MIN(size, ntohs(nh->ip6_plen)); /* Never pull padding. */
         dp_packet_set_l2_pad_size(packet, size - plen);
         size = plen;
         const struct ovs_16aligned_ip6_frag *frag_hdr;
