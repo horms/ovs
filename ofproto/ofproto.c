@@ -976,6 +976,28 @@ handle_nxt_ct_flush(struct ofconn *ofconn, const struct ofp_header *oh)
     return 0;
 }
 
+static enum ofperr
+handle_nxt_ct_set_zone_limit(struct ofconn *ofconn,
+                            const struct ofp_header *oh)
+{
+    struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
+    const struct nx_ct_zone_limit *nzl = ofpmsg_body(oh);
+
+    if (!is_all_zeros(nzl->zero, sizeof nzl->zero)) {
+        return OFPERR_NXBRC_MUST_BE_ZERO;
+    }
+
+    uint16_t zone_id = ntohs(nzl->zone_id);
+    uint32_t limit = ntohl(nzl->limit);
+    if (ofproto->ofproto_class->ct_set_zone_limit) {
+        ofproto->ofproto_class->ct_set_zone_limit(ofproto, zone_id, limit);
+    } else {
+        return EOPNOTSUPP;
+    }
+
+    return 0;
+}
+
 void
 ofproto_set_flow_restore_wait(bool flow_restore_wait_db)
 {
@@ -8827,6 +8849,9 @@ handle_single_part_openflow(struct ofconn *ofconn, const struct ofp_header *oh,
 
     case OFPTYPE_CT_FLUSH:
         return handle_nxt_ct_flush(ofconn, oh);
+
+    case OFPTYPE_CT_SET_ZONE_LIMIT:
+        return handle_nxt_ct_set_zone_limit(ofconn, oh);
 
     case OFPTYPE_HELLO:
     case OFPTYPE_ERROR:

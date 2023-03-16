@@ -489,6 +489,8 @@ usage(void)
            "  ct-flush SWITCH [ZONE] [CT_ORIG_TUPLE [CT_REPLY_TUPLE]]\n"
            "                              flush conntrack entries specified\n"
            "                              by CT_ORIG/REPLY_TUPLE and ZONE\n"
+           "  ct-set-zone-limit SWITCH ZONE LIMIT set conntrack entries\n"
+           "                                      limit for the ZONE\n"
            "\nFor OpenFlow switches and controllers:\n"
            "  probe TARGET                probe whether TARGET is up\n"
            "  ping TARGET [N]             latency of N-byte echos\n"
@@ -3103,6 +3105,35 @@ ofctl_ct_flush(struct ovs_cmdl_context *ctx)
 }
 
 static void
+ofctl_ct_set_zone_limit(struct ovs_cmdl_context *ctx)
+{
+    uint16_t zone_id;
+    uint32_t limit;
+
+    char *error = str_to_u16(ctx->argv[2], "zone_id", &zone_id);
+    if (error) {
+        ovs_fatal(0, "%s", error);
+    }
+    error = str_to_u32(ctx->argv[3], &limit);
+    if (error) {
+        ovs_fatal(0, "%s", error);
+    }
+
+    struct vconn *vconn;
+    open_vconn(ctx->argv[1], &vconn);
+    enum ofp_version version = vconn_get_version(vconn);
+
+    struct ofpbuf *msg = ofpraw_alloc(OFPRAW_NXT_CT_SET_ZONE_LIMIT, version,
+                                      0);
+    struct nx_ct_zone_limit *nzl = ofpbuf_put_zeros(msg, sizeof *nzl);
+    nzl->zone_id = htons(zone_id);
+    nzl->limit = htonl(limit);
+
+    transact_noreply(vconn, msg);
+    vconn_close(vconn);
+}
+
+static void
 ofctl_dump_ipfix_flow(struct ovs_cmdl_context *ctx)
 {
     dump_trivial_transaction(ctx->argv[1], OFPRAW_NXST_IPFIX_FLOW_REQUEST);
@@ -5117,6 +5148,9 @@ static const struct ovs_cmdl_command all_commands[] = {
 
     { "ct-flush", "switch [zone=N] [ct-orig-tuple [ct-reply-tuple]]",
       1, 4, ofctl_ct_flush, OVS_RO },
+
+    { "ct-set-zone-limit", "switch zone limit",
+      3, 3, ofctl_ct_set_zone_limit, OVS_RO },
 
     { "ofp-parse", "file",
       1, 1, ofctl_ofp_parse, OVS_RW },

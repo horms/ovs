@@ -326,6 +326,11 @@ An example of an IPv6 TCP \fIct-[orig|reply]-tuple\fR:
 .IP
 This command uses an Open vSwitch extension that is only in Open vSwitch 3.1
 and later.
+.IP "\fBct\-set\-zone\-limit \fIswitch zone limit\fR
+Set the connection tracking entries limit in \fIzone\fR on \fIswitch\fR.
+.IP
+This command uses an Open vSwitch extension that is only in Open
+vSwitch 3.1 and later.
 .
 .SS "OpenFlow Switch Flow Table Commands"
 .

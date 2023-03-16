@@ -4181,3 +4181,13 @@ AT_CHECK([ovs-ofctl ofp-print "\
 00 00 00 14 00 00 00 00 00 00 00 00 00 00 ff ff 0a 0a 00 02 00 00 00 00 \
 " | grep -q OFPBPC_BAD_VALUE], [0])
 AT_CLEANUP
+
+AT_SETUP([NXT_CT_SET_ZONE_LIMIT])
+AT_KEYWORDS([ofp-print])
+AT_CHECK([ovs-ofctl ofp-print "\
+01 04 00 18 00 00 00 03 00 00 23 20 00 00 00 23 \
+00 00 00 12 00 01 86 a0 \
+"], [0], [dnl
+NXT_CT_SET_ZONE_LIMIT (xid=0x3): zone_id=18 limit=100000
+])
+AT_CLEANUP

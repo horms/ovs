@@ -3309,3 +3309,15 @@ AT_CHECK([grep -q "ct_dpif|DBG|.*ct_flush: <all>" ovs-vswitchd.log])
 
 OVS_VSWITCHD_STOP
 AT_CLEANUP
+
+
+AT_SETUP([ovs-ofctl ct-set-zone-limit])
+OVS_VSWITCHD_START
+
+AT_CHECK([ovs-appctl vlog/set ct_dpif:dbg])
+AT_CHECK([ovs-ofctl ct-set-zone-limit br0 1 200000])
+
+OVS_WAIT_UNTIL([grep -q "ofproto_dpif|DBG|.*zone=1.*limit=200000" ovs-vswitchd.log])
+AT_CHECK([grep -q "ofproto_dpif|DBG|.*zone=1.*limit=200000" ovs-vswitchd.log])
+OVS_VSWITCHD_STOP
+AT_CLEANUP
