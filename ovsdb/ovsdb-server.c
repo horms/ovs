@@ -1784,14 +1784,16 @@ ovsdb_server_list_databases(struct unixctl_conn *conn, int argc OVS_UNUSED,
     ds_init(&s);
 
     nodes = shash_sort(all_dbs);
-    for (i = 0; i < shash_count(all_dbs); i++) {
-        const struct shash_node *node = nodes[i];
-        struct db *db = node->data;
-        if (db->db) {
-            ds_put_format(&s, "%s\n", node->name);
+    if (nodes) {
+        for (i = 0; i < shash_count(all_dbs); i++) {
+            const struct shash_node *node = nodes[i];
+            struct db *db = node->data;
+            if (db->db) {
+                ds_put_format(&s, "%s\n", node->name);
+            }
         }
+        free(nodes);
     }
-    free(nodes);
 
     unixctl_command_reply(conn, ds_cstr(&s));
     ds_destroy(&s);
@@ -2191,6 +2193,7 @@ save_config(struct server_config *config)
 static void
 sset_from_json(struct sset *sset, const struct json *array)
 {
+    ovs_assert(array);
     size_t i;
 
     sset_clear(sset);

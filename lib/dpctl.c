@@ -336,12 +336,14 @@ dpctl_add_if(int argc OVS_UNUSED, const char *argv[],
                 value = "";
             }
 
-            if (!strcmp(key, "type")) {
-                type = value;
-            } else if (!strcmp(key, "port_no")) {
-                port_no = u32_to_odp(atoi(value));
-            } else if (!smap_add_once(&args, key, value)) {
-                dpctl_error(dpctl_p, 0, "duplicate \"%s\" option", key);
+            if (key) {
+                if (!strcmp(key, "type")) {
+                    type = value;
+                } else if (!strcmp(key, "port_no")) {
+                    port_no = u32_to_odp(atoi(value));
+                } else if (!smap_add_once(&args, key, value)) {
+                    dpctl_error(dpctl_p, 0, "duplicate \"%s\" option", key);
+                }
             }
         }
 
@@ -454,25 +456,29 @@ dpctl_set_if(int argc, const char *argv[], struct dpctl_params *dpctl_p)
                 value = "";
             }
 
-            if (!strcmp(key, "type")) {
-                if (strcmp(value, type)) {
-                    dpctl_error(dpctl_p, 0,
-                                "%s: can't change type from %s to %s",
-                                 name, type, value);
-                    error = EINVAL;
-                    goto next_destroy_args;
+            if (key) {
+                if (!strcmp(key, "type")) {
+                    if (strcmp(value, type)) {
+                        dpctl_error(dpctl_p, 0,
+                                    "%s: can't change type from %s to %s",
+                                    name, type, value);
+                        error = EINVAL;
+                        goto next_destroy_args;
+                    }
+                } else if (!strcmp(key, "port_no")) {
+                    if (port_no != u32_to_odp(atoi(value))) {
+                        dpctl_error(dpctl_p, 0,
+                                    "%s: can't change port number from"
+                                    " %"PRIu32" to %d", name, port_no,
+                                    atoi(value));
+                        error = EINVAL;
+                        goto next_destroy_args;
+                    }
+                } else if (value[0] == '\0') {
+                    smap_remove(&args, key);
+                } else {
+                    smap_replace(&args, key, value);
                 }
-            } else if (!strcmp(key, "port_no")) {
-                if (port_no != u32_to_odp(atoi(value))) {
-                    dpctl_error(dpctl_p, 0, "%s: can't change port number from"
-                              " %"PRIu32" to %d", name, port_no, atoi(value));
-                    error = EINVAL;
-                    goto next_destroy_args;
-                }
-            } else if (value[0] == '\0') {
-                smap_remove(&args, key);
-            } else {
-                smap_replace(&args, key, value);
             }
         }
 
@@ -693,12 +699,14 @@ show_dpif(struct dpif *dpif, struct dpctl_params *dpctl_p)
                 error = netdev_get_config(netdev, &config);
                 if (!error) {
                     const struct smap_node **nodes = smap_sort(&config);
-                    for (size_t j = 0; j < smap_count(&config); j++) {
-                        const struct smap_node *node = nodes[j];
-                        dpctl_print(dpctl_p, "%c %s=%s", j ? ',' : ':',
-                                    node->key, node->value);
+                    if (nodes) {
+                        for (size_t j = 0; j < smap_count(&config); j++) {
+                            const struct smap_node *node = nodes[j];
+                            dpctl_print(dpctl_p, "%c %s=%s", j ? ',' : ':',
+                                        node->key, node->value);
+                        }
+                        free(nodes);
                     }
-                    free(nodes);
                 } else {
                     dpctl_print(dpctl_p, ", could not retrieve configuration "
                                          "(%s)",  ovs_strerror(error));

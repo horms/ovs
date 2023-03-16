@@ -334,8 +334,11 @@ parse_options(int argc, char *argv[], struct shash *local_options)
             exit(EXIT_SUCCESS);
 
         case 't':
-            if (!str_to_uint(optarg, 10, &timeout) || !timeout) {
-                ctl_fatal("value %s on -t or --timeout is invalid", optarg);
+            if (optarg) {
+                if (!str_to_uint(optarg, 10, &timeout) || !timeout) {
+                    ctl_fatal("value %s on -t or --timeout is invalid",
+                              optarg);
+                }
             }
             break;
 
@@ -349,11 +352,15 @@ parse_options(int argc, char *argv[], struct shash *local_options)
         STREAM_SSL_OPTION_HANDLERS
 
         case OPT_PEER_CA_CERT:
-            stream_ssl_set_peer_ca_cert_file(optarg);
+            if (optarg) {
+                stream_ssl_set_peer_ca_cert_file(optarg);
+            }
             break;
 
         case OPT_BOOTSTRAP_CA_CERT:
-            stream_ssl_set_ca_cert_file(optarg, true);
+            if (optarg) {
+                stream_ssl_set_ca_cert_file(optarg, true);
+            }
             break;
 
         case '?':
@@ -575,7 +582,7 @@ add_bridge_to_cache(struct vsctl_context *vsctl_ctx,
                     struct ovsrec_bridge *br_cfg, const char *name,
                     struct vsctl_bridge *parent, int vlan)
 {
-    struct vsctl_bridge *br = xmalloc(sizeof *br);
+    struct vsctl_bridge *br = xzalloc(sizeof *br);
     br->br_cfg = br_cfg;
     br->name = xstrdup(name);
     ovs_list_init(&br->ports);
@@ -659,7 +666,7 @@ static struct vsctl_port *
 add_port_to_cache(struct vsctl_context *vsctl_ctx, struct vsctl_bridge *parent,
                   struct ovsrec_port *port_cfg)
 {
-    struct vsctl_port *port;
+    struct vsctl_port *port = xzalloc(sizeof *port);
 
     if (port_cfg->tag
         && *port_cfg->tag >= 0 && *port_cfg->tag <= 4095) {
@@ -671,11 +678,13 @@ add_port_to_cache(struct vsctl_context *vsctl_ctx, struct vsctl_bridge *parent,
         }
     }
 
-    port = xmalloc(sizeof *port);
-    ovs_list_push_back(&parent->ports, &port->ports_node);
+    if (parent) {
+        ovs_list_push_back(&parent->ports, &port->ports_node);
+        port->bridge = parent;
+    }
+
     ovs_list_init(&port->ifaces);
     port->port_cfg = port_cfg;
-    port->bridge = parent;
     shash_add(&vsctl_ctx->ports, port_cfg->name, port);
 
     return port;
@@ -818,55 +827,63 @@ vsctl_context_populate_cache(struct ctl_context *ctx)
             continue;
         }
         br = shash_find_data(&vsctl_ctx->bridges, br_cfg->name);
-        for (j = 0; j < br_cfg->n_ports; j++) {
-            struct ovsrec_port *port_cfg = br_cfg->ports[j];
-            struct vsctl_port *port;
-            size_t k;
+        if (br) {
+            for (j = 0; j < br_cfg->n_ports; j++) {
+                struct ovsrec_port *port_cfg = br_cfg->ports[j];
+                struct vsctl_port *port;
+                size_t k;
 
-            port = shash_find_data(&vsctl_ctx->ports, port_cfg->name);
-            if (port) {
-                if (port_cfg == port->port_cfg) {
-                    VLOG_WARN("%s: port is in multiple bridges (%s and %s)",
-                              port_cfg->name, br->name, port->bridge->name);
-                } else {
-                    /* Log as an error because this violates the database's
-                     * uniqueness constraints, so the database server shouldn't
-                     * have allowed it. */
-                    VLOG_ERR("%s: database contains duplicate port name",
-                             port_cfg->name);
-                }
-                continue;
-            }
-
-            if (port_is_fake_bridge(port_cfg)
-                && !sset_add(&bridges, port_cfg->name)) {
-                continue;
-            }
-
-            port = add_port_to_cache(vsctl_ctx, br, port_cfg);
-            for (k = 0; k < port_cfg->n_interfaces; k++) {
-                struct ovsrec_interface *iface_cfg = port_cfg->interfaces[k];
-                struct vsctl_iface *iface;
-
-                iface = shash_find_data(&vsctl_ctx->ifaces, iface_cfg->name);
-                if (iface) {
-                    if (iface_cfg == iface->iface_cfg) {
-                        VLOG_WARN("%s: interface is in multiple ports "
-                                  "(%s and %s)",
-                                  iface_cfg->name,
-                                  iface->port->port_cfg->name,
-                                  port->port_cfg->name);
+                port = shash_find_data(&vsctl_ctx->ports, port_cfg->name);
+                if (port) {
+                    if (port_cfg == port->port_cfg) {
+                        VLOG_WARN("%s: port is in multiple bridges "
+                                "(%s and %s)", port_cfg->name, br->name,
+                                port->bridge->name);
                     } else {
                         /* Log as an error because this violates the database's
-                         * uniqueness constraints, so the database server
-                         * shouldn't have allowed it. */
-                        VLOG_ERR("%s: database contains duplicate interface "
-                                 "name", iface_cfg->name);
+                        * uniqueness constraints, so the database server
+                        * shouldn't have allowed it. */
+                        VLOG_ERR("%s: database contains duplicate port name",
+                                port_cfg->name);
                     }
                     continue;
                 }
 
-                add_iface_to_cache(vsctl_ctx, port, iface_cfg);
+                if (port_is_fake_bridge(port_cfg)
+                    && !sset_add(&bridges, port_cfg->name)) {
+                    continue;
+                }
+
+                port = add_port_to_cache(vsctl_ctx, br, port_cfg);
+                if (port) {
+                    for (k = 0; k < port_cfg->n_interfaces; k++) {
+                        struct ovsrec_interface *iface_cfg =
+                                                port_cfg->interfaces[k];
+                        struct vsctl_iface *iface;
+
+                        iface = shash_find_data(&vsctl_ctx->ifaces,
+                                                iface_cfg->name);
+                        if (iface) {
+                            if (iface_cfg == iface->iface_cfg) {
+                                VLOG_WARN("%s: interface is in multiple ports "
+                                        "(%s and %s)",
+                                        iface_cfg->name,
+                                        iface->port->port_cfg->name,
+                                        port->port_cfg->name);
+                            } else {
+                                /* Log as an error because this violates the
+                                * database's uniqueness constraints, so the
+                                * database server shouldn't have allowed it.
+                                */
+                                VLOG_ERR("%s: database contains duplicate "
+                                        "interface name", iface_cfg->name);
+                            }
+                            continue;
+                        }
+
+                        add_iface_to_cache(vsctl_ctx, port, iface_cfg);
+                    }
+                }
             }
         }
     }
@@ -889,14 +906,23 @@ check_conflicts(struct vsctl_context *vsctl_ctx, const char *name,
 
     port = shash_find_data(&vsctl_ctx->ports, name);
     if (port) {
-        ctl_fatal("%s because a port named %s already exists on "
-                    "bridge %s", msg, name, port->bridge->name);
+        if (port->bridge) {
+            ctl_fatal("%s because a port named %s already exists on "
+                      "bridge %s", msg, name, port->bridge->name);
+        } else {
+            ctl_fatal("%s because a port named %s already exists", msg, name);
+        }
     }
 
     iface = shash_find_data(&vsctl_ctx->ifaces, name);
     if (iface) {
-        ctl_fatal("%s because an interface named %s already exists "
-                    "on bridge %s", msg, name, iface->port->bridge->name);
+        if (iface->port->bridge) {
+            ctl_fatal("%s because an interface named %s already exists "
+                      "on bridge %s", msg, name, iface->port->bridge->name);
+        } else {
+            ctl_fatal("%s because an interface named %s already exists", msg,
+                      name);
+        }
     }
 
     free(msg);
@@ -936,7 +962,7 @@ find_port(struct vsctl_context *vsctl_ctx, const char *name, bool must_exist)
     ovs_assert(vsctl_ctx->cache_valid);
 
     port = shash_find_data(&vsctl_ctx->ports, name);
-    if (port && !strcmp(name, port->bridge->name)) {
+    if (port && port->bridge && !strcmp(name, port->bridge->name)) {
         port = NULL;
     }
     if (must_exist && !port) {
@@ -954,7 +980,8 @@ find_iface(struct vsctl_context *vsctl_ctx, const char *name, bool must_exist)
     ovs_assert(vsctl_ctx->cache_valid);
 
     iface = shash_find_data(&vsctl_ctx->ifaces, name);
-    if (iface && !strcmp(name, iface->port->bridge->name)) {
+    if (iface && iface->port->bridge &&
+        !strcmp(name, iface->port->bridge->name)) {
         iface = NULL;
     }
     if (must_exist && !iface) {
@@ -1679,14 +1706,16 @@ get_external_id(struct smap *smap, const char *prefix, const char *key,
         size_t prefix_len = strlen(prefix);
         size_t i;
 
-        for (i = 0; i < smap_count(smap); i++) {
-            const struct smap_node *node = sorted[i];
-            if (!strncmp(node->key, prefix, prefix_len)) {
-                ds_put_format(output, "%s=%s\n", node->key + prefix_len,
-                              node->value);
+        if (sorted) {
+            for (i = 0; i < smap_count(smap); i++) {
+                const struct smap_node *node = sorted[i];
+                if (!strncmp(node->key, prefix, prefix_len)) {
+                    ds_put_format(output, "%s=%s\n", node->key + prefix_len,
+                                node->value);
+                }
             }
+            free(sorted);
         }
-        free(sorted);
     }
 }
 

@@ -575,15 +575,17 @@ create_monitor_request(struct ovsdb_schema *schema)
     size_t n = shash_count(&schema->tables);
     const struct shash_node **nodes = shash_sort(&schema->tables);
 
-    for (int j = 0; j < n; j++) {
-        struct ovsdb_table_schema *table = nodes[j]->data;
+    if (nodes) {
+        for (int j = 0; j < n; j++) {
+            struct ovsdb_table_schema *table = nodes[j]->data;
 
-        /* Monitor all tables not excluded. */
-        if (!excluded_tables_find(db_name, table->name)) {
-            add_monitored_table(table, monitor_request);
+            /* Monitor all tables not excluded. */
+            if (!excluded_tables_find(db_name, table->name)) {
+                add_monitored_table(table, monitor_request);
+            }
         }
+        free(nodes);
     }
-    free(nodes);
 
     /* Create a monitor request. */
     monitor = json_array_create_3(

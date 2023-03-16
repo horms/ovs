@@ -147,42 +147,45 @@ odp_set_ipv4(struct dp_packet *packet, const struct ovs_key_ipv4 *key,
     uint8_t new_tos;
     uint8_t new_ttl;
 
-    if (mask->ipv4_src) {
-        ip_src_nh = get_16aligned_be32(&nh->ip_src);
-        new_ip_src = key->ipv4_src | (ip_src_nh & ~mask->ipv4_src);
+    if (nh) {
+        if (mask->ipv4_src) {
+            ip_src_nh = get_16aligned_be32(&nh->ip_src);
+            new_ip_src = key->ipv4_src | (ip_src_nh & ~mask->ipv4_src);
 
-        if (ip_src_nh != new_ip_src) {
-            packet_set_ipv4_addr(packet, &nh->ip_src, new_ip_src);
+            if (ip_src_nh != new_ip_src) {
+                packet_set_ipv4_addr(packet, &nh->ip_src, new_ip_src);
+            }
         }
-    }
 
-    if (mask->ipv4_dst) {
-        ip_dst_nh = get_16aligned_be32(&nh->ip_dst);
-        new_ip_dst = key->ipv4_dst | (ip_dst_nh & ~mask->ipv4_dst);
+        if (mask->ipv4_dst) {
+            ip_dst_nh = get_16aligned_be32(&nh->ip_dst);
+            new_ip_dst = key->ipv4_dst | (ip_dst_nh & ~mask->ipv4_dst);
 
-        if (ip_dst_nh != new_ip_dst) {
-            packet_set_ipv4_addr(packet, &nh->ip_dst, new_ip_dst);
+            if (ip_dst_nh != new_ip_dst) {
+                packet_set_ipv4_addr(packet, &nh->ip_dst, new_ip_dst);
+            }
         }
-    }
 
-    if (mask->ipv4_tos) {
-        new_tos = key->ipv4_tos | (nh->ip_tos & ~mask->ipv4_tos);
+        if (mask->ipv4_tos) {
+            new_tos = key->ipv4_tos | (nh->ip_tos & ~mask->ipv4_tos);
 
-        if (nh->ip_tos != new_tos) {
-            nh->ip_csum = recalc_csum16(nh->ip_csum,
-                                        htons((uint16_t) nh->ip_tos),
-                                        htons((uint16_t) new_tos));
-            nh->ip_tos = new_tos;
+            if (nh->ip_tos != new_tos) {
+                nh->ip_csum = recalc_csum16(nh->ip_csum,
+                                            htons((uint16_t) nh->ip_tos),
+                                            htons((uint16_t) new_tos));
+                nh->ip_tos = new_tos;
+            }
         }
-    }
 
-    if (OVS_LIKELY(mask->ipv4_ttl)) {
-        new_ttl = key->ipv4_ttl | (nh->ip_ttl & ~mask->ipv4_ttl);
+        if (OVS_LIKELY(mask->ipv4_ttl)) {
+            new_ttl = key->ipv4_ttl | (nh->ip_ttl & ~mask->ipv4_ttl);
 
-        if (OVS_LIKELY(nh->ip_ttl != new_ttl)) {
-            nh->ip_csum = recalc_csum16(nh->ip_csum, htons(nh->ip_ttl << 8),
-                                        htons(new_ttl << 8));
-            nh->ip_ttl = new_ttl;
+            if (OVS_LIKELY(nh->ip_ttl != new_ttl)) {
+                nh->ip_csum = recalc_csum16(nh->ip_csum,
+                                            htons(nh->ip_ttl << 8),
+                                            htons(new_ttl << 8));
+                nh->ip_ttl = new_ttl;
+            }
         }
     }
 }
@@ -276,23 +279,25 @@ set_arp(struct dp_packet *packet, const struct ovs_key_arp *key,
 {
     struct arp_eth_header *arp = dp_packet_l3(packet);
 
-    if (!mask) {
-        arp->ar_op = key->arp_op;
-        arp->ar_sha = key->arp_sha;
-        put_16aligned_be32(&arp->ar_spa, key->arp_sip);
-        arp->ar_tha = key->arp_tha;
-        put_16aligned_be32(&arp->ar_tpa, key->arp_tip);
-    } else {
-        ovs_be32 ar_spa = get_16aligned_be32(&arp->ar_spa);
-        ovs_be32 ar_tpa = get_16aligned_be32(&arp->ar_tpa);
+    if (arp) {
+        if (!mask) {
+            arp->ar_op = key->arp_op;
+            arp->ar_sha = key->arp_sha;
+            put_16aligned_be32(&arp->ar_spa, key->arp_sip);
+            arp->ar_tha = key->arp_tha;
+            put_16aligned_be32(&arp->ar_tpa, key->arp_tip);
+        } else {
+            ovs_be32 ar_spa = get_16aligned_be32(&arp->ar_spa);
+            ovs_be32 ar_tpa = get_16aligned_be32(&arp->ar_tpa);
 
-        arp->ar_op = key->arp_op | (arp->ar_op & ~mask->arp_op);
-        ether_addr_copy_masked(&arp->ar_sha, key->arp_sha, mask->arp_sha);
-        put_16aligned_be32(&arp->ar_spa,
-                           key->arp_sip | (ar_spa & ~mask->arp_sip));
-        ether_addr_copy_masked(&arp->ar_tha, key->arp_tha, mask->arp_tha);
-        put_16aligned_be32(&arp->ar_tpa,
-                           key->arp_tip | (ar_tpa & ~mask->arp_tip));
+            arp->ar_op = key->arp_op | (arp->ar_op & ~mask->arp_op);
+            ether_addr_copy_masked(&arp->ar_sha, key->arp_sha, mask->arp_sha);
+            put_16aligned_be32(&arp->ar_spa,
+                            key->arp_sip | (ar_spa & ~mask->arp_sip));
+            ether_addr_copy_masked(&arp->ar_tha, key->arp_tha, mask->arp_tha);
+            put_16aligned_be32(&arp->ar_tpa,
+                            key->arp_tip | (ar_tpa & ~mask->arp_tip));
+        }
     }
 }
 

@@ -1223,17 +1223,25 @@ parse_monitor_columns(char *arg, const char *server, const char *database,
 
         n = shash_count(&table->columns);
         nodes = shash_sort(&table->columns);
-        for (i = 0; i < n; i++) {
-            const struct ovsdb_column *column = nodes[i]->data;
-            if (column->index != OVSDB_COL_UUID
-                && column->index != OVSDB_COL_VERSION) {
-                add_column(server, column, columns, columns_json);
+        if (nodes) {
+            for (i = 0; i < n; i++) {
+                const struct ovsdb_column *column = nodes[i]->data;
+                if (column->index != OVSDB_COL_UUID
+                    && column->index != OVSDB_COL_VERSION) {
+                    add_column(server, column, columns, columns_json);
+                }
             }
+            free(nodes);
         }
-        free(nodes);
 
-        add_column(server, ovsdb_table_schema_get_column(table, "_version"),
-                   columns, columns_json);
+        const struct ovsdb_column *version_column =
+                            ovsdb_table_schema_get_column(table, "_version");
+
+        if (version_column) {
+            add_column(server, version_column, columns, columns_json);
+        } else {
+            VLOG_ERR("Table does not contain _version column.");
+        }
     }
 
     if (!initial || !insert || !delete || !modify) {
@@ -1439,14 +1447,16 @@ do_monitor__(struct jsonrpc *rpc, const char *database,
             ovs_fatal(0, "ALL tables are not allowed with condition");
         }
 
-        for (i = 0; i < n; i++) {
-            struct ovsdb_table_schema *table = nodes[i]->data;
+        if (nodes) {
+            for (i = 0; i < n; i++) {
+                struct ovsdb_table_schema *table = nodes[i]->data;
 
-            add_monitored_table(argc, argv, server, database, NULL, table,
-                                monitor_requests,
-                                &mts, &n_mts, &allocated_mts);
+                add_monitored_table(argc, argv, server, database, NULL, table,
+                                    monitor_requests,
+                                    &mts, &n_mts, &allocated_mts);
+            }
+            free(nodes);
         }
-        free(nodes);
     }
 
     send_db_change_aware(rpc);
@@ -1870,6 +1880,10 @@ do_dump(struct jsonrpc *rpc, const char *database,
         n_tables = shash_count(&schema->tables);
     }
 
+    if (!tables) {
+        goto end;
+    }
+
     /* Construct transaction to retrieve entire database. */
     transaction = json_array_create_1(json_string_create(database));
     for (i = 0; i < n_tables; i++) {
@@ -1929,8 +1943,9 @@ do_dump(struct jsonrpc *rpc, const char *database,
     }
 
     jsonrpc_msg_destroy(reply);
-    shash_destroy(&custom_columns);
     free(tables);
+end:
+    shash_destroy(&custom_columns);
     ovsdb_schema_destroy(schema);
 }
 

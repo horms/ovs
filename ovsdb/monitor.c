@@ -478,7 +478,9 @@ ovsdb_monitor_add_column(struct ovsdb_monitor *dbmon,
     struct ovsdb_monitor_column *c;
 
     mt = shash_find_data(&dbmon->tables, table->schema->name);
-
+    if (!mt) {
+        return NULL;
+    }
     /* Check for column duplication. Return duplicated column name. */
     if (mt->columns_index_map[column->index] != -1) {
         return column->name;
@@ -781,11 +783,15 @@ ovsdb_monitor_table_condition_update(
                             const struct json *cond_json)
 {
     if (!condition) {
-        return NULL;
+        return ovsdb_syntax_error(cond_json, NULL,
+                                  "Parse error, condition empty.");
     }
 
     struct ovsdb_monitor_table_condition *mtc =
         shash_find_data(&condition->tables, table->schema->name);
+    if (!mtc) {
+        return NULL;
+    }
     struct ovsdb_error *error;
     struct ovsdb_condition cond = OVSDB_CONDITION_INITIALIZER(&cond);
 
@@ -1279,7 +1285,9 @@ ovsdb_monitor_table_add_select(struct ovsdb_monitor *dbmon,
     struct ovsdb_monitor_table * mt;
 
     mt = shash_find_data(&dbmon->tables, table->schema->name);
-    mt->select |= select;
+    if (mt) {
+        mt->select |= select;
+    }
 }
 
  /*
@@ -1329,8 +1337,23 @@ ovsdb_monitor_changes_update(const struct ovsdb_row *old,
                              const struct ovsdb_monitor_table *mt,
                              struct ovsdb_monitor_change_set_for_table *mcst)
 {
-    const struct uuid *uuid = ovsdb_row_get_uuid(new ? new : old);
-    struct ovsdb_monitor_row *change;
+    const struct uuid *uuid = NULL;
+
+    if (!new && !old) {
+        return;
+    } else {
+        if (new) {
+            uuid = ovsdb_row_get_uuid(new);
+        } else if (old) {
+            uuid = ovsdb_row_get_uuid(old);
+        }
+    }
+
+    if (!uuid) {
+        return;
+    }
+
+    struct ovsdb_monitor_row *change = NULL;
 
     change = ovsdb_monitor_changes_row_find(mcst, uuid);
     if (!change) {
@@ -1657,15 +1680,21 @@ ovsdb_monitor_hash(const struct ovsdb_monitor *dbmon, size_t basis)
     nodes = shash_sort(&dbmon->tables);
     n = shash_count(&dbmon->tables);
 
+    if (!nodes) {
+        return basis;
+    }
+
     for (i = 0; i < n; i++) {
         struct ovsdb_monitor_table *mt = nodes[i]->data;
 
-        basis = hash_pointer(mt->table, basis);
-        basis = hash_3words(mt->select, mt->n_columns, basis);
+        if (mt) {
+            basis = hash_pointer(mt->table, basis);
+            basis = hash_3words(mt->select, mt->n_columns, basis);
 
-        for (j = 0; j < mt->n_columns; j++) {
-            basis = hash_pointer(mt->columns[j].column, basis);
-            basis = hash_2words(mt->columns[j].select, basis);
+            for (j = 0; j < mt->n_columns; j++) {
+                basis = hash_pointer(mt->columns[j].column, basis);
+                basis = hash_2words(mt->columns[j].select, basis);
+            }
         }
     }
     free(nodes);

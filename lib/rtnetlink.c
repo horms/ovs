@@ -131,10 +131,13 @@ rtnetlink_parse(struct ofpbuf *buf, struct rtnetlink_change *change)
                 change->irrelevant = true;
             }
 
+            if (ifinfo) {
+                change->if_index   = ifinfo->ifi_index;
+                change->ifi_flags  = ifinfo->ifi_flags;
+            }
+
             change->nlmsg_type     = nlmsg->nlmsg_type;
-            change->if_index       = ifinfo->ifi_index;
             change->ifname         = nl_attr_get_string(attrs[IFLA_IFNAME]);
-            change->ifi_flags      = ifinfo->ifi_flags;
             change->master_ifindex = (attrs[IFLA_MASTER]
                                       ? nl_attr_get_u32(attrs[IFLA_MASTER])
                                       : 0);
@@ -178,7 +181,9 @@ rtnetlink_parse(struct ofpbuf *buf, struct rtnetlink_change *change)
             ifaddr = ofpbuf_at(buf, NLMSG_HDRLEN, sizeof *ifaddr);
 
             change->nlmsg_type     = nlmsg->nlmsg_type;
-            change->if_index       = ifaddr->ifa_index;
+            if (ifaddr) {
+                change->if_index   = ifaddr->ifa_index;
+            }
             change->ifname         = (attrs[IFA_LABEL]
                                       ? nl_attr_get_string(attrs[IFA_LABEL])
                                       : NULL);

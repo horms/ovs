@@ -91,7 +91,9 @@ ovsdb_query_distinct(struct ovsdb_table *table,
         struct ovsdb_row_hash hash;
 
         ovsdb_row_hash_init(&hash, columns);
-        ovsdb_query(table, condition, query_distinct_cb, &hash);
+        if (condition) {
+            ovsdb_query(table, condition, query_distinct_cb, &hash);
+        }
         HMAP_FOR_EACH (node, hmap_node, &hash.rows) {
             ovsdb_row_set_add_row(results, node->row);
         }

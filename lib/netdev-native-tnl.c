@@ -221,16 +221,20 @@ netdev_tnl_calc_udp_csum(struct udp_header *udp, struct dp_packet *packet,
 {
     uint32_t csum;
 
-    if (netdev_tnl_is_header_ipv6(dp_packet_data(packet))) {
-        csum = packet_csum_pseudoheader6(netdev_tnl_ipv6_hdr(
-                                         dp_packet_data(packet)));
-    } else {
-        csum = packet_csum_pseudoheader(netdev_tnl_ip_hdr(
-                                        dp_packet_data(packet)));
-    }
+    void *data_dp = dp_packet_data(packet);
 
-    csum = csum_continue(csum, udp, ip_tot_size);
-    udp->udp_csum = csum_finish(csum);
+    if (data_dp) {
+        if (netdev_tnl_is_header_ipv6(data_dp)) {
+            csum = packet_csum_pseudoheader6(netdev_tnl_ipv6_hdr(
+                                             data_dp));
+        } else {
+            csum = packet_csum_pseudoheader(netdev_tnl_ip_hdr(
+                                            data_dp));
+        }
+
+        csum = csum_continue(csum, udp, ip_tot_size);
+        udp->udp_csum = csum_finish(csum);
+    }
 
     if (!udp->udp_csum) {
         udp->udp_csum = htons(0xffff);
@@ -425,20 +429,24 @@ netdev_gre_pop_header(struct dp_packet *packet)
     struct flow_tnl *tnl = &md->tunnel;
     int hlen = sizeof(struct eth_header) + 4;
 
-    hlen += netdev_tnl_is_header_ipv6(dp_packet_data(packet)) ?
-            IPV6_HEADER_LEN : IP_HEADER_LEN;
+    const void *data_dp = dp_packet_data(packet);
 
-    pkt_metadata_init_tnl(md);
-    if (hlen > dp_packet_size(packet)) {
-        goto err;
+    if (data_dp) {
+        hlen += netdev_tnl_is_header_ipv6(data_dp) ?
+                IPV6_HEADER_LEN : IP_HEADER_LEN;
+
+        pkt_metadata_init_tnl(md);
+        if (hlen > dp_packet_size(packet)) {
+            goto err;
+        }
+
+        hlen = parse_gre_header(packet, tnl);
+        if (hlen < 0) {
+            goto err;
+        }
+
+        dp_packet_reset_packet(packet, hlen);
     }
-
-    hlen = parse_gre_header(packet, tnl);
-    if (hlen < 0) {
-        goto err;
-    }
-
-    dp_packet_reset_packet(packet, hlen);
 
     return packet;
 err:
