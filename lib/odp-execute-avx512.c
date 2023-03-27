@@ -485,9 +485,11 @@ action_avx512_ipv4_set_addrs(struct dp_packet_batch *batch,
             size_t l4_size = dp_packet_l4_size(packet);
 
             if (nh->ip_proto == IPPROTO_UDP && l4_size >= UDP_HEADER_LEN) {
-                /* New UDP checksum. */
                 struct udp_header *uh = dp_packet_l4(packet);
-                if (uh->udp_csum) {
+                if (dp_packet_hwol_l4_is_udp(packet)) {
+                    dp_packet_ol_reset_l4_csum_good(packet);
+                } else if (uh->udp_csum) {
+                    /* New UDP checksum. */
                     uint16_t old_udp_checksum = ~uh->udp_csum;
                     uint32_t udp_checksum = old_udp_checksum + delta_checksum;
                     udp_checksum = csum_finish(udp_checksum);
@@ -500,13 +502,17 @@ action_avx512_ipv4_set_addrs(struct dp_packet_batch *batch,
                 }
             } else if (nh->ip_proto == IPPROTO_TCP &&
                        l4_size >= TCP_HEADER_LEN) {
-                /* New TCP checksum. */
-                struct tcp_header *th = dp_packet_l4(packet);
-                uint16_t old_tcp_checksum = ~th->tcp_csum;
-                uint32_t tcp_checksum = old_tcp_checksum + delta_checksum;
-                tcp_checksum = csum_finish(tcp_checksum);
+                if (dp_packet_hwol_l4_is_tcp(packet)) {
+                    dp_packet_ol_reset_l4_csum_good(packet);
+                } else {
+                    /* New TCP checksum. */
+                    struct tcp_header *th = dp_packet_l4(packet);
+                    uint16_t old_tcp_checksum = ~th->tcp_csum;
+                    uint32_t tcp_checksum = old_tcp_checksum + delta_checksum;
+                    tcp_checksum = csum_finish(tcp_checksum);
 
-                th->tcp_csum = tcp_checksum;
+                    th->tcp_csum = tcp_checksum;
+                }
             }
 
             pkt_metadata_init_conn(&packet->md);
