@@ -262,3 +262,9 @@ PMDs in the case where no value is specified.  By default "scalar" is used.
 \fIstudy_cnt\fR defaults to 128 and indicates the number of packets that the
 "study" miniflow implementation must parse before choosing an optimal
 implementation.
+.
+.IP "\fBdpif-netdev/offload-show\fR [\fIdp\fR] [\fInetdev\fR]"
+Prints the hardware offloading features enabled in netdev \fInetdev\fR
+attached to datapath \fIdp\fR. The datapath \fIdp\fR parameter can be
+omitted if there is only one. All netdev ports are printed if the
+parameter \fInetdev\fR is omitted.

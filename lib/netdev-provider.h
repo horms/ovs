@@ -37,6 +37,7 @@ extern "C" {
 struct netdev_tnl_build_header_params;
 #define NETDEV_NUMA_UNSPEC OVS_NUMA_UNSPEC
 
+/* Keep this enum updated with translation to string below. */
 enum netdev_ol_flags {
     NETDEV_TX_OFFLOAD_IPV4_CKSUM = 1 << 0,
     NETDEV_TX_OFFLOAD_TCP_CKSUM = 1 << 1,
