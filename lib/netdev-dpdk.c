@@ -411,6 +411,11 @@ struct ingress_policer {
     rte_spinlock_t policer_lock;
 };
 
+struct ingress_pkts_policer {
+    struct token_bucket tb;
+    rte_spinlock_t policer_lock;
+};
+
 enum dpdk_hw_ol_features {
     NETDEV_RX_CHECKSUM_OFFLOAD = 1 << 0,
     NETDEV_RX_HW_CRC_STRIP = 1 << 1,
@@ -491,6 +496,11 @@ struct netdev_dpdk {
         uint32_t policer_rate;
         uint32_t policer_burst;
 
+        /* Ingress Pkts Policer */
+        OVSRCU_TYPE(struct ingress_pkts_policer *) ingress_pkts_policer;
+        uint32_t policer_kpkts_rate;
+        uint32_t policer_kpkts_burst;
+
         /* Array of vhost rxq states, see vring_state_changed. */
         bool *vhost_rxq_enabled;
     );
@@ -566,6 +576,9 @@ int netdev_dpdk_get_vid(const struct netdev_dpdk *dev);
 
 struct ingress_policer *
 netdev_dpdk_get_ingress_policer(const struct netdev_dpdk *dev);
+
+struct ingress_pkts_policer *
+netdev_dpdk_get_ingress_pkts_policer(const struct netdev_dpdk *dev);
 
 static bool
 is_dpdk_class(const struct netdev_class *class)
@@ -1308,8 +1321,11 @@ common_construct(struct netdev *netdev, dpdk_port_t port_no,
     ovsrcu_init(&dev->qos_conf, NULL);
 
     ovsrcu_init(&dev->ingress_policer, NULL);
+    ovsrcu_init(&dev->ingress_pkts_policer, NULL);
     dev->policer_rate = 0;
     dev->policer_burst = 0;
+    dev->policer_kpkts_rate = 0;
+    dev->policer_kpkts_burst = 0;
 
     netdev->n_rxq = 0;
     netdev->n_txq = 0;
@@ -1487,6 +1503,8 @@ common_destruct(struct netdev_dpdk *dev)
     ovs_list_remove(&dev->list_node);
     free(ovsrcu_get_protected(struct ingress_policer *,
                               &dev->ingress_policer));
+    free(ovsrcu_get_protected(struct ingress_pkts_policer *,
+                              &dev->ingress_pkts_policer));
     free(dev->sw_stats);
     ovs_mutex_destroy(&dev->mutex);
 }
@@ -2377,6 +2395,20 @@ ingress_policer_run(struct ingress_policer *policer, struct rte_mbuf **pkts,
     return cnt;
 }
 
+static int
+ingress_pkts_policer_run(struct ingress_pkts_policer *policer,
+                         struct rte_mbuf **pkts, int pkt_cnt, bool should_steal)
+{
+    int cnt = 0;
+
+    rte_spinlock_lock(&policer->policer_lock);
+    cnt = pkts_policer_run_single_packet(&policer->tb, pkts, pkt_cnt,
+                                         should_steal);
+    rte_spinlock_unlock(&policer->policer_lock);
+
+    return cnt;
+}
+
 static bool
 is_vhost_running(struct netdev_dpdk *dev)
 {
@@ -2392,6 +2424,8 @@ netdev_dpdk_vhost_rxq_recv(struct netdev_rxq *rxq,
 {
     struct netdev_dpdk *dev = netdev_dpdk_cast(rxq->netdev);
     struct ingress_policer *policer = netdev_dpdk_get_ingress_policer(dev);
+    struct ingress_pkts_policer *pkts_policer =
+                                    netdev_dpdk_get_ingress_pkts_policer(dev);
     uint16_t nb_rx = 0;
     uint16_t qos_drops = 0;
     int qid = rxq->queue_id * VIRTIO_QNUM + VIRTIO_TXQ;
@@ -2427,6 +2461,14 @@ netdev_dpdk_vhost_rxq_recv(struct netdev_rxq *rxq,
         qos_drops -= nb_rx;
     }
 
+    if (pkts_policer) {
+        qos_drops = nb_rx;
+        nb_rx = ingress_pkts_policer_run(pkts_policer,
+                                         (struct rte_mbuf **) batch->packets,
+                                         nb_rx, true);
+        qos_drops -= nb_rx;
+    }
+
     if (OVS_UNLIKELY(qos_drops)) {
         rte_spinlock_lock(&dev->stats_lock);
         dev->stats.rx_dropped += qos_drops;
@@ -2455,6 +2497,8 @@ netdev_dpdk_rxq_recv(struct netdev_rxq *rxq, struct dp_packet_batch *batch,
     struct netdev_rxq_dpdk *rx = netdev_rxq_dpdk_cast(rxq);
     struct netdev_dpdk *dev = netdev_dpdk_cast(rxq->netdev);
     struct ingress_policer *policer = netdev_dpdk_get_ingress_policer(dev);
+    struct ingress_pkts_policer *pkts_policer =
+                                    netdev_dpdk_get_ingress_pkts_policer(dev);
     int nb_rx;
     int dropped = 0;
 
@@ -2474,6 +2518,14 @@ netdev_dpdk_rxq_recv(struct netdev_rxq *rxq, struct dp_packet_batch *batch,
         nb_rx = ingress_policer_run(policer,
                                     (struct rte_mbuf **) batch->packets,
                                     nb_rx, true);
+        dropped -= nb_rx;
+    }
+
+    if (pkts_policer) {
+        dropped = nb_rx;
+        nb_rx = ingress_pkts_policer_run(pkts_policer,
+                                         (struct rte_mbuf **) batch->packets,
+                                         nb_rx, true);
         dropped -= nb_rx;
     }
 
@@ -3565,14 +3617,28 @@ netdev_dpdk_policer_construct(uint32_t rate, uint32_t burst)
     return policer;
 }
 
+static struct ingress_pkts_policer *
+netdev_dpdk_pkts_policer_construct(uint32_t kpkts_rate, uint32_t kpkts_burst)
+{
+    struct ingress_pkts_policer *pkts_policer;
+
+    pkts_policer = xmalloc(sizeof *pkts_policer);
+    rte_spinlock_init(&pkts_policer->policer_lock);
+
+    token_bucket_init(&pkts_policer->tb, kpkts_rate, kpkts_burst);
+
+    return pkts_policer;
+}
+
 static int
 netdev_dpdk_set_policing(struct netdev* netdev, uint32_t policer_rate,
                          uint32_t policer_burst,
-                         uint32_t policer_kpkts_rate OVS_UNUSED,
-                         uint32_t policer_kpkts_burst OVS_UNUSED)
+                         uint32_t policer_kpkts_rate,
+                         uint32_t policer_kpkts_burst)
 {
     struct netdev_dpdk *dev = netdev_dpdk_cast(netdev);
     struct ingress_policer *policer;
+    struct ingress_pkts_policer *pkts_policer;
 
     /* Force to 0 if no rate specified,
      * default to 8000 kbits if burst is 0,
@@ -3582,13 +3648,32 @@ netdev_dpdk_set_policing(struct netdev* netdev, uint32_t policer_rate,
                      : !policer_burst ? 8000
                      : policer_burst);
 
+    /*
+     * Force to 0 if no rate specified,
+     * default to rate value if burst is 0,
+     * else stick with user-specified value.
+     */
+    policer_kpkts_burst = (!policer_kpkts_rate ? 0
+                           : !policer_kpkts_burst ? policer_kpkts_rate
+                           : policer_kpkts_burst);
+    /*
+    * kpkts_rate in kilo packets/second, bucket 1 packets.
+    * msec * kilo packets/sec = 1 packets.
+    */
+    policer_kpkts_rate  *= 1000;
+    policer_kpkts_burst *= 1000;
+
     ovs_mutex_lock(&dev->mutex);
 
     policer = ovsrcu_get_protected(struct ingress_policer *,
-                                    &dev->ingress_policer);
+                                   &dev->ingress_policer);
+    pkts_policer = ovsrcu_get_protected(struct ingress_pkts_policer *,
+                                        &dev->ingress_pkts_policer);
 
     if (dev->policer_rate == policer_rate &&
-        dev->policer_burst == policer_burst) {
+        dev->policer_burst == policer_burst &&
+        dev->policer_kpkts_rate == policer_kpkts_rate &&
+        dev->policer_kpkts_burst == policer_kpkts_burst) {
         /* Assume that settings haven't changed since we last set them. */
         ovs_mutex_unlock(&dev->mutex);
         return 0;
@@ -3599,14 +3684,30 @@ netdev_dpdk_set_policing(struct netdev* netdev, uint32_t policer_rate,
         ovsrcu_postpone(free, policer);
     }
 
+    /* Destroy any existing ingress policer for the device if one exists */
+    if (pkts_policer) {
+        ovsrcu_postpone(free, pkts_policer);
+    }
+
     if (policer_rate != 0) {
         policer = netdev_dpdk_policer_construct(policer_rate, policer_burst);
     } else {
         policer = NULL;
     }
+
+    if (policer_kpkts_rate != 0) {
+        pkts_policer = netdev_dpdk_pkts_policer_construct(policer_kpkts_rate,
+                                                          policer_kpkts_burst);
+    } else {
+        pkts_policer = NULL;
+    }
+
     ovsrcu_set(&dev->ingress_policer, policer);
+    ovsrcu_set(&dev->ingress_pkts_policer, pkts_policer);
     dev->policer_rate = policer_rate;
     dev->policer_burst = policer_burst;
+    dev->policer_kpkts_rate = policer_kpkts_rate;
+    dev->policer_kpkts_burst = policer_kpkts_burst;
     ovs_mutex_unlock(&dev->mutex);
 
     return 0;
@@ -4509,6 +4610,12 @@ struct ingress_policer *
 netdev_dpdk_get_ingress_policer(const struct netdev_dpdk *dev)
 {
     return ovsrcu_get(struct ingress_policer *, &dev->ingress_policer);
+}
+
+struct ingress_pkts_policer *
+netdev_dpdk_get_ingress_pkts_policer(const struct netdev_dpdk *dev)
+{
+    return ovsrcu_get(struct ingress_pkts_policer *, &dev->ingress_pkts_policer);
 }
 
 /*
