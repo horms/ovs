@@ -4791,6 +4791,19 @@ ovs-vsctl add-port br0 p0 -- set Interface p0 type=patch options:peer=p1 \
           in performance will be noticed in terms of overall aggregate traffic
           throughput.
         </dd>
+        <dt><code>egress-pkts-policer</code></dt>
+        <dd>
+          A DPDK egress packet per second policer algorithm using the ovs
+          token bucket library. The token bucket library provides an
+          implementation which allows the policing of packets traffic. The
+          implementation in OVS essentially creates a single token bucket used
+          to police traffic. It should be noted that when the token bucket is
+          configured as part of QoS there will be a performance overhead as the
+          token bucket itself will consume CPU cycles in order to police
+          traffic. These CPU cycles ordinarily are used for packet proccessing.
+          As such the drop in performance will be noticed in terms of overall
+          aggregate traffic throughput.
+        </dd>
         <dt><code>trtcm-policer</code></dt>
         <dd>
           A DPDK egress policer algorithm using RFC 4115's Two-Rate,
@@ -4893,6 +4906,25 @@ ovs-vsctl add-port br0 p0 -- set Interface p0 type=patch options:peer=p1 \
         be transmitted then the ebs will be decremented by the number of
         bytes/tokens of the packet. If there are not enough tokens in the cbs
         bucket the packet might be dropped.
+      </column>
+    </group>
+
+    <group title="Configuration for egress-pkts-policer QoS">
+      <p>
+        <ref table="QoS"/> <ref table="QoS" column="type"/>
+        <code>egress-pkts-policer</code> provides egress pkts policing for
+        userspace port types with DPDK.
+
+        It has the following key-value pairs defined.
+      </p>
+
+      <column name="other_config" key="pkts_rate" type='{"type": "integer"}'>
+        The Packets Per Second (pps) represents the packet per second rate at
+        which the token bucket will be updated.
+      </column>
+      <column name="other_config" key="pkts_burst" type='{"type": "integer"}'>
+        The Packets Per Second Burst Size is measured in count and represents a
+        token bucket.
       </column>
     </group>
 

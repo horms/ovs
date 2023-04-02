@@ -19,6 +19,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -59,6 +60,7 @@
 #include "openvswitch/ofp-parse.h"
 #include "openvswitch/ofp-print.h"
 #include "openvswitch/shash.h"
+#include "openvswitch/token-bucket.h"
 #include "openvswitch/vlog.h"
 #include "ovs-numa.h"
 #include "ovs-rcu.h"
@@ -345,6 +347,7 @@ struct dpdk_qos_ops {
 
 /* dpdk_qos_ops for each type of user space QoS implementation. */
 static const struct dpdk_qos_ops egress_policer_ops;
+static const struct dpdk_qos_ops egress_pkts_policer_ops;
 static const struct dpdk_qos_ops trtcm_policer_ops;
 
 /*
@@ -353,6 +356,7 @@ static const struct dpdk_qos_ops trtcm_policer_ops;
  */
 static const struct dpdk_qos_ops *const qos_confs[] = {
     &egress_policer_ops,
+    &egress_pkts_policer_ops,
     &trtcm_policer_ops,
     NULL
 };
@@ -2329,6 +2333,29 @@ srtcm_policer_run_single_packet(struct rte_meter_srtcm *meter,
             if (should_steal) {
                 rte_pktmbuf_free(pkt);
             }
+        }
+    }
+
+    return cnt;
+}
+
+static int
+pkts_policer_run_single_packet(struct token_bucket *tb, struct rte_mbuf **pkts,
+                               int pkt_cnt, bool should_steal)
+{
+    int cnt = 0;
+    struct rte_mbuf *pkt;
+
+    for (int i = 0; i < pkt_cnt; i++) {
+        pkt = pkts[i];
+        /* Handle current packet */
+        if (token_bucket_withdraw(tb, 1000)) {
+            if (cnt != i) {
+                pkts[cnt] = pkt;
+            }
+            cnt++;
+        } else if (should_steal) {
+            rte_pktmbuf_free(pkt);
         }
     }
 
@@ -4856,6 +4883,97 @@ static const struct dpdk_qos_ops egress_policer_ops = {
     .qos_get = egress_policer_qos_get,
     .qos_is_equal = egress_policer_qos_is_equal,
     .qos_run = egress_policer_run
+};
+
+/* egress-pkts-policer details */
+
+struct egress_pkts_policer {
+    struct qos_conf qos_conf;
+    struct token_bucket tb;
+};
+
+static int
+egress_pkts_policer_qos_construct(const struct smap *details,
+                                  struct qos_conf **conf)
+{
+    uint32_t rate, burst;
+    struct egress_pkts_policer *policer;
+
+    policer = xmalloc(sizeof *policer);
+    rate  = smap_get_uint(details, "pkts_rate", 0);
+    burst = smap_get_uint(details, "pkts_burst", 0);
+
+    /*
+     * Force to 0 if no rate specified,
+     * default to rate if burst is 0,
+     * else stick with user-specified value.
+     */
+    burst = (!rate ? 0 : !burst ? rate : burst);
+
+    qos_conf_init(&policer->qos_conf, &egress_pkts_policer_ops);
+    token_bucket_init(&policer->tb, rate, burst * 1000);
+
+    *conf = &policer->qos_conf;
+
+    return 0;
+}
+
+static void
+egress_pkts_policer_qos_destruct(struct qos_conf *conf)
+{
+    struct egress_pkts_policer *policer =
+                CONTAINER_OF(conf, struct egress_pkts_policer, qos_conf);
+
+    free(policer);
+}
+
+static int
+egress_pkts_policer_qos_get(const struct qos_conf *conf, struct smap *details)
+{
+    struct egress_pkts_policer *policer =
+                CONTAINER_OF(conf, struct egress_pkts_policer, qos_conf);
+
+    smap_add_format(details, "pkts_rate", "%"PRIu32, policer->tb.rate);
+    smap_add_format(details, "pkts_burst", "%"PRIu32, policer->tb.burst);
+
+    return 0;
+}
+
+static bool
+egress_pkts_policer_qos_is_equal(const struct qos_conf *conf,
+                                 const struct smap *details)
+{
+    uint32_t rate, burst;
+    struct egress_pkts_policer *policer =
+        CONTAINER_OF(conf, struct egress_pkts_policer, qos_conf);
+
+    rate  = smap_get_uint(details, "pkts_rate", 0);
+    burst = smap_get_uint(details, "pkts_burst", 0);
+
+    return (policer->tb.rate == rate && policer->tb.burst == burst);
+}
+
+static int
+egress_pkts_policer_run(struct qos_conf *conf, struct rte_mbuf **pkts,
+                        int pkt_cnt, bool should_steal)
+{
+    int cnt = 0;
+    struct egress_pkts_policer *policer =
+                CONTAINER_OF(conf, struct egress_pkts_policer, qos_conf);
+
+    cnt = pkts_policer_run_single_packet(&policer->tb, pkts, pkt_cnt,
+                                         should_steal);
+
+    return cnt;
+}
+
+static const struct dpdk_qos_ops egress_pkts_policer_ops = {
+    .qos_name = "egress-pkts-policer",
+    .qos_construct = egress_pkts_policer_qos_construct,
+    .qos_destruct = egress_pkts_policer_qos_destruct,
+    .qos_get = egress_pkts_policer_qos_get,
+    .qos_is_equal = egress_pkts_policer_qos_is_equal,
+    .qos_run = egress_pkts_policer_run
 };
 
 /* trtcm-policer details */
