@@ -283,11 +283,6 @@ AT_CHECK([ovs-appctl vlog/set dpif:dbg dpif_netdev:dbg])
 
 AT_CHECK([ovs-ofctl -O OpenFlow13 add-meter br0 'meter=1 pktps burst stats bands=type=drop rate=1 burst_size=1'])
 AT_CHECK([ovs-ofctl -O OpenFlow13 add-meter br0 'meter=2 kbps burst stats bands=type=drop rate=1 burst_size=2'])
-AT_CHECK([ovs-ofctl -O OpenFlow13 add-flow br0 'in_port=1 action=meter:1,7'])
-AT_CHECK([ovs-ofctl -O OpenFlow13 add-flow br0 'in_port=7 action=meter:2,1'])
-AT_CHECK([ovs-ofctl add-flow br1 'in_port=2 action=8'])
-AT_CHECK([ovs-ofctl add-flow br1 'in_port=8 action=2'])
-ovs-appctl time/stop
 
 AT_CHECK([ovs-ofctl -O OpenFlow13 dump-meters br0], [0], [dnl
 OFPST_METER_CONFIG reply (OF1.3) (xid=0x2):
@@ -297,6 +292,45 @@ type=drop rate=1 burst_size=1
 meter=2 kbps burst stats bands=
 type=drop rate=1 burst_size=2
 ])
+
+AT_CHECK([ovs-ofctl -O OpenFlow13 dump-meters br0 --oneline], [0], [dnl
+OFPST_METER_CONFIG reply (OF1.3) (xid=0x2):
+meter=1 pktps burst stats bands= type=drop rate=1 burst_size=1
+meter=2 kbps burst stats bands= type=drop rate=1 burst_size=2
+])
+
+AT_CHECK([ovs-ofctl -O OpenFlow13 dump-meters br0 meter=1 --oneline], [0], [dnl
+OFPST_METER_CONFIG reply (OF1.3) (xid=0x2):
+meter=1 pktps burst stats bands= type=drop rate=1 burst_size=1
+])
+
+AT_CHECK([ovs-ofctl del-meters -O openflow13 br0])
+AT_CHECK([ovs-ofctl -O OpenFlow13 dump-meters br0], [0], [dnl
+OFPST_METER_CONFIG reply (OF1.3) (xid=0x2):
+])
+
+AT_DATA([meters.txt], [dnl
+meter=1 pktps burst stats bands= type=drop rate=1 burst_size=1
+
+meter=2 kbps burst stats bands= type=drop rate=1 burst_size=2
+meter=3 kbps burst stats bands= type=drop rate=2 burst_size=3
+])
+
+AT_CHECK([ovs-ofctl add-meters -O openflow13 br0 meters.txt])
+AT_CHECK([ovs-ofctl -O OpenFlow13 dump-meters br0 --oneline], [0], [dnl
+OFPST_METER_CONFIG reply (OF1.3) (xid=0x2):
+meter=1 pktps burst stats bands= type=drop rate=1 burst_size=1
+meter=2 kbps burst stats bands= type=drop rate=1 burst_size=2
+meter=3 kbps burst stats bands= type=drop rate=2 burst_size=3
+])
+
+AT_CHECK([ovs-ofctl del-meters -O openflow13 br0 meter=3])
+
+AT_CHECK([ovs-ofctl -O OpenFlow13 add-flow br0 'in_port=1 action=meter:1,7'])
+AT_CHECK([ovs-ofctl -O OpenFlow13 add-flow br0 'in_port=7 action=meter:2,1'])
+AT_CHECK([ovs-ofctl add-flow br1 'in_port=2 action=8'])
+AT_CHECK([ovs-ofctl add-flow br1 'in_port=8 action=2'])
+ovs-appctl time/stop
 
 ovs-appctl time/warp 5000
 for i in `seq 1 7`; do

@@ -54,6 +54,7 @@
 #include "openvswitch/ofp-monitor.h"
 #include "openvswitch/ofp-msgs.h"
 #include "openvswitch/ofp-port.h"
+#include "openvswitch/ofp-print.h"
 #include "openvswitch/ofp-queue.h"
 #include "openvswitch/ofp-switch.h"
 #include "openvswitch/ofp-table.h"
@@ -365,11 +366,17 @@ ofp_print_meter_features_reply(struct ds *s, const struct ofp_header *oh)
 }
 
 static enum ofperr
-ofp_print_meter_config_reply(struct ds *s, const struct ofp_header *oh)
+ofp_print_meter_config_reply(struct ds *s, const struct ofp_header *oh,
+                             int verbosity)
 {
     struct ofpbuf b = ofpbuf_const_initializer(oh, ntohs(oh->length));
+    bool oneline = ONELINE_GET(verbosity);
     struct ofpbuf bands;
     int retval;
+
+    if (oneline) {
+        ds_put_char(s, '\n');
+    }
 
     ofpbuf_init(&bands, 64);
     for (;;) {
@@ -379,8 +386,10 @@ ofp_print_meter_config_reply(struct ds *s, const struct ofp_header *oh)
         if (retval) {
             break;
         }
-        ds_put_char(s, '\n');
-        ofputil_format_meter_config(s, &mc);
+        if (!oneline) {
+            ds_put_char(s, '\n');
+        }
+        ofputil_format_meter_config(s, &mc, oneline ? true : false);
     }
     ofpbuf_uninit(&bands);
 
@@ -1090,7 +1099,7 @@ ofp_to_string__(const struct ofp_header *oh,
         return ofp_print_meter_stats_reply(string, oh);
 
     case OFPTYPE_METER_CONFIG_STATS_REPLY:
-        return ofp_print_meter_config_reply(string, oh);
+        return ofp_print_meter_config_reply(string, oh, VERBOSITY(verbosity));
 
     case OFPTYPE_METER_FEATURES_STATS_REPLY:
         return ofp_print_meter_features_reply(string, oh);
@@ -1278,7 +1287,7 @@ ofp_to_string(const void *oh_, size_t len,
             ofp_print_error(&string, error);
         }
 
-        if (verbosity >= 5 || error) {
+        if (VERBOSITY(verbosity) >= 5 || error) {
             add_newline(&string);
             ds_put_hex_dump(&string, oh, len, 0, true);
         }
