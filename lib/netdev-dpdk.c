@@ -19,6 +19,7 @@
 
 #include <errno.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -59,6 +60,7 @@
 #include "openvswitch/ofp-parse.h"
 #include "openvswitch/ofp-print.h"
 #include "openvswitch/shash.h"
+#include "openvswitch/token-bucket.h"
 #include "openvswitch/vlog.h"
 #include "ovs-numa.h"
 #include "ovs-rcu.h"
@@ -90,6 +92,8 @@ static bool per_port_memory = false; /* Status of per port memory support */
 
 #define OVS_CACHE_LINE_SIZE CACHE_LINE_SIZE
 #define OVS_VPORT_DPDK "ovs_dpdk"
+
+#define MAX_KPKTS_PARAMETER 4294967U  /* UINT32_MAX / 1000 */
 
 /*
  * need to reserve tons of extra space in the mbufs so we can align the
@@ -398,6 +402,11 @@ struct dpdk_tx_queue {
         /* Mapping of configured vhost-user queue to enabled by guest. */
         int map;
     );
+};
+
+enum policer_type {
+    POLICER_BPS   = 1 << 0,   /* Rate value in bytes/sec. */
+    POLICER_PKTPS = 1 << 1,   /* Rate value in packet/sec. */
 };
 
 struct ingress_policer {
@@ -2330,6 +2339,22 @@ srtcm_policer_run_single_packet(struct rte_meter_srtcm *meter,
                 rte_pktmbuf_free(pkt);
             }
         }
+    }
+
+    return cnt;
+}
+
+static int
+pkts_policer_run_single_packet(struct token_bucket *tb, struct rte_mbuf **pkts,
+                               int pkt_cnt, bool should_steal)
+{
+    int cnt = 0;
+
+    if (token_bucket_withdraw(tb, pkt_cnt)) {
+        /* Handle packet by batch. */
+        cnt = pkt_cnt;
+    } else if (should_steal) {
+        rte_pktmbuf_free_bulk(pkts, pkt_cnt);
     }
 
     return cnt;
@@ -4757,6 +4782,10 @@ netdev_dpdk_queue_dump_done(const struct netdev *netdev OVS_UNUSED,
 
 struct egress_policer {
     struct qos_conf qos_conf;
+    enum policer_type type;
+    uint32_t kpkts_rate;
+    uint32_t kpkts_burst;
+    struct token_bucket egress_tb;
     struct rte_meter_srtcm_params app_srtcm_params;
     struct rte_meter_srtcm egress_meter;
     struct rte_meter_srtcm_profile egress_prof;
@@ -4776,26 +4805,53 @@ static int
 egress_policer_qos_construct(const struct smap *details,
                              struct qos_conf **conf)
 {
+    uint32_t kpkts_burst, kpkts_rate;
     struct egress_policer *policer;
     int err = 0;
 
-    policer = xmalloc(sizeof *policer);
+    policer = xzalloc(sizeof *policer);
+    if (!policer) {
+        return ENOMEM;
+    }
+
     qos_conf_init(&policer->qos_conf, &egress_policer_ops);
     egress_policer_details_to_param(details, &policer->app_srtcm_params);
     err = rte_meter_srtcm_profile_config(&policer->egress_prof,
-                                         &policer->app_srtcm_params);
+                                        &policer->app_srtcm_params);
     if (!err) {
         err = rte_meter_srtcm_config(&policer->egress_meter,
-                                     &policer->egress_prof);
+                                    &policer->egress_prof);
+    }
+    if (err) {
+        VLOG_ERR("Could not create rte meter for egress policer");
+        err = -err;
+    } else {
+        policer->type |= POLICER_BPS;
     }
 
-    if (!err) {
-        *conf = &policer->qos_conf;
+    kpkts_rate  = smap_get_uint(details, "kpkts_rate", 0);
+    kpkts_burst = smap_get_uint(details, "kpkts_burst", 0);
+    if (kpkts_rate > MAX_KPKTS_PARAMETER || kpkts_burst > MAX_KPKTS_PARAMETER
+        || kpkts_rate == 0 || kpkts_burst == 0) {
+        /* Paramters between (1 ~ MAX_KPKTS_PARAMETER). */
+        err = EINVAL;
+        VLOG_ERR("Could not create tocken bucket for egress policer");
     } else {
-        VLOG_ERR("Could not create rte meter for egress policer");
+        /* Rate in kilo-packets/second, bucket 1000 packets. */
+        /* msec * kilo-packets/sec = 1 packets. */
+        token_bucket_set(&policer->egress_tb, kpkts_rate, kpkts_burst * 1000);
+        policer->kpkts_burst = kpkts_burst;
+        policer->kpkts_rate = kpkts_rate;
+        policer->type |= POLICER_PKTPS;
+    }
+
+    if (!policer->type) {
+        /* both bps and kpkts contrsruct failed.*/
         free(policer);
         *conf = NULL;
-        err = -err;
+    } else {
+        err = 0;
+        *conf = &policer->qos_conf;
     }
 
     return err;
@@ -4817,6 +4873,8 @@ egress_policer_qos_get(const struct qos_conf *conf, struct smap *details)
 
     smap_add_format(details, "cir", "%"PRIu64, policer->app_srtcm_params.cir);
     smap_add_format(details, "cbs", "%"PRIu64, policer->app_srtcm_params.cbs);
+    smap_add_format(details, "kpkts_rate", "%"PRIu32, policer->kpkts_rate);
+    smap_add_format(details, "kpkts_burst", "%"PRIu32, policer->kpkts_burst);
 
     return 0;
 }
@@ -4828,25 +4886,37 @@ egress_policer_qos_is_equal(const struct qos_conf *conf,
     struct egress_policer *policer =
         CONTAINER_OF(conf, struct egress_policer, qos_conf);
     struct rte_meter_srtcm_params params;
+    uint32_t kpkts_burst, kpkts_rate;
 
     egress_policer_details_to_param(details, &params);
 
-    return !memcmp(&params, &policer->app_srtcm_params, sizeof params);
+    kpkts_rate  = smap_get_uint(details, "kpkts_rate", 0);
+    kpkts_burst = smap_get_uint(details, "kpkts_burst", 0);
+
+    return (!memcmp(&params, &policer->app_srtcm_params, sizeof params))
+            && (policer->kpkts_rate == kpkts_rate
+                && policer->kpkts_burst == kpkts_burst);
 }
 
 static int
 egress_policer_run(struct qos_conf *conf, struct rte_mbuf **pkts, int pkt_cnt,
                    bool should_steal)
 {
-    int cnt = 0;
     struct egress_policer *policer =
         CONTAINER_OF(conf, struct egress_policer, qos_conf);
 
-    cnt = srtcm_policer_run_single_packet(&policer->egress_meter,
-                                          &policer->egress_prof, pkts,
-                                          pkt_cnt, should_steal);
+    if (policer->type & POLICER_BPS) {
+        pkt_cnt = srtcm_policer_run_single_packet(&policer->egress_meter,
+                                                  &policer->egress_prof, pkts,
+                                                  pkt_cnt, should_steal);
+    }
 
-    return cnt;
+    if (policer->type & POLICER_PKTPS) {
+        pkt_cnt = pkts_policer_run_single_packet(&policer->egress_tb, pkts,
+                                                 pkt_cnt, should_steal);
+    }
+
+    return pkt_cnt;
 }
 
 static const struct dpdk_qos_ops egress_policer_ops = {

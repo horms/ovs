@@ -4894,6 +4894,16 @@ ovs-vsctl add-port br0 p0 -- set Interface p0 type=patch options:peer=p1 \
         bytes/tokens of the packet. If there are not enough tokens in the cbs
         bucket the packet might be dropped.
       </column>
+      <column name="other_config" key="kpkts_rate"
+              type='{"type": "integer", "minInteger": 0, "maxInteger": 4294967}'>
+        The Packets Per Second (PPS) represents the packet per second rate at
+        which the token bucket will be updated.
+      </column>
+      <column name="other_config" key="kpkts_burst"
+              type='{"type": "integer", "minInteger": 0, "maxInteger": 4294967}'>
+        The Packets Per Second Burst Size is measured in count and represents a
+        token bucket.
+      </column>
     </group>
 
     <group title="Configuration for linux-sfq">
