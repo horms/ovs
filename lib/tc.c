@@ -237,11 +237,19 @@ static void request_from_tcf_id(struct tcf_id *id, uint16_t eth_type,
     }
 }
 
+/* Please acquaint yourself with the documentation of the `nl_transact`
+ * function in the netlink-sock module before making use of this function.
+ */
 int
 tc_transact(struct ofpbuf *request, struct ofpbuf **replyp)
 {
     int error = nl_transact(NETLINK_ROUTE, request, replyp);
     ofpbuf_uninit(request);
+
+    if (!error && replyp && !(*replyp)->size) {
+        return EAGAIN;
+    }
+
     return error;
 }
 

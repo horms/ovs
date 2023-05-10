@@ -2340,7 +2340,9 @@ parse_flow_put(struct dpif_netlink *dpif, struct dpif_flow_put *put)
             }
             netdev_set_hw_info(oor_netdev, HW_INFO_TYPE_OOR, true);
         }
-        level = (err == ENOSPC || err == EOPNOTSUPP) ? VLL_DBG : VLL_ERR;
+        level = (err == EAGAIN ||
+                 err == ENOSPC ||
+                 err == EOPNOTSUPP) ? VLL_DBG : VLL_ERR;
         VLOG_RL(&rl, level, "failed to offload flow: %s: %s",
                 ovs_strerror(err),
                 (oor_netdev ? oor_netdev->name : dev->name));

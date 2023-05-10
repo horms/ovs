@@ -1798,6 +1798,11 @@ nl_pool_release(struct nl_sock *sock)
  *
  *      2. Resending the request causes it to be re-executed, so the request
  *         needs to be idempotent.
+ *
+ *      3. In the event that the kernel is to busy to handle the request to
+ *         receive the response (i.e. EAGAIN), this function will still return
+ *         0.  The caller can check for this condition by checking for a zero
+ *         size of the 'replyp' ofpbuf buffer.
  */
 int
 nl_transact(int protocol, const struct ofpbuf *request,
