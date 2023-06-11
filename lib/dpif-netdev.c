@@ -547,7 +547,8 @@ static int get_port_by_name(struct dp_netdev *dp, const char *devname,
 static void dp_netdev_free(struct dp_netdev *)
     OVS_REQUIRES(dp_netdev_mutex);
 static int do_add_port(struct dp_netdev *dp, const char *devname,
-                       const char *type, odp_port_t port_no)
+                       const char *type, odp_port_t port_no,
+                       struct netdev **datapath_netdev)
     OVS_REQ_WRLOCK(dp->port_rwlock);
 static void do_del_port(struct dp_netdev *dp, struct dp_netdev_port *)
     OVS_REQ_WRLOCK(dp->port_rwlock);
@@ -1899,7 +1900,7 @@ create_dp_netdev(const char *name, const struct dpif_class *class,
 
     error = do_add_port(dp, name, dpif_netdev_port_open_type(dp->class,
                                                              "internal"),
-                        ODPP_LOCAL);
+                        ODPP_LOCAL, NULL);
     ovs_rwlock_unlock(&dp->port_rwlock);
     if (error) {
         dp_netdev_free(dp);
@@ -2166,7 +2167,7 @@ out:
 
 static int
 do_add_port(struct dp_netdev *dp, const char *devname, const char *type,
-            odp_port_t port_no)
+            odp_port_t port_no, struct netdev **datapath_netdev)
     OVS_REQ_WRLOCK(dp->port_rwlock)
 {
     struct netdev_saved_flags *sf;
@@ -2181,6 +2182,9 @@ do_add_port(struct dp_netdev *dp, const char *devname, const char *type,
     error = port_create(devname, type, port_no, &port);
     if (error) {
         return error;
+    }
+    if (datapath_netdev) {
+        *datapath_netdev = port->netdev;
     }
 
     hmap_insert(&dp->ports, &port->node, hash_port_no(port_no));
@@ -2211,7 +2215,7 @@ do_add_port(struct dp_netdev *dp, const char *devname, const char *type,
 
 static int
 dpif_netdev_port_add(struct dpif *dpif, struct netdev *netdev,
-                     odp_port_t *port_nop)
+                     odp_port_t *port_nop, struct netdev **datapath_netdev)
 {
     struct dp_netdev *dp = get_dp_netdev(dpif);
     char namebuf[NETDEV_VPORT_NAME_BUFSIZE];
@@ -2230,7 +2234,8 @@ dpif_netdev_port_add(struct dpif *dpif, struct netdev *netdev,
     }
     if (!error) {
         *port_nop = port_no;
-        error = do_add_port(dp, dpif_port, netdev_get_type(netdev), port_no);
+        error = do_add_port(dp, dpif_port, netdev_get_type(netdev), port_no,
+                            datapath_netdev);
     }
     ovs_rwlock_unlock(&dp->port_rwlock);
 

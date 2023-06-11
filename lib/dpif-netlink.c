@@ -1144,7 +1144,7 @@ dpif_netlink_rtnl_port_create_and_add(struct dpif_netlink *dpif,
 
 static int
 dpif_netlink_port_add(struct dpif *dpif_, struct netdev *netdev,
-                      odp_port_t *port_nop)
+                      odp_port_t *port_nop, struct netdev **datapath_netdev)
 {
     struct dpif_netlink *dpif = dpif_netlink_cast(dpif_);
     int error = EOPNOTSUPP;
@@ -1157,6 +1157,9 @@ dpif_netlink_port_add(struct dpif *dpif_, struct netdev *netdev,
         error = dpif_netlink_port_add_compat(dpif, netdev, port_nop);
     }
     fat_rwlock_unlock(&dpif->upcall_lock);
+    if (datapath_netdev) {
+        *datapath_netdev = netdev;
+    }
 
     return error;
 }

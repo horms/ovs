@@ -204,10 +204,11 @@ struct dpif_class {
      * ODPP_NONE, attempts to use that as the port's port number.
      *
      * If port is successfully added, sets '*port_no' to the new port's
-     * port number.  Returns EBUSY if caller attempted to choose a port
+     * port number, and datapath_netdev to a potentially created netdev in the
+     * dpif-class level.  Returns EBUSY if caller attempted to choose a port
      * number, and it was in use. */
     int (*port_add)(struct dpif *dpif, struct netdev *netdev,
-                    odp_port_t *port_no);
+                    odp_port_t *port_no, struct netdev **datapath_netdev);
 
     /* Removes port numbered 'port_no' from 'dpif'. */
     int (*port_del)(struct dpif *dpif, odp_port_t port_no);
