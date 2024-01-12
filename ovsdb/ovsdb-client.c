@@ -391,7 +391,7 @@ parse_options(int argc, char *argv[])
             break;
 
         default:
-            abort();
+            ovs_hard_stop();
         }
     }
     free(short_options);

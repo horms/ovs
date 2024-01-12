@@ -110,7 +110,7 @@ fpv_create(const char *type, struct fake_pvconn *fpv)
         free(open_name);
         free(s);
     } else {
-        abort();
+        ovs_hard_stop();
     }
 }
 

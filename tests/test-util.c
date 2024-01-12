@@ -36,7 +36,7 @@ check_log_2_floor(uint32_t x, int n)
     if (log_2_floor(x) != n) {
         fprintf(stderr, "log_2_floor(%"PRIu32") is %d but should be %d\n",
                 x, log_2_floor(x), n);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -64,7 +64,7 @@ check_ctz32(uint32_t x, int n)
     if (ctz32(x) != n) {
         fprintf(stderr, "ctz32(%"PRIu32") is %d but should be %d\n",
                 x, ctz32(x), n);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -74,7 +74,7 @@ check_ctz64(uint64_t x, int n)
     if (ctz64(x) != n) {
         fprintf(stderr, "ctz64(%"PRIu64") is %d but should be %d\n",
                 x, ctz64(x), n);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -117,7 +117,7 @@ check_clz32(uint32_t x, int n)
     if (clz32(x) != n) {
         fprintf(stderr, "clz32(%"PRIu32") is %d but should be %d\n",
                 x, clz32(x), n);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -127,7 +127,7 @@ check_clz64(uint64_t x, int n)
     if (clz64(x) != n) {
         fprintf(stderr, "clz64(%"PRIu64") is %d but should be %d\n",
                 x, clz64(x), n);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -177,7 +177,7 @@ check_rup2(uint32_t x, int n)
     if (rup2 != n) {
         fprintf(stderr, "ROUND_UP_POW2(%#"PRIx32") is %#"PRIx32" "
                 "but should be %#"PRIx32"\n", x, rup2, n);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -205,7 +205,7 @@ check_rdp2(uint32_t x, int n)
     if (rdp2 != n) {
         fprintf(stderr, "ROUND_DOWN_POW2(%#"PRIx32") is %#"PRIx32" "
                 "but should be %#"PRIx32"\n", x, rdp2, n);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -243,7 +243,7 @@ check_count_1bits(uint64_t x, int n)
     if (count_1bits(x) != n) {
         fprintf(stderr, "count_1bits(%#"PRIx64") is %d but should be %d\n",
                 x, count_1bits(x), n);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -323,7 +323,7 @@ test_bitwise_copy(struct ovs_cmdl_context *ctx OVS_UNUSED)
                             ntohll(orig_dst), dst_ofs,
                             n_bits,
                             ntohll(dst), ntohll(expect));
-                    abort();
+                    ovs_hard_stop();
                 }
 
                 n_loops++;
@@ -332,7 +332,7 @@ test_bitwise_copy(struct ovs_cmdl_context *ctx OVS_UNUSED)
     }
 
     if (n_loops != sum_of_squares(64)) {
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -365,7 +365,7 @@ test_bitwise_zero(struct ovs_cmdl_context *ctx OVS_UNUSED)
                         ntohll(orig_dst), dst_ofs,
                         n_bits,
                         ntohll(dst), ntohll(expect));
-                abort();
+                ovs_hard_stop();
             }
 
             n_loops++;
@@ -373,7 +373,7 @@ test_bitwise_zero(struct ovs_cmdl_context *ctx OVS_UNUSED)
     }
 
     if (n_loops != 64 * (64 + 1) / 2) {
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -406,7 +406,7 @@ test_bitwise_one(struct ovs_cmdl_context *ctx OVS_UNUSED)
                         ntohll(orig_dst), dst_ofs,
                         n_bits,
                         ntohll(dst), ntohll(expect));
-                abort();
+                ovs_hard_stop();
             }
 
             n_loops++;
@@ -414,7 +414,7 @@ test_bitwise_one(struct ovs_cmdl_context *ctx OVS_UNUSED)
     }
 
     if (n_loops != 64 * (64 + 1) / 2) {
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -454,7 +454,7 @@ test_bitwise_is_all_zeros(struct ovs_cmdl_context *ctx OVS_UNUSED)
                                 ntohll(x), ofs, n,
                                 answer ? "true" : "false",
                                 expect ? "true" : "false");
-                        abort();
+                        ovs_hard_stop();
                     }
                 }
             }
@@ -553,7 +553,7 @@ test_bitwise_rscan(struct ovs_cmdl_context *ctx OVS_UNUSED)
                                     start, end,
                                     answer ? "true" : "false",
                                     expect ? "true" : "false");
-                            abort();
+                            ovs_hard_stop();
                         }
                     }
                 }
@@ -1145,7 +1145,7 @@ check_sat(long long int x, long long int y, const char *op,
     if (r_a != r_b) {
         fprintf(stderr, "%lld %s %lld saturates differently: %lld vs %lld\n",
                 x, op, y, r_a, r_b);
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -1244,7 +1244,7 @@ parse_options(int argc, char *argv[])
             exit(EXIT_FAILURE);
 
         default:
-            abort();
+            ovs_hard_stop();
         }
     }
     free(short_options);

@@ -832,7 +832,7 @@ ovsthread_key_create(ovsthread_key_t *keyp, void (*destructor)(void *))
         key = xmalloc(sizeof *key);
         key->index = n_keys++;
         if (key->index >= MAX_KEYS) {
-            abort();
+            ovs_hard_stop();
         }
     } else {
         key = CONTAINER_OF(ovs_list_pop_back(&free_keys),

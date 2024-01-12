@@ -93,10 +93,10 @@ ovs_assert_failure(const char *where, const char *function,
     case 1:
         fprintf(stderr, "%s: assertion %s failed in %s()",
                 where, condition, function);
-        abort();
+        ovs_hard_stop();
 
     default:
-        abort();
+        ovs_hard_stop();
     }
 }
 
@@ -423,7 +423,7 @@ string_ends_with(const char *str, const char *suffix)
 
 /* Prints 'format' on stderr, formatting it like printf() does.  If 'err_no' is
  * nonzero, then it is formatted with ovs_retval_to_string() and appended to
- * the message inside parentheses.  Then, terminates with abort().
+ * the message inside parentheses.  Then, terminates with ovs_hard_stop().
  *
  * This function is preferred to ovs_fatal() in a situation where it would make
  * sense for a monitoring process to restart the daemon.
@@ -444,7 +444,7 @@ void
 ovs_abort_valist(int err_no, const char *format, va_list args)
 {
     ovs_error_valist(err_no, format, args);
-    abort();
+    ovs_hard_stop();
 }
 
 /* Prints 'format' on stderr, formatting it like printf() does.  If 'err_no' is

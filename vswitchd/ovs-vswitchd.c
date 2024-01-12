@@ -263,7 +263,7 @@ parse_options(int argc, char *argv[], char **unixctl_pathp)
             break;
 
         default:
-            abort();
+            ovs_hard_stop();
         }
     }
     free(short_options);

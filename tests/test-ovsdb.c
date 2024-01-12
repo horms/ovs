@@ -143,7 +143,7 @@ parse_options(int argc, char *argv[], struct test_ovsdb_pvt_context *pvt)
             exit(EXIT_FAILURE);
 
         default:
-            abort();
+            ovs_hard_stop();
         }
     }
     free(short_options);
@@ -949,7 +949,7 @@ do_compare_rows(struct ovs_cmdl_context *ctx)
                 printf("%s == %s\n", names[i], names[j]);
                 if (i_hash != j_hash) {
                     printf("but hash(%s) != hash(%s)\n", names[i], names[j]);
-                    abort();
+                    ovs_hard_stop();
                 }
             } else if (i_hash == j_hash) {
                 printf("hash(%s) == hash(%s)\n", names[i], names[j]);

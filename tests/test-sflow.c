@@ -780,7 +780,7 @@ parse_options(int argc, char *argv[])
             exit(EXIT_FAILURE);
 
         default:
-            abort();
+            ovs_hard_stop();
         }
     }
     free(short_options);

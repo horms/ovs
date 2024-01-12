@@ -24,6 +24,7 @@
 #include "openvswitch/list.h"
 #include "ovs-thread.h"
 #include "random.h"
+#include "util.h"
 
 struct fat_rwlock_slot {
     /* Membership in rwlock's list of "struct fat_rwlock_slot"s.
@@ -63,7 +64,7 @@ static void
 free_slot(struct fat_rwlock_slot *slot)
 {
     if (slot->depth) {
-        abort();
+        ovs_hard_stop();
     }
 
     ovs_list_remove(&slot->list_node);
@@ -151,7 +152,7 @@ fat_rwlock_rdlock(const struct fat_rwlock *rwlock_)
     switch (this->depth) {
     case UINT_MAX:
         /* This thread already holds the write-lock. */
-        abort();
+        ovs_hard_stop();
 
     case 0:
         ovs_mutex_lock(&this->mutex);
@@ -266,7 +267,7 @@ fat_rwlock_unlock(const struct fat_rwlock *rwlock_)
 
     case 0:
         /* This thread doesn't hold any lock. */
-        abort();
+        ovs_hard_stop();
 
     case 1:
         ovs_mutex_unlock(&this->mutex);

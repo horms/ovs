@@ -159,7 +159,7 @@ parse_options(int *argcp, char **argvp[], char **unixctl_pathp)
             exit(EXIT_FAILURE);
 
         default:
-            abort();
+            ovs_hard_stop();
         }
     }
     free(short_options);

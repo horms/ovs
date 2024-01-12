@@ -109,7 +109,7 @@ ovs_prefetch_range(const void *start, size_t size)
 #define INT_MOD_MIN(a, b)   ((INT_MOD_LT(a, b)) ? (a) : (b))
 #define INT_MOD_MAX(a, b)   ((INT_MOD_GT(a, b)) ? (a) : (b))
 
-#define OVS_NOT_REACHED() abort()
+#define OVS_NOT_REACHED() ovs_hard_stop()
 
 /* Joins two token expanding the arguments if they are macros.
  *
@@ -225,6 +225,8 @@ nullable_memset(void *dst, int c, size_t n)
  * array. */
 #define ovs_strlcpy_arrays(DST, SRC) \
     ovs_strlcpy(DST, SRC, MIN(ARRAY_SIZE(DST), ARRAY_SIZE(SRC)))
+
+#define abort please_use_ovs_hard_stop_instead_of_abort
 
 OVS_NO_RETURN void ovs_abort(int err_no, const char *format, ...)
     OVS_PRINTF_FORMAT(2, 3);
