@@ -280,7 +280,7 @@ void xpthread_join(pthread_t, void **);
     NAME##_once_init(void)                                              \
     {                                                                   \
         if (pthread_key_create(&NAME##_key, free)) {                    \
-            abort();                                                    \
+            ovs_hard_stop();                                            \
         }                                                               \
     }                                                                   \
                                                                         \
@@ -317,7 +317,7 @@ void xpthread_join(pthread_t, void **);
     NAME##_once_init(void)                                              \
     {                                                                   \
         if (pthread_key_create(&NAME##_key, free)) {                    \
-            abort();                                                    \
+            ovs_hard_stop();                                            \
         }                                                               \
     }                                                                   \
                                                                         \
@@ -377,7 +377,7 @@ void xpthread_join(pthread_t, void **);
     NAME##_once_init(void)                              \
     {                                                   \
         if (pthread_key_create(&NAME##_key, free)) {    \
-            abort();                                    \
+            ovs_hard_stop();                            \
         }                                               \
     }                                                   \
                                                         \

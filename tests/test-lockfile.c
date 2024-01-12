@@ -44,7 +44,7 @@ check(int a, int b,
         fprintf(stderr, "%s:%d: expected %s == %s but %d != %d\n",
                 file, line, a_string, b_string, a, b);
         fflush(stderr);
-        abort();
+        ovs_hard_stop();
     }
 }
 

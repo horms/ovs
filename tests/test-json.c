@@ -248,7 +248,7 @@ test_json_main(int argc, char *argv[])
             exit(1);
 
         default:
-            abort();
+            ovs_hard_stop();
         }
     }
 

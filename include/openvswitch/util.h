@@ -17,6 +17,8 @@
 #ifndef OPENVSWITCH_UTIL_H
 #define OPENVSWITCH_UTIL_H 1
 
+#include <stdlib.h>
+
 #include <openvswitch/compiler.h>
 #include <openvswitch/version.h>
 #include <openvswitch/types.h>
@@ -43,6 +45,13 @@ const char *ovs_get_program_version(void);
     ((Y) == 0 ? 0                                                       \
      : (X) <= UINT_MAX / (Y) ? (unsigned int) (X) * (unsigned int) (Y)  \
      : UINT_MAX)
+
+/* Prefer the term hard stop to abort */
+OVS_NO_RETURN static inline void
+ovs_hard_stop(void)
+{
+    abort();
+}
 
 /* Like the standard assert macro, except:
  *

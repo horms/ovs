@@ -268,7 +268,7 @@ parse_options(int argc, char *argv[], struct shash *local_options)
             exit(EXIT_FAILURE);
 
         default:
-            abort();
+            ovs_hard_stop();
         }
     }
     free(short_options);

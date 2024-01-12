@@ -159,7 +159,7 @@ atomic_signal_fence(memory_order order)
     } else if (sizeof *(DST) == 8) {                                     \
         atomic_store64(DST, SRC, ORDER)                                  \
     } else {                                                             \
-        abort();                                                         \
+        ovs_hard_stop();                                                 \
     }
 
 /* On x86, for 'memory_order_seq_cst', if stores are locked, the corresponding
@@ -203,7 +203,7 @@ atomic_signal_fence(memory_order order)
     } else if (sizeof *(DST) == 8) {                                      \
         atomic_read64(SRC, DST, ORDER)                                    \
     } else {                                                              \
-        abort();                                                          \
+        ovs_hard_stop();                                                  \
     }
 
 /* For add, sub, and logical operations, for 8, 16 and 64 bit data types,
@@ -246,7 +246,7 @@ atomic_signal_fence(memory_order order)
     } else if (sizeof *(RMW) == 8) {                           \
         atomic_add64(RMW, ARG, ORIG, ORDER)              \
     } else {                                                   \
-        abort();                                               \
+        ovs_hard_stop();                                       \
     }
 
 /* Arithmetic subtraction calls. */
@@ -280,7 +280,7 @@ atomic_signal_fence(memory_order order)
     } else if (sizeof *(RMW) == 8) {                           \
         atomic_op(and, 64, RMW, ARG, ORIG, ORDER)              \
     } else {                                                   \
-        abort();                                               \
+        ovs_hard_stop();                                       \
     }
 
 /* Logical 'Or' calls. */
@@ -306,7 +306,7 @@ atomic_signal_fence(memory_order order)
     } else if (sizeof *(RMW) == 8) {                           \
         atomic_op(or, 64, RMW, ARG, ORIG, ORDER)               \
     } else {                                                   \
-        abort();                                               \
+        ovs_hard_stop();                                       \
     }
 
 /* Logical Xor calls. */
@@ -332,7 +332,7 @@ atomic_signal_fence(memory_order order)
     } else if (sizeof *(RMW) == 8) {                           \
         atomic_op(xor, 64, RMW, ARG, ORIG, ORDER)              \
     } else {                                                   \
-        abort();                                               \
+        ovs_hard_stop();                                       \
     }
 
 #define atomic_compare_exchange_strong(DST, EXP, SRC)   \
@@ -361,7 +361,7 @@ atomic_signal_fence(memory_order order)
         _InterlockedExchange((long int volatile *) DST, SRC) \
     : (sizeof *(DST) == 8) ? \
         _InterlockedExchange64((__int64 volatile *) DST, SRC) \
-    : (abort(), 0))
+    : (ovs_hard_stop(), 0))
 
 #define atomic_exchange(DST, SRC) \
         atomic_exchange_explicit(DST, SRC, memory_order_seq_cst)

@@ -1523,7 +1523,7 @@ json_parser_input(struct json_parser *p, struct json_token *token)
         break;
 
     default:
-        abort();
+        ovs_hard_stop();
     }
 
     p->lex_state = JSON_LEX_START;
