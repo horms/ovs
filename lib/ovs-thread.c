@@ -63,13 +63,14 @@ static bool multithreaded;
  \
         /* Verify that 'l' was initialized. */ \
         if (OVS_UNLIKELY(!l->where)) { \
-            ovs_abort(0, "%s: %s() passed uninitialized ovs_"#TYPE, \
-                      where, __func__); \
+            ovs_force_stop(0, "%s: %s() passed uninitialized ovs_"#TYPE, \
+                           where, __func__); \
         } \
  \
         error = pthread_##TYPE##_##FUN(&l->lock); \
         if (OVS_UNLIKELY(error)) { \
-            ovs_abort(error, "%s: pthread_%s_%s failed", where, #TYPE, #FUN); \
+            ovs_force_stop(error, "%s: pthread_%s_%s failed", where, #TYPE, \
+                           #FUN); \
         } \
         l->where = where; \
  }
@@ -91,13 +92,14 @@ LOCK_FUNCTION(spin, lock);
  \
         /* Verify that 'l' was initialized. */ \
         if (OVS_UNLIKELY(!l->where)) { \
-            ovs_abort(0, "%s: %s() passed uninitialized ovs_"#TYPE, \
-                      where, __func__); \
+            ovs_force_stop(0, "%s: %s() passed uninitialized ovs_"#TYPE, \
+                           where, __func__); \
         } \
  \
         error = pthread_##TYPE##_##FUN(&l->lock); \
         if (OVS_UNLIKELY(error) && error != EBUSY) { \
-            ovs_abort(error, "%s: pthread_%s_%s failed", where, #TYPE, #FUN); \
+            ovs_force_stop(error, "%s: pthread_%s_%s failed", where, #TYPE, \
+                           #FUN); \
         } \
         if (!error) { \
             l->where = where; \
@@ -125,7 +127,7 @@ TRY_LOCK_FUNCTION(spin, trylock);
         l->where = WHERE; \
         error = pthread_##TYPE##_##FUN(&l->lock); \
         if (OVS_UNLIKELY(error)) { \
-            ovs_abort(error, "pthread_%s_%s failed", #TYPE, #FUN); \
+            ovs_force_stop(error, "pthread_%s_%s failed", #TYPE, #FUN); \
         } \
     }
 UNLOCK_FUNCTION(mutex, unlock, "<unlocked>");
@@ -137,32 +139,32 @@ UNLOCK_FUNCTION(spin, unlock, "<unlocked>");
 UNLOCK_FUNCTION(spin, destroy, NULL);
 #endif
 
-#define XPTHREAD_FUNC1(FUNCTION, PARAM1)                \
-    void                                                \
-    x##FUNCTION(PARAM1 arg1)                            \
-    {                                                   \
-        int error = FUNCTION(arg1);                     \
-        if (OVS_UNLIKELY(error)) {                      \
-            ovs_abort(error, "%s failed", #FUNCTION);   \
-        }                                               \
+#define XPTHREAD_FUNC1(FUNCTION, PARAM1)                    \
+    void                                                    \
+    x##FUNCTION(PARAM1 arg1)                                \
+    {                                                       \
+        int error = FUNCTION(arg1);                         \
+        if (OVS_UNLIKELY(error)) {                          \
+            ovs_force_stop(error, "%s failed", #FUNCTION);  \
+        }                                                   \
     }
-#define XPTHREAD_FUNC2(FUNCTION, PARAM1, PARAM2)        \
-    void                                                \
-    x##FUNCTION(PARAM1 arg1, PARAM2 arg2)               \
-    {                                                   \
-        int error = FUNCTION(arg1, arg2);               \
-        if (OVS_UNLIKELY(error)) {                      \
-            ovs_abort(error, "%s failed", #FUNCTION);   \
-        }                                               \
+#define XPTHREAD_FUNC2(FUNCTION, PARAM1, PARAM2)            \
+    void                                                    \
+    x##FUNCTION(PARAM1 arg1, PARAM2 arg2)                   \
+    {                                                       \
+        int error = FUNCTION(arg1, arg2);                   \
+        if (OVS_UNLIKELY(error)) {                          \
+            ovs_force_stop(error, "%s failed", #FUNCTION);  \
+        }                                                   \
     }
-#define XPTHREAD_FUNC3(FUNCTION, PARAM1, PARAM2, PARAM3)\
-    void                                                \
-    x##FUNCTION(PARAM1 arg1, PARAM2 arg2, PARAM3 arg3)  \
-    {                                                   \
-        int error = FUNCTION(arg1, arg2, arg3);         \
-        if (OVS_UNLIKELY(error)) {                      \
-            ovs_abort(error, "%s failed", #FUNCTION);   \
-        }                                               \
+#define XPTHREAD_FUNC3(FUNCTION, PARAM1, PARAM2, PARAM3)    \
+    void                                                    \
+    x##FUNCTION(PARAM1 arg1, PARAM2 arg2, PARAM3 arg3)      \
+    {                                                       \
+        int error = FUNCTION(arg1, arg2, arg3);             \
+        if (OVS_UNLIKELY(error)) {                          \
+            ovs_force_stop(error, "%s failed", #FUNCTION);  \
+        }                                                   \
     }
 
 XPTHREAD_FUNC1(pthread_mutexattr_init, pthread_mutexattr_t *);
@@ -204,7 +206,7 @@ ovs_mutex_init__(const struct ovs_mutex *l_, int type)
     xpthread_mutexattr_settype(&attr, type);
     error = pthread_mutex_init(&l->lock, &attr);
     if (OVS_UNLIKELY(error)) {
-        ovs_abort(error, "pthread_mutex_init failed");
+        ovs_force_stop(error, "pthread_mutex_init failed");
     }
     xpthread_mutexattr_destroy(&attr);
 }
@@ -251,13 +253,14 @@ ovs_rwlock_init(const struct ovs_rwlock *l_)
     xpthread_rwlockattr_destroy(&attr);
 #else
     /* It is important to avoid passing a rwlockattr in this case because
-     * Windows pthreads 2.9.1 (and earlier) fail and abort if passed one, even
-     * one without any special attributes. */
+     * Windows pthreads 2.9.1 (and earlier) fail and perform an
+     * ovs_force_stop if passed one, even one without any special
+     * attributes. */
     error = pthread_rwlock_init(&l->lock, NULL);
 #endif
 
     if (OVS_UNLIKELY(error)) {
-        ovs_abort(error, "pthread_rwlock_init failed");
+        ovs_force_stop(error, "pthread_rwlock_init failed");
     }
 }
 
@@ -275,7 +278,7 @@ ovs_mutex_cond_wait(pthread_cond_t *cond, const struct ovs_mutex *mutex_)
     error = pthread_cond_wait(cond, &mutex->lock);
 
     if (OVS_UNLIKELY(error)) {
-        ovs_abort(error, "pthread_cond_wait failed");
+        ovs_force_stop(error, "pthread_cond_wait failed");
     }
 }
 
@@ -289,7 +292,7 @@ ovs_spin_init__(const struct ovs_spin *l_, int pshared)
     l->where = "<unlocked>";
     error = pthread_spin_init(&l->lock, pshared);
     if (OVS_UNLIKELY(error)) {
-        ovs_abort(error, "pthread_spin_init failed");
+        ovs_force_stop(error, "pthread_spin_init failed");
     }
 }
 
@@ -431,13 +434,13 @@ set_min_stack_size(pthread_attr_t *attr, size_t min_stacksize)
 
     error = pthread_attr_getstacksize(attr, &stacksize);
     if (error) {
-        ovs_abort(error, "pthread_attr_getstacksize failed");
+        ovs_force_stop(error, "pthread_attr_getstacksize failed");
     }
 
     if (stacksize < min_stacksize) {
         error = pthread_attr_setstacksize(attr, min_stacksize);
         if (error) {
-            ovs_abort(error, "pthread_attr_setstacksize failed");
+            ovs_force_stop(error, "pthread_attr_setstacksize failed");
         }
     }
 }
@@ -486,7 +489,7 @@ ovs_thread_create(const char *name, void *(*start)(void *), void *arg)
 
     error = pthread_create(&thread, &attr, ovsthread_wrapper, aux);
     if (error) {
-        ovs_abort(error, "pthread_create failed");
+        ovs_force_stop(error, "pthread_create failed");
     }
     pthread_attr_destroy(&attr);
     return thread;

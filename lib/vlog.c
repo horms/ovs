@@ -1274,8 +1274,9 @@ vlog_fatal(const struct vlog_module *module, const char *message, ...)
     va_end(args);
 }
 
-/* Logs 'message' to 'module' at maximum verbosity, then calls abort().  Always
- * writes the message to stderr, even if the console destination is disabled.
+/* Logs 'message' to 'module' at maximum verbosity, then calls
+ * ovs_force_stop().  Always writes the message to stderr, even if the
+ * console destination is disabled.
  *
  * Choose this function instead of vlog_fatal_valist() if the daemon monitoring
  * facility should automatically restart the current daemon.  */
@@ -1286,15 +1287,16 @@ vlog_abort_valist(const struct vlog_module *module_,
     struct vlog_module *module = (struct vlog_module *) module_;
 
     /* Don't log this message to the console to avoid redundancy with the
-     * message written by the later ovs_abort_valist(). */
+     * message written by the later ovs_force_stop_valist(). */
     module->levels[VLF_CONSOLE] = VLL_OFF;
 
     vlog_valist(module, VLL_EMER, message, args);
-    ovs_abort_valist(0, message, args);
+    ovs_force_stop_valist(0, message, args);
 }
 
-/* Logs 'message' to 'module' at maximum verbosity, then calls abort().  Always
- * writes the message to stderr, even if the console destination is disabled.
+/* Logs 'message' to 'module' at maximum verbosity, then calls
+ * ovs_force_stop().  Always writes the message to stderr, even if the
+ * console destination is disabled.
  *
  * Choose this function instead of vlog_fatal() if the daemon monitoring
  * facility should automatically restart the current daemon.  */

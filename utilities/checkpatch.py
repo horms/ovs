@@ -678,7 +678,7 @@ std_functions = [
         ('strncpy', 'Use ovs_strzcpy() in place of strncpy()'),
         ('strerror', 'Use ovs_strerror() in place of strerror()'),
         ('sleep', 'Use xsleep() in place of sleep()'),
-        ('abort', 'Use ovs_abort() in place of abort()'),
+        ('abort', 'Use ovs_force_stop() in place of abort()'),
         ('assert', 'Use ovs_assert() in place of assert()'),
         ('error', 'Use ovs_error() in place of error()'),
 ]

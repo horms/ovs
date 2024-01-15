@@ -469,7 +469,7 @@ dpdk_init(const struct smap *ovs_other_config)
             if (enabled) {
                 VLOG_INFO("DPDK Enabled - initialized");
             } else if (!try_only) {
-                ovs_abort(rte_errno, "Cannot init EAL");
+                ovs_force_stop(rte_errno, "Cannot init EAL");
             }
             ovsthread_once_done(&once_enable);
         } else {

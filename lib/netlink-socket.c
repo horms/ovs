@@ -75,7 +75,7 @@ void
 lost_communication(DWORD last_err)
 {
     if (last_err == ERROR_NOT_FOUND) {
-        ovs_abort(0, "lost communication with the kernel device");
+        ovs_force_stop(0, "lost communication with the kernel device");
     }
 }
 #endif
