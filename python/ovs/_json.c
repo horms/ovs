@@ -10,7 +10,7 @@ typedef struct {
 static void
 Parser_dealloc(json_ParserObject * p)
 {
-    json_parser_abort(p->_parser);
+    json_parser_hard_stop(p->_parser);
     Py_TYPE(p)->tp_free(p);
 }
 

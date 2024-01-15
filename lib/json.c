@@ -1286,13 +1286,13 @@ json_parser_finish(struct json_parser *p)
         p->error = NULL;
     }
 
-    json_parser_abort(p);
+    json_parser_hard_stop(p);
 
     return json;
 }
 
 void
-json_parser_abort(struct json_parser *p)
+json_parser_hard_stop(struct json_parser *p)
 {
     if (p) {
         ds_destroy(&p->buffer);
@@ -1304,6 +1304,13 @@ json_parser_abort(struct json_parser *p)
         free(p->error);
         free(p);
     }
+}
+
+/* Legacy function. Please use json_parser_hard_stop() instead. */
+void
+json_parser_abort(struct json_parser *p)
+{
+    json_parser_hard_stop(p);
 }
 
 static struct json_parser_node *
