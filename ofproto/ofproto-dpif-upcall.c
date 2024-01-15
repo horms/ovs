@@ -1992,9 +1992,9 @@ transition_ukey_at(struct udpif_key *ukey, enum ukey_state dst,
     OVS_REQUIRES(ukey->mutex)
 {
     if (dst < ukey->state) {
-        VLOG_ABORT("Invalid ukey transition %d->%d (last transitioned from "
-                   "thread %u at %s)", ukey->state, dst, ukey->state_thread,
-                   ukey->state_where);
+        VLOG_FORCE_STOP("Invalid ukey transition %d->%d (last transitioned "
+                        "from thread %u at %s)", ukey->state, dst,
+                        ukey->state_thread, ukey->state_where);
     }
     if (ukey->state == dst && dst == UKEY_OPERATIONAL) {
         return;

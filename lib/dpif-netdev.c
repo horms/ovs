@@ -7144,8 +7144,8 @@ pmd_alloc_static_tx_qid(struct dp_netdev_pmd_thread *pmd)
 {
     ovs_mutex_lock(&pmd->dp->tx_qid_pool_mutex);
     if (!id_pool_alloc_id(pmd->dp->tx_qid_pool, &pmd->static_tx_qid)) {
-        VLOG_ABORT("static_tx_qid allocation failed for PMD on core %2d"
-                   ", numa_id %d.", pmd->core_id, pmd->numa_id);
+        VLOG_FORCE_STOP("static_tx_qid allocation failed for PMD on core %2d"
+                        ", numa_id %d.", pmd->core_id, pmd->numa_id);
     }
     ovs_mutex_unlock(&pmd->dp->tx_qid_pool_mutex);
 

@@ -169,8 +169,19 @@ OVS_NO_RETURN void vlog_fatal_valist(const struct vlog_module *,
                                  const char *format, va_list)
     OVS_PRINTF_FORMAT (2, 0);
 
+OVS_NO_RETURN void vlog_force_stop(const struct vlog_module *,
+                                   const char *format, ...)
+    OVS_PRINTF_FORMAT (2, 3);
+OVS_NO_RETURN void vlog_force_stop_valist(const struct vlog_module *,
+                                 const char *format, va_list)
+    OVS_PRINTF_FORMAT (2, 0);
+
+/* Legacy compatibility function.
+ * Please use vlog_force_stop() instead. */
 OVS_NO_RETURN void vlog_abort(const struct vlog_module *, const char *format, ...)
     OVS_PRINTF_FORMAT (2, 3);
+/* Legacy compatibility function.
+ * Please use vlog_force_stop_valist() instead. */
 OVS_NO_RETURN void vlog_abort_valist(const struct vlog_module *,
                                  const char *format, va_list)
     OVS_PRINTF_FORMAT (2, 0);
@@ -205,12 +216,15 @@ void vlog_rate_limit(const struct vlog_module *, enum vlog_level,
  * Guaranteed to preserve errno.
  */
 #define VLOG_FATAL(...) vlog_fatal(&this_module, __VA_ARGS__)
-#define VLOG_ABORT(...) vlog_abort(&this_module, __VA_ARGS__)
+#define VLOG_FORCE_STOP(...) vlog_force_stop(&this_module, __VA_ARGS__)
 #define VLOG_EMER(...) VLOG(VLL_EMER, __VA_ARGS__)
 #define VLOG_ERR(...) VLOG(VLL_ERR, __VA_ARGS__)
 #define VLOG_WARN(...) VLOG(VLL_WARN, __VA_ARGS__)
 #define VLOG_INFO(...) VLOG(VLL_INFO, __VA_ARGS__)
 #define VLOG_DBG(...) VLOG(VLL_DBG, __VA_ARGS__)
+
+/* Legacy macro. Please use VLOG_FORCE_STOP instead */
+#define VLOG_ABORT(...) vlog_force_stop(&this_module, __VA_ARGS__)
 
 /* More convenience macros, for testing whether a given level is enabled.  When
  * constructing a log message is expensive, this enables it to be skipped. */
