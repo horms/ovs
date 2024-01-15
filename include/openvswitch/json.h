@@ -127,6 +127,9 @@ struct json_parser *json_parser_create(int flags);
 size_t json_parser_feed(struct json_parser *, const char *, size_t);
 bool json_parser_is_done(const struct json_parser *);
 struct json *json_parser_finish(struct json_parser *);
+void json_parser_hard_stop(struct json_parser *);
+
+/* Legacy function. Please use json_parser_hard_stop() instead. */
 void json_parser_abort(struct json_parser *);
 
 struct json *json_from_string(const char *string);

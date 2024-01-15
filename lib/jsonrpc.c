@@ -531,7 +531,7 @@ jsonrpc_cleanup(struct jsonrpc *rpc)
     stream_close(rpc->stream);
     rpc->stream = NULL;
 
-    json_parser_abort(rpc->parser);
+    json_parser_hard_stop(rpc->parser);
     rpc->parser = NULL;
 
     ofpbuf_list_delete(&rpc->output);
