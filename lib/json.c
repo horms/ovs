@@ -1230,7 +1230,7 @@ json_parser_feed(struct json_parser *p, const char *input, size_t n)
             break;
 
         default:
-            ovs_abort(0, "unexpected lexer state");
+            ovs_force_stop(0, "unexpected lexer state");
         }
 
         if (consumed) {

@@ -115,7 +115,7 @@ memory_locked(void)
 void
 out_of_memory(void)
 {
-    ovs_abort(0, "virtual memory exhausted");
+    ovs_force_stop(0, "virtual memory exhausted");
 }
 
 void *
@@ -286,7 +286,7 @@ xmalloc_size_align(size_t size, size_t alignment)
     bool runt;
 
     if (!IS_POW2(alignment) || (alignment % sizeof(void *) != 0)) {
-        ovs_abort(0, "Invalid alignment");
+        ovs_force_stop(0, "Invalid alignment");
     }
 
     p = xmalloc((alignment - 1)
@@ -431,17 +431,18 @@ string_ends_with(const char *str, const char *suffix)
  * 'format' should not end with a new-line, because this function will add one
  * itself. */
 void
-ovs_abort(int err_no, const char *format, ...)
+ovs_force_stop(int err_no, const char *format, ...)
 {
     va_list args;
 
     va_start(args, format);
-    ovs_abort_valist(err_no, format, args);
+    ovs_force_stop_valist(err_no, format, args);
 }
 
-/* Same as ovs_abort() except that the arguments are supplied as a va_list. */
+/* Same as ovs_force_stop() except that the arguments are supplied as a
+ * va_list. */
 void
-ovs_abort_valist(int err_no, const char *format, va_list args)
+ovs_force_stop_valist(int err_no, const char *format, va_list args)
 {
     ovs_error_valist(err_no, format, args);
     ovs_hard_stop();

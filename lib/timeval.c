@@ -505,7 +505,7 @@ xclock_gettime(clock_t id, struct timespec *ts)
     if (clock_gettime(id, ts) == -1) {
         /* It seems like a bad idea to try to use vlog here because it is
          * likely to try to check the current time. */
-        ovs_abort(errno, "xclock_gettime() failed");
+        ovs_force_stop(errno, "xclock_gettime() failed");
     }
 }
 

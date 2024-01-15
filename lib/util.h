@@ -161,7 +161,7 @@ bool memory_locked(void);
 
 OVS_NO_RETURN void out_of_memory(void);
 
-/* Allocation wrappers that abort if memory is exhausted. */
+/* Allocation wrappers that perform an ovs_force_stop if memory is exhausted. */
 OVS_RETURNS_NONNULL void *xmalloc(size_t) MALLOC_LIKE;
 OVS_RETURNS_NONNULL void *xcalloc(size_t, size_t) MALLOC_LIKE;
 OVS_RETURNS_NONNULL void *xzalloc(size_t) MALLOC_LIKE;
@@ -228,9 +228,10 @@ nullable_memset(void *dst, int c, size_t n)
 
 #define abort please_use_ovs_hard_stop_instead_of_abort
 
-OVS_NO_RETURN void ovs_abort(int err_no, const char *format, ...)
+OVS_NO_RETURN void ovs_force_stop(int err_no, const char *format, ...)
     OVS_PRINTF_FORMAT(2, 3);
-OVS_NO_RETURN void ovs_abort_valist(int err_no, const char *format, va_list)
+OVS_NO_RETURN void ovs_force_stop_valist(int err_no, const char *format,
+                                         va_list)
     OVS_PRINTF_FORMAT(2, 0);
 OVS_NO_RETURN void ovs_fatal(int err_no, const char *format, ...)
     OVS_PRINTF_FORMAT(2, 3);
