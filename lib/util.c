@@ -80,14 +80,14 @@ void
 ovs_assert_failure(const char *where, const char *function,
                    const char *condition)
 {
-    /* Prevent an infinite loop (or stack overflow) in case VLOG_ABORT happens
-     * to trigger an assertion failure of its own. */
+    /* Prevent an infinite loop (or stack overflow) in case VLOG_FORCE_STOP
+     * happens to trigger an assertion failure of its own. */
     static int reentry = 0;
 
     switch (reentry++) {
     case 0:
-        VLOG_ABORT("%s: assertion %s failed in %s()",
-                   where, condition, function);
+        VLOG_FORCE_STOP("%s: assertion %s failed in %s()",
+                        where, condition, function);
         OVS_NOT_REACHED();
 
     case 1:

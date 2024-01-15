@@ -1242,8 +1242,9 @@ vlog(const struct vlog_module *module, enum vlog_level level,
  * exit code.  Always writes the message to stderr, even if the console
  * destination is disabled.
  *
- * Choose this function instead of vlog_abort_valist() if the daemon monitoring
- * facility shouldn't automatically restart the current daemon.  */
+ * Choose this function instead of vlog_force_stop_valist() if the daemon
+ * monitoring facility shouldn't automatically restart the current daemon.
+ */
 void
 vlog_fatal_valist(const struct vlog_module *module_,
                   const char *message, va_list args)
@@ -1262,7 +1263,7 @@ vlog_fatal_valist(const struct vlog_module *module_,
  * exit code.  Always writes the message to stderr, even if the console
  * destination is disabled.
  *
- * Choose this function instead of vlog_abort() if the daemon monitoring
+ * Choose this function instead of vlog_force_stop() if the daemon monitoring
  * facility shouldn't automatically restart the current daemon.  */
 void
 vlog_fatal(const struct vlog_module *module, const char *message, ...)
@@ -1281,8 +1282,8 @@ vlog_fatal(const struct vlog_module *module, const char *message, ...)
  * Choose this function instead of vlog_fatal_valist() if the daemon monitoring
  * facility should automatically restart the current daemon.  */
 void
-vlog_abort_valist(const struct vlog_module *module_,
-                  const char *message, va_list args)
+vlog_force_stop_valist(const struct vlog_module *module_,
+                       const char *message, va_list args)
 {
     struct vlog_module *module = (struct vlog_module *) module_;
 
@@ -1301,12 +1302,33 @@ vlog_abort_valist(const struct vlog_module *module_,
  * Choose this function instead of vlog_fatal() if the daemon monitoring
  * facility should automatically restart the current daemon.  */
 void
+vlog_force_stop(const struct vlog_module *module, const char *message, ...)
+{
+    va_list args;
+
+    va_start(args, message);
+    vlog_force_stop_valist(module, message, args);
+    va_end(args);
+}
+
+/* Legacy compatibility function.
+ * Please use vlog_force_stop_valist() instead. */
+void
+vlog_abort_valist(const struct vlog_module *module,
+                  const char *message, va_list args)
+{
+    vlog_force_stop_valist(module, message, args);
+}
+
+/* Legacy compatibility function.
+ * Please use vlog_force_stop_valist() instead. */
+void
 vlog_abort(const struct vlog_module *module, const char *message, ...)
 {
     va_list args;
 
     va_start(args, message);
-    vlog_abort_valist(module, message, args);
+    vlog_force_stop_valist(module, message, args);
     va_end(args);
 }
 

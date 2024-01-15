@@ -587,8 +587,8 @@ dpif_netlink_rtnl_probe_oot_tunnels(void)
                                  ARRAY_SIZE(rtlink_policy))
                 || !nl_parse_nested(rtlink[IFLA_LINKINFO], linkinfo_policy,
                                     linkinfo, ARRAY_SIZE(linkinfo_policy))) {
-                VLOG_ABORT("Error fetching Geneve tunnel device %s "
-                           "linkinfo", name);
+                VLOG_FORCE_STOP("Error fetching Geneve tunnel device %s "
+                                "linkinfo", name);
             }
 
             kind = nl_attr_get_string(linkinfo[IFLA_INFO_KIND]);
@@ -598,8 +598,8 @@ dpif_netlink_rtnl_probe_oot_tunnels(void)
             } else if (!strcmp(kind, "geneve")) {
                 out_of_tree = false;
             } else {
-                VLOG_ABORT("Geneve tunnel device %s with kind %s"
-                           " not supported", name, kind);
+                VLOG_FORCE_STOP("Geneve tunnel device %s with kind %s"
+                                " not supported", name, kind);
             }
 
             ofpbuf_delete(reply);
