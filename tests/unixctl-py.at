@@ -65,6 +65,13 @@ AT_CHECK([head -1 stderr], [0], [dnl
 sed 's/ovs-appctl/appctl.py/' stderr > experr
 AT_CHECK([PYAPPCTL_PY bond/hash mac vlan basis extra], [2], [], [experr])
 
+AT_CHECK([APPCTL --format json dpif-netdev/pmd-rxq-show], [2], [], [stderr])
+AT_CHECK([head -1 stderr], [0], [dnl
+"dpif-netdev/pmd-rxq-show" command does not support output format "json" (supported: 1, requested: 2)
+])
+sed 's/ovs-appctl/appctl.py/' stderr > experr
+AT_CHECK([PYAPPCTL_PY --format json dpif-netdev/pmd-rxq-show], [2], [], [experr])
+
 OVS_VSWITCHD_STOP
 AT_CLEANUP
 
