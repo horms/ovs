@@ -49,13 +49,30 @@ def main():
                         help="Arguments to the command.")
     parser.add_argument("-T", "--timeout", metavar="SECS",
                         help="wait at most SECS seconds for a response")
+    parser.add_argument("-f", "--format", metavar="FMT",
+                        help="Output format.", default="text",
+                        choices=[fmt.name.lower()
+                                 for fmt in ovs.util.OutputFormat])
     args = parser.parse_args()
 
     signal_alarm(int(args.timeout) if args.timeout else None)
 
     ovs.vlog.Vlog.init()
     target = args.target
+    format = ovs.util.OutputFormat[args.format.upper()]
     client = connect_to_target(target)
+
+    if format != ovs.util.OutputFormat.TEXT:
+        err_no, error, _ = client.transact(
+            "set-options", ["--format", args.format])
+
+        if err_no:
+            ovs.util.ovs_fatal(err_no, "%s: transaction error" % target)
+        elif error is not None:
+            sys.stderr.write(error)
+            ovs.util.ovs_error(0, "%s: server returned an error" % target)
+            sys.exit(2)
+
     err_no, error, result = client.transact(args.command, args.argv)
     client.close()
 

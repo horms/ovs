@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import copy
 import errno
 import os
@@ -35,6 +36,7 @@ class UnixctlConnection(object):
         assert isinstance(rpc, ovs.jsonrpc.Connection)
         self._rpc = rpc
         self._request_id = None
+        self._fmt = ovs.util.OutputFormat.TEXT
 
     def run(self):
         self._rpc.run()
@@ -116,6 +118,17 @@ class UnixctlConnection(object):
         elif len(params) > command.max_args:
             error = '"%s" command takes at most %d arguments' \
                     % (method, command.max_args)
+        # FIXME: Uncomment when command.output_fmts is available
+        # elif self._fmt not in command.output_fmts:
+        #     error = '"%s" command does not support output format' \
+        #             ' "%s" (supported: %d, requested: %d)' \
+        #             % (method, self._fmt.name.lower(), command.output_fmts,
+        #                self._fmt)
+        # FIXME: Remove this check once output format will be passed to the
+        #        command handler below.
+        elif self._fmt != ovs.util.OutputFormat.TEXT:
+            error = 'output format "%s" has not been implemented yet' \
+                    % self._fmt.name.lower()
         else:
             for param in params:
                 if not isinstance(param, str):
@@ -124,7 +137,8 @@ class UnixctlConnection(object):
 
             if error is None:
                 unicode_params = [str(p) for p in params]
-                command.callback(self, unicode_params, command.aux)
+                command.callback(self, unicode_params,  # FIXME: self._fmt,
+                                 command.aux)
 
         if error:
             self.reply_error(error)
@@ -134,6 +148,24 @@ def _unixctl_version(conn, unused_argv, version):
     assert isinstance(conn, UnixctlConnection)
     version = "%s (Open vSwitch) %s" % (ovs.util.PROGRAM_NAME, version)
     conn.reply(version)
+
+
+def _unixctl_set_options(conn, argv, unused_aux):
+    assert isinstance(conn, UnixctlConnection)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--format", default="text",
+                        choices=[fmt.name.lower()
+                                 for fmt in ovs.util.OutputFormat])
+
+    try:
+        args = parser.parse_args(args=argv)
+    except argparse.ArgumentError as e:
+        conn.reply_error(str(e))
+        return
+
+    conn._fmt = ovs.util.OutputFormat[args.format.upper()]
+    conn.reply(None)
 
 
 class UnixctlServer(object):
@@ -209,5 +241,8 @@ class UnixctlServer(object):
 
         ovs.unixctl.command_register("version", "", 0, 0, _unixctl_version,
                                      version)
+
+        ovs.unixctl.command_register("set-options", "[--format text|json]", 2,
+                                     2, _unixctl_set_options, None)
 
         return 0, UnixctlServer(listener)

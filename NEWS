@@ -29,6 +29,8 @@ Post-v3.2.0
        on mark and labels.
      * Added new option [-f|--format] to choose the output format, e.g. 'json'
        or 'text' (by default).
+   - Python:
+     * Added support for choosing the output format, e.g. 'json' or 'text'.
    - ovs-vsctl:
      * New commands 'set-zone-limit', 'del-zone-limit' and 'list-zone-limits'
        to manage the maximum number of connections in conntrack zones via
