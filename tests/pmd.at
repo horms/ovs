@@ -112,8 +112,33 @@ dummy@ovs-dummy: hit:0 missed:0
     p0 1/1: (dummy-pmd: n_rxq=1, n_txq=1, numa_id=0)
 ])
 
-AT_CHECK([ovs-appctl --format json dpif/show], [0], [dnl
-[[{"ofprotos":[{"name":"br0","ports":[{"netdev_type":"dummy-internal","ofp_port":"65534","odp_port":"100","netdev_config":{},"netdev_name":"br0"},{"netdev_type":"dummy-pmd","ofp_port":"1","odp_port":"1","netdev_config":{"numa_id":"0","n_txq":"1","n_rxq":"1"},"netdev_name":"p0"}]}],"name":"dummy@ovs-dummy","stats":{"n_hit":"0","n_missed":"0"}}]]])
+AT_CHECK([ovs-appctl --format json --pretty dpif/show], [0], [dnl
+[[
+  {
+    "name": "dummy@ovs-dummy",
+    "ofprotos": [
+      {
+        "name": "br0",
+        "ports": [
+          {
+            "netdev_config": {
+              },
+            "netdev_name": "br0",
+            "netdev_type": "dummy-internal",
+            "odp_port": "100",
+            "ofp_port": "65534"},
+          {
+            "netdev_config": {
+              "n_rxq": "1",
+              "n_txq": "1",
+              "numa_id": "0"},
+            "netdev_name": "p0",
+            "netdev_type": "dummy-pmd",
+            "odp_port": "1",
+            "ofp_port": "1"}]}],
+    "stats": {
+      "n_hit": "0",
+      "n_missed": "0"}}]]])
 
 OVS_VSWITCHD_STOP
 AT_CLEANUP

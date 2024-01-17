@@ -29,6 +29,9 @@ Post-v3.2.0
        on mark and labels.
      * Added new option [-f|--format] to choose the output format, e.g. 'json'
        or 'text' (by default).
+     * Added new option [--pretty] to print JSON output in a readable fashion.
+       E.g. members of objects and elements of arrays are printed one per line,
+       with indentation.
    - Python:
      * Added support for choosing the output format, e.g. 'json' or 'text'.
    - ovs-vsctl:

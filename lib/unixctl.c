@@ -553,7 +553,7 @@ unixctl_client_create(const char *path, struct jsonrpc **client)
  * '*err' if not NULL. */
 int
 unixctl_client_transact(struct jsonrpc *client, const char *command, int argc,
-                        char *argv[], char **result, char **err)
+                        char *argv[], int fmt_flags, char **result, char **err)
 {
     struct jsonrpc_msg *request, *reply;
     struct json **json_args, *params;
@@ -590,7 +590,7 @@ unixctl_client_transact(struct jsonrpc *client, const char *command, int argc,
             *result = xstrdup(json_string(reply->result));
         } else if (reply->result->type == JSON_OBJECT ||
                    reply->result->type == JSON_ARRAY) {
-            *result = json_to_string(reply->result, 0);
+            *result = json_to_string(reply->result, fmt_flags);
         } else {
             VLOG_WARN("%s: unexpected result type in JSON rpc reply: %s",
                       jsonrpc_get_name(client),
