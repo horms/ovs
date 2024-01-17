@@ -267,9 +267,13 @@ static void bfd_status_changed(struct bfd *) OVS_REQUIRES(mutex);
 
 static void bfd_forwarding_if_rx_update(struct bfd *) OVS_REQUIRES(mutex);
 static void bfd_unixctl_show(struct unixctl_conn *, int argc,
-                             const char *argv[], void *aux OVS_UNUSED);
+                             const char *argv[],
+                             enum ovs_output_fmt fmt OVS_UNUSED,
+                             void *aux OVS_UNUSED);
 static void bfd_unixctl_set_forwarding_override(struct unixctl_conn *,
                                                 int argc, const char *argv[],
+                                                enum ovs_output_fmt fmt
+                                                OVS_UNUSED,
                                                 void *aux OVS_UNUSED);
 static void log_msg(enum vlog_level, const struct msg *, const char *message,
                     const struct bfd *) OVS_REQUIRES(mutex);
@@ -339,9 +343,10 @@ void
 bfd_init(void)
 {
     unixctl_command_register("bfd/show", "[interface]", 0, 1,
-                             bfd_unixctl_show, NULL);
+                             OVS_OUTPUT_FMT_TEXT, bfd_unixctl_show, NULL);
     unixctl_command_register("bfd/set-forwarding",
                              "[interface] normal|false|true", 1, 2,
+                             OVS_OUTPUT_FMT_TEXT,
                              bfd_unixctl_set_forwarding_override, NULL);
 }
 
@@ -1311,7 +1316,8 @@ bfd_put_details(struct ds *ds, const struct bfd *bfd) OVS_REQUIRES(mutex)
 
 static void
 bfd_unixctl_show(struct unixctl_conn *conn, int argc, const char *argv[],
-                 void *aux OVS_UNUSED) OVS_EXCLUDED(mutex)
+                 enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
+    OVS_EXCLUDED(mutex)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     struct bfd *bfd;
@@ -1340,7 +1346,9 @@ out:
 
 static void
 bfd_unixctl_set_forwarding_override(struct unixctl_conn *conn, int argc,
-                                    const char *argv[], void *aux OVS_UNUSED)
+                                    const char *argv[],
+                                    enum ovs_output_fmt fmt OVS_UNUSED,
+                                    void *aux OVS_UNUSED)
     OVS_EXCLUDED(mutex)
 {
     const char *forward_str = argv[argc - 1];

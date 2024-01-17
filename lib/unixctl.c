@@ -67,7 +67,8 @@ static struct shash commands = SHASH_INITIALIZER(&commands);
 
 static void
 unixctl_list_commands(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                      const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                      const char *argv[] OVS_UNUSED,
+                      enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     const struct shash_node **nodes = shash_sort(&commands);
@@ -91,13 +92,15 @@ unixctl_list_commands(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 unixctl_version(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                const char *argv[] OVS_UNUSED,
+                enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     unixctl_command_reply(conn, ovs_get_program_version());
 }
 
 static void
 unixctl_set_options(struct unixctl_conn *conn, int argc, const char *argv[],
+                    enum ovs_output_fmt fmt OVS_UNUSED,
                     void *aux OVS_UNUSED)
 {
     char * error = NULL;
@@ -132,26 +135,6 @@ error:
 /* Registers a unixctl command with the given 'name'.  'usage' describes the
  * arguments to the command; it is used only for presentation to the user in
  * "list-commands" output.  (If 'usage' is NULL, then the command is hidden.)
- *
- * 'cb' is called when the command is received.  It is passed an array
- * containing the command name and arguments, plus a copy of 'aux'.  Normally
- * 'cb' should reply by calling unixctl_command_reply() or
- * unixctl_command_reply_error() before it returns, but if the command cannot
- * be handled immediately then it can defer the reply until later.  A given
- * connection can only process a single request at a time, so a reply must be
- * made eventually to avoid blocking that connection. */
-void
-unixctl_command_register(const char *name, const char *usage,
-                         int min_args, int max_args,
-                         unixctl_cb_func *cb, void *aux)
-{
-    unixctl_command_register_fmt(name, usage, min_args, max_args,
-                                 OVS_OUTPUT_FMT_TEXT, cb, aux);
-}
-
-/* Registers a unixctl command with the given 'name'.  'usage' describes the
- * arguments to the command; it is used only for presentation to the user in
- * "list-commands" output.  (If 'usage' is NULL, then the command is hidden.)
  * 'output_fmts' is a bitmap that defines what output formats a command
  * supports, e.g. OVS_OUTPUT_FMT_TEXT | OVS_OUTPUT_FMT_JSON.
  *
@@ -163,9 +146,9 @@ unixctl_command_register(const char *name, const char *usage,
  * connection can only process a single request at a time, so a reply must be
  * made eventually to avoid blocking that connection. */
 void
-unixctl_command_register_fmt(const char *name, const char *usage,
-                             int min_args, int max_args, int output_fmts,
-                             unixctl_cb_func *cb, void *aux)
+unixctl_command_register(const char *name, const char *usage,
+                         int min_args, int max_args, int output_fmts,
+                         unixctl_cb_func *cb, void *aux)
 {
     struct unixctl_command *command;
     struct unixctl_command *lookup = shash_find_data(&commands, name);
@@ -323,11 +306,12 @@ unixctl_server_create(const char *path, struct unixctl_server **serverp)
         return error;
     }
 
-    unixctl_command_register("list-commands", "", 0, 0, unixctl_list_commands,
-                             NULL);
-    unixctl_command_register("version", "", 0, 0, unixctl_version, NULL);
+    unixctl_command_register("list-commands", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             unixctl_list_commands, NULL);
+    unixctl_command_register("version", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             unixctl_version, NULL);
     unixctl_command_register("set-options", "[--format text|json]", 2, 2,
-                             unixctl_set_options, NULL);
+                             OVS_OUTPUT_FMT_TEXT, unixctl_set_options, NULL);
 
     struct unixctl_server *server = xmalloc(sizeof *server);
     server->listener = listener;
@@ -376,11 +360,6 @@ process_command(struct unixctl_conn *conn, struct jsonrpc_msg *request)
                           " \"%s\" (supported: %d, requested: %d)",
                           request->method, ovs_output_fmt_to_string(conn->fmt),
                           command->output_fmts, conn->fmt);
-    } else if (conn->fmt != OVS_OUTPUT_FMT_TEXT) {
-        /* FIXME: Remove this check once output format will be passed to the
-         *        command handler below. */
-        error = xasprintf("output format \"%s\" has not been implemented yet",
-                          ovs_output_fmt_to_string(conn->fmt));
     } else {
         struct svec argv = SVEC_EMPTY_INITIALIZER;
         int  i;
@@ -397,10 +376,8 @@ process_command(struct unixctl_conn *conn, struct jsonrpc_msg *request)
         svec_terminate(&argv);
 
         if (!error) {
-            /* FIXME: Output format will be passed as 'fmt' to the command in
-             *        later patch. */
-            command->cb(conn, argv.n, (const char **) argv.names,
-                        /* conn->fmt, */ command->aux);
+            command->cb(conn, argv.n, (const char **) argv.names, conn->fmt,
+                        command->aux);
         }
 
         svec_destroy(&argv);

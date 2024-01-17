@@ -4295,7 +4295,9 @@ netdev_dpdk_set_admin_state__(struct netdev_dpdk *dev, bool admin_state)
 
 static void
 netdev_dpdk_set_admin_state(struct unixctl_conn *conn, int argc,
-                            const char *argv[], void *aux OVS_UNUSED)
+                            const char *argv[],
+                            enum ovs_output_fmt fmt OVS_UNUSED,
+                            void *aux OVS_UNUSED)
 {
     bool up;
 
@@ -4340,7 +4342,9 @@ netdev_dpdk_set_admin_state(struct unixctl_conn *conn, int argc,
 
 static void
 netdev_dpdk_detach(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                   const char *argv[], void *aux OVS_UNUSED)
+                   const char *argv[],
+                   enum ovs_output_fmt fmt OVS_UNUSED,
+                   void *aux OVS_UNUSED)
 {
     struct ds used_interfaces = DS_EMPTY_INITIALIZER;
     struct rte_eth_dev_info dev_info;
@@ -4407,6 +4411,7 @@ error:
 static void
 netdev_dpdk_get_mempool_info(struct unixctl_conn *conn,
                              int argc, const char *argv[],
+                             enum ovs_output_fmt fmt OVS_UNUSED,
                              void *aux OVS_UNUSED)
 {
     size_t size;
@@ -4919,19 +4924,22 @@ netdev_dpdk_class_init(void)
         ovs_thread_create("dpdk_watchdog", dpdk_watchdog, NULL);
         unixctl_command_register("netdev-dpdk/set-admin-state",
                                  "[netdev] up|down", 1, 2,
+                                 OVS_OUTPUT_FMT_TEXT,
                                  netdev_dpdk_set_admin_state, NULL);
 
         unixctl_command_register("netdev-dpdk/detach",
                                  "pci address of device", 1, 1,
+                                 OVS_OUTPUT_FMT_TEXT,
                                  netdev_dpdk_detach, NULL);
 
         unixctl_command_register("netdev-dpdk/get-mempool-info",
-                                 "[netdev]", 0, 1,
+                                 "[netdev]", 0, 1, OVS_OUTPUT_FMT_TEXT,
                                  netdev_dpdk_get_mempool_info, NULL);
 
         ret = rte_eth_dev_callback_register(RTE_ETH_ALL,
                                             RTE_ETH_EVENT_INTR_RESET,
-                                            dpdk_eth_event_callback, NULL);
+                                            dpdk_eth_event_callback,
+                                            NULL);
         if (ret != 0) {
             VLOG_ERR("Ethernet device callback register error: %s",
                      rte_strerror(-ret));

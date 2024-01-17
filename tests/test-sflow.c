@@ -715,7 +715,8 @@ test_sflow_main(int argc, char *argv[])
     if (error) {
         ovs_fatal(error, "failed to create unixctl server");
     }
-    unixctl_command_register("exit", "", 0, 0, test_sflow_exit, &exiting);
+    unixctl_command_register("exit", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             test_sflow_exit, &exiting);
 
     daemonize_complete();
 
@@ -804,6 +805,7 @@ usage(void)
 static void
 test_sflow_exit(struct unixctl_conn *conn,
                 int argc OVS_UNUSED, const char *argv[] OVS_UNUSED,
+                enum ovs_output_fmt fmt OVS_UNUSED,
                 void *exiting_)
 {
     bool *exiting = exiting_;

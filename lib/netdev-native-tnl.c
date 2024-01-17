@@ -1181,7 +1181,9 @@ netdev_geneve_build_header(const struct netdev *netdev,
 
 void
 netdev_tnl_egress_port_range(struct unixctl_conn *conn, int argc,
-                             const char *argv[], void *aux OVS_UNUSED)
+                             const char *argv[],
+                             enum ovs_output_fmt fmt OVS_UNUSED,
+                             void *aux OVS_UNUSED)
 {
     int val1, val2;
 

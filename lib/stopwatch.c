@@ -314,7 +314,8 @@ stopwatch_show_protected(int argc, const char *argv[], struct ds *s)
 
 static void
 stopwatch_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-               const char *argv[], void *aux OVS_UNUSED)
+               const char *argv[],
+               enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct ds s = DS_EMPTY_INITIALIZER;
     bool success;
@@ -351,7 +352,8 @@ stopwatch_packet_write(struct stopwatch_packet *pkt)
 
 static void
 stopwatch_reset(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                const char *argv[], void *aux OVS_UNUSED)
+                const char *argv[],
+                enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct stopwatch_packet *pkt = stopwatch_packet_create(OP_RESET);
     if (argc > 1) {
@@ -488,9 +490,9 @@ static void
 do_init_stopwatch(void)
 {
     unixctl_command_register("stopwatch/show", "[NAME]", 0, 1,
-                             stopwatch_show, NULL);
+                             OVS_OUTPUT_FMT_TEXT, stopwatch_show, NULL);
     unixctl_command_register("stopwatch/reset", "[NAME]", 0, 1,
-                             stopwatch_reset, NULL);
+                             OVS_OUTPUT_FMT_TEXT, stopwatch_reset, NULL);
     guarded_list_init(&stopwatch_commands);
     latch_init(&stopwatch_latch);
     stopwatch_thread_id = ovs_thread_create(

@@ -327,10 +327,12 @@ lookup_remote_mp(const struct cfm *cfm, uint64_t mpid) OVS_REQUIRES(mutex)
 void
 cfm_init(void)
 {
-    unixctl_command_register("cfm/show", "[interface]", 0, 1, cfm_unixctl_show,
+    unixctl_command_register("cfm/show", "[interface]", 0, 1,
+                             OVS_OUTPUT_FMT_TEXT, cfm_unixctl_show,
                              NULL);
     unixctl_command_register("cfm/set-fault", "[interface] normal|false|true",
-                             1, 2, cfm_unixctl_set_fault, NULL);
+                             1, 2, OVS_OUTPUT_FMT_TEXT, cfm_unixctl_set_fault,
+                             NULL);
 }
 
 /* Records the status change and changes the global connectivity seq. */
@@ -1061,7 +1063,8 @@ cfm_print_details(struct ds *ds, struct cfm *cfm) OVS_REQUIRES(mutex)
 
 static void
 cfm_unixctl_show(struct unixctl_conn *conn, int argc, const char *argv[],
-                 void *aux OVS_UNUSED) OVS_EXCLUDED(mutex)
+                 enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
+    OVS_EXCLUDED(mutex)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     struct cfm *cfm;
@@ -1088,7 +1091,9 @@ out:
 
 static void
 cfm_unixctl_set_fault(struct unixctl_conn *conn, int argc, const char *argv[],
-                      void *aux OVS_UNUSED) OVS_EXCLUDED(mutex)
+                      enum ovs_output_fmt fmt OVS_UNUSED,
+                      void *aux OVS_UNUSED)
+    OVS_EXCLUDED(mutex)
 {
     const char *fault_str = argv[argc - 1];
     int fault_override;

@@ -1389,6 +1389,7 @@ netdev_vport_tunnel_register(void)
         }
 
         unixctl_command_register("tnl/egress_port_range", "min max", 0, 2,
+                                 OVS_OUTPUT_FMT_TEXT,
                                  netdev_tnl_egress_port_range, NULL);
 
         ovsthread_once_done(&once);

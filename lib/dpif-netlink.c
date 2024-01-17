@@ -124,7 +124,9 @@ dpif_netlink_set_features(struct dpif *dpif_, uint32_t new_features);
 
 static void
 dpif_netlink_unixctl_dispatch_mode(struct unixctl_conn *conn, int argc,
-                                   const char *argv[], void *aux);
+                                   const char *argv[],
+                                   enum ovs_output_fmt fmt OVS_UNUSED,
+                                   void *aux);
 
 struct dpif_netlink_flow {
     /* Generic Netlink header. */
@@ -4634,6 +4636,7 @@ dpif_netlink_init(void)
         ovs_tunnels_out_of_tree = dpif_netlink_rtnl_probe_oot_tunnels();
 
         unixctl_command_register("dpif-netlink/dispatch-mode", "", 0, 0,
+                                 OVS_OUTPUT_FMT_TEXT,
                                  dpif_netlink_unixctl_dispatch_mode, NULL);
 
         ovsthread_once_done(&once);
@@ -5287,6 +5290,7 @@ static void
 dpif_netlink_unixctl_dispatch_mode(struct unixctl_conn *conn,
                                    int argc OVS_UNUSED,
                                    const char *argv[] OVS_UNUSED,
+                                   enum ovs_output_fmt fmt OVS_UNUSED,
                                    void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;

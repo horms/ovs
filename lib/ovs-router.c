@@ -390,8 +390,8 @@ scan_ipv4_route(const char *s, ovs_be32 *addr, unsigned int *plen)
 }
 
 static void
-ovs_router_add(struct unixctl_conn *conn, int argc,
-              const char *argv[], void *aux OVS_UNUSED)
+ovs_router_add(struct unixctl_conn *conn, int argc, const char *argv[],
+               enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct in6_addr src6 = in6addr_any;
     struct in6_addr gw6 = in6addr_any;
@@ -464,7 +464,8 @@ ovs_router_add(struct unixctl_conn *conn, int argc,
 
 static void
 ovs_router_del(struct unixctl_conn *conn, int argc OVS_UNUSED,
-              const char *argv[], void *aux OVS_UNUSED)
+               const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+               void *aux OVS_UNUSED)
 {
     struct in6_addr ip6;
     uint32_t mark = 0;
@@ -495,7 +496,8 @@ ovs_router_del(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovs_router_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-               const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                const char *argv[] OVS_UNUSED,
+                enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct ovs_router_entry *rt;
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -535,8 +537,9 @@ ovs_router_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
 }
 
 static void
-ovs_router_lookup_cmd(struct unixctl_conn *conn, int argc,
-                      const char *argv[], void *aux OVS_UNUSED)
+ovs_router_lookup_cmd(struct unixctl_conn *conn, int argc, const char *argv[],
+                      enum ovs_output_fmt fmt OVS_UNUSED,
+                      void *aux OVS_UNUSED)
 {
     struct in6_addr gw, src = in6addr_any;
     char iface[IFNAMSIZ];
@@ -606,14 +609,15 @@ ovs_router_init(void)
         unixctl_command_register("ovs/route/add",
                                  "ip/plen output_bridge [gw] "
                                  "[pkt_mark=mark] [src=src_ip]",
-                                 2, 5, ovs_router_add, NULL);
-        unixctl_command_register("ovs/route/show", "", 0, 0,
-                                 ovs_router_show, NULL);
-        unixctl_command_register("ovs/route/del", "ip/plen "
-                                 "[pkt_mark=mark]", 1, 2, ovs_router_del,
+                                 2, 5, OVS_OUTPUT_FMT_TEXT, ovs_router_add,
                                  NULL);
+        unixctl_command_register("ovs/route/show", "", 0, 0,
+                                 OVS_OUTPUT_FMT_TEXT,  ovs_router_show, NULL);
+        unixctl_command_register("ovs/route/del", "ip/plen "
+                                 "[pkt_mark=mark]", 1, 2, OVS_OUTPUT_FMT_TEXT,
+                                 ovs_router_del, NULL);
         unixctl_command_register("ovs/route/lookup", "ip_addr "
-                                 "[pkt_mark=mark]", 1, 2,
+                                 "[pkt_mark=mark]", 1, 2, OVS_OUTPUT_FMT_TEXT,
                                  ovs_router_lookup_cmd, NULL);
         ovsthread_once_done(&once);
     }

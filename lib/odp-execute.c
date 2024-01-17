@@ -916,7 +916,8 @@ odp_actions_impl_set(const char *name)
 
 static void
 action_impl_set(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                const char *argv[], void *aux OVS_UNUSED)
+                const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
 
@@ -936,7 +937,8 @@ action_impl_set(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 action_impl_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                 const char *argv[] OVS_UNUSED,
+                 enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
 
@@ -949,10 +951,10 @@ static void
 odp_execute_unixctl_init(void)
 {
     unixctl_command_register("odp-execute/action-impl-set", "name",
-                             1, 1, action_impl_set,
+                             1, 1, OVS_OUTPUT_FMT_TEXT, action_impl_set,
                              NULL);
     unixctl_command_register("odp-execute/action-impl-show", "",
-                             0, 0, action_impl_show,
+                             0, 0, OVS_OUTPUT_FMT_TEXT, action_impl_show,
                              NULL);
 }
 

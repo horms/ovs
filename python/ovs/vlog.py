@@ -237,8 +237,10 @@ class Vlog(object):
                 logger.disabled = True
 
         ovs.unixctl.command_register("vlog/reopen", "", 0, 0,
+                                     ovs.util.OutputFormat.TEXT,
                                      Vlog._unixctl_vlog_reopen, None)
         ovs.unixctl.command_register("vlog/close", "", 0, 0,
+                                     ovs.util.OutputFormat.TEXT,
                                      Vlog._unixctl_vlog_close, None)
         try:
             # Windows limitation on Python 2, sys.maxsize is a long number
@@ -248,8 +250,10 @@ class Vlog(object):
         except AttributeError:
             maxsize_int = sys.maxsize
         ovs.unixctl.command_register("vlog/set", "spec", 1, maxsize_int,
+                                     ovs.util.OutputFormat.TEXT,
                                      Vlog._unixctl_vlog_set, None)
         ovs.unixctl.command_register("vlog/list", "", 0, 0,
+                                     ovs.util.OutputFormat.TEXT,
                                      Vlog._unixctl_vlog_list, None)
 
     @staticmethod
@@ -406,7 +410,7 @@ class Vlog(object):
             Vlog.__file_handler.close()
 
     @staticmethod
-    def _unixctl_vlog_reopen(conn, unused_argv, unused_aux):
+    def _unixctl_vlog_reopen(conn, unused_argv, unused_fmt, unused_aux):
         if Vlog.__log_file:
             Vlog.reopen_log_file()
             conn.reply(None)
@@ -414,7 +418,7 @@ class Vlog(object):
             conn.reply("Logging to file not configured")
 
     @staticmethod
-    def _unixctl_vlog_close(conn, unused_argv, unused_aux):
+    def _unixctl_vlog_close(conn, unused_argv, unused_fmt, unused_aux):
         if Vlog.__log_file:
             if sys.platform != 'win32':
                 logger = logging.getLogger("file")
@@ -424,7 +428,7 @@ class Vlog(object):
         conn.reply(None)
 
     @staticmethod
-    def _unixctl_vlog_set(conn, argv, unused_aux):
+    def _unixctl_vlog_set(conn, argv, unused_fmt, unused_aux):
         for arg in argv:
             msg = Vlog.set_levels_from_string(arg)
             if msg:
@@ -433,7 +437,7 @@ class Vlog(object):
         conn.reply(None)
 
     @staticmethod
-    def _unixctl_vlog_list(conn, unused_argv, unused_aux):
+    def _unixctl_vlog_list(conn, unused_argv, unused_fmt, unused_aux):
         conn.reply(Vlog.get_levels())
 
 

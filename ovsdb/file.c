@@ -62,6 +62,7 @@ static bool use_column_diff = true;
 static void
 ovsdb_file_column_diff_enable(struct unixctl_conn *conn, int argc OVS_UNUSED,
                               const char *argv[] OVS_UNUSED,
+                              enum ovs_output_fmt fmt OVS_UNUSED,
                               void *arg OVS_UNUSED)
 {
     use_column_diff = true;
@@ -76,7 +77,8 @@ ovsdb_file_column_diff_disable(void)
     }
     use_column_diff = false;
     unixctl_command_register("ovsdb/file/column-diff-enable", "",
-                             0, 0, ovsdb_file_column_diff_enable, NULL);
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_file_column_diff_enable, NULL);
 }
 
 static struct ovsdb_error *

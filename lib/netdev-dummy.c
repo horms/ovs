@@ -1859,7 +1859,8 @@ netdev_dummy_queue_packet(struct netdev_dummy *dummy, struct dp_packet *packet,
 
 static void
 netdev_dummy_receive(struct unixctl_conn *conn,
-                     int argc, const char *argv[], void *aux OVS_UNUSED)
+                     int argc, const char *argv[],
+                     enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct netdev_dummy *dummy_dev;
     struct netdev *netdev;
@@ -1942,7 +1943,9 @@ netdev_dummy_set_admin_state__(struct netdev_dummy *dev, bool admin_state)
 
 static void
 netdev_dummy_set_admin_state(struct unixctl_conn *conn, int argc,
-                             const char *argv[], void *aux OVS_UNUSED)
+                             const char *argv[],
+                             enum ovs_output_fmt fmt OVS_UNUSED,
+                             void *aux OVS_UNUSED)
 {
     bool up;
 
@@ -2008,7 +2011,9 @@ display_conn_state__(struct ds *s, const char *name,
 
 static void
 netdev_dummy_conn_state(struct unixctl_conn *conn, int argc,
-                        const char *argv[], void *aux OVS_UNUSED)
+                        const char *argv[],
+                        enum ovs_output_fmt fmt OVS_UNUSED,
+                        void *aux OVS_UNUSED)
 {
     enum dummy_netdev_conn_state state = CONN_STATE_UNKNOWN;
     struct ds s;
@@ -2050,7 +2055,9 @@ netdev_dummy_conn_state(struct unixctl_conn *conn, int argc,
 
 static void
 netdev_dummy_ip4addr(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[], void *aux OVS_UNUSED)
+                     const char *argv[],
+                     enum ovs_output_fmt fmt OVS_UNUSED,
+                     void *aux OVS_UNUSED)
 {
     struct netdev *netdev = netdev_from_name(argv[1]);
 
@@ -2075,7 +2082,8 @@ netdev_dummy_ip4addr(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 netdev_dummy_ip6addr(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[], void *aux OVS_UNUSED)
+                     const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                     void *aux OVS_UNUSED)
 {
     struct netdev *netdev = netdev_from_name(argv[1]);
 
@@ -2127,18 +2135,20 @@ netdev_dummy_register(enum dummy_level level)
 {
     unixctl_command_register("netdev-dummy/receive",
                              "name [--qid queue_id] packet|flow [--len packet_len]",
-                             2, INT_MAX, netdev_dummy_receive, NULL);
+                             2, INT_MAX, OVS_OUTPUT_FMT_TEXT,
+                             netdev_dummy_receive, NULL);
     unixctl_command_register("netdev-dummy/set-admin-state",
-                             "[netdev] up|down", 1, 2,
+                             "[netdev] up|down", 1, 2, OVS_OUTPUT_FMT_TEXT,
                              netdev_dummy_set_admin_state, NULL);
     unixctl_command_register("netdev-dummy/conn-state",
-                             "[netdev]", 0, 1,
+                             "[netdev]", 0, 1, OVS_OUTPUT_FMT_TEXT,
                              netdev_dummy_conn_state, NULL);
     unixctl_command_register("netdev-dummy/ip4addr",
                              "[netdev] ipaddr/mask-prefix-len", 2, 2,
-                             netdev_dummy_ip4addr, NULL);
+                             OVS_OUTPUT_FMT_TEXT, netdev_dummy_ip4addr,
+                             NULL);
     unixctl_command_register("netdev-dummy/ip6addr",
-                             "[netdev] ip6addr", 2, 2,
+                             "[netdev] ip6addr", 2, 2, OVS_OUTPUT_FMT_TEXT,
                              netdev_dummy_ip6addr, NULL);
 
     if (level == DUMMY_OVERRIDE_ALL) {

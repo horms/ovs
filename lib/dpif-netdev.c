@@ -1018,6 +1018,7 @@ sorted_poll_thread_list(struct dp_netdev *dp,
 static void
 dpif_netdev_subtable_lookup_get(struct unixctl_conn *conn, int argc OVS_UNUSED,
                                 const char *argv[] OVS_UNUSED,
+                                enum ovs_output_fmt fmt OVS_UNUSED,
                                 void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
@@ -1029,7 +1030,9 @@ dpif_netdev_subtable_lookup_get(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 dpif_netdev_subtable_lookup_set(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                                const char *argv[], void *aux OVS_UNUSED)
+                                const char *argv[],
+                                enum ovs_output_fmt fmt OVS_UNUSED,
+                                void *aux OVS_UNUSED)
 {
     /* This function requires 2 parameters (argv[1] and argv[2]) to execute.
      *   argv[1] is subtable name
@@ -1109,7 +1112,9 @@ dpif_netdev_subtable_lookup_set(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 dpif_netdev_impl_get(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                     const char *argv[] OVS_UNUSED,
+                     enum ovs_output_fmt fmt OVS_UNUSED,
+                     void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
     struct shash_node *node;
@@ -1133,7 +1138,8 @@ dpif_netdev_impl_get(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 dpif_netdev_impl_set(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[], void *aux OVS_UNUSED)
+                     const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                     void *aux OVS_UNUSED)
 {
     /* This function requires just one parameter, the DPIF name. */
     const char *dpif_name = argv[1];
@@ -1195,6 +1201,7 @@ dpif_netdev_impl_set(struct unixctl_conn *conn, int argc OVS_UNUSED,
 static void
 dpif_miniflow_extract_impl_get(struct unixctl_conn *conn, int argc OVS_UNUSED,
                                const char *argv[] OVS_UNUSED,
+                               enum ovs_output_fmt fmt OVS_UNUSED,
                                void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
@@ -1219,7 +1226,9 @@ dpif_miniflow_extract_impl_get(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 dpif_miniflow_extract_impl_set(struct unixctl_conn *conn, int argc,
-                               const char *argv[], void *aux OVS_UNUSED)
+                               const char *argv[],
+                               enum ovs_output_fmt fmt OVS_UNUSED,
+                               void *aux OVS_UNUSED)
 {
     /* This command takes some optional and mandatory arguments. The function
      * here first parses all of the options, saving results in local variables.
@@ -1408,7 +1417,9 @@ error:
 
 static void
 dpif_netdev_pmd_rebalance(struct unixctl_conn *conn, int argc,
-                          const char *argv[], void *aux OVS_UNUSED)
+                          const char *argv[],
+                          enum ovs_output_fmt fmt OVS_UNUSED,
+                          void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
     struct dp_netdev *dp = NULL;
@@ -1451,7 +1462,7 @@ pmd_info_show_sleep(struct ds *reply, unsigned core_id, int numa_id,
 
 static void
 dpif_netdev_pmd_info(struct unixctl_conn *conn, int argc, const char *argv[],
-                     void *aux)
+                     enum ovs_output_fmt fmt OVS_UNUSED, void *aux)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
     struct dp_netdev_pmd_thread **pmd_list;
@@ -1550,9 +1561,8 @@ dpif_netdev_pmd_info(struct unixctl_conn *conn, int argc, const char *argv[],
 }
 
 static void
-pmd_perf_show_cmd(struct unixctl_conn *conn, int argc,
-                          const char *argv[],
-                          void *aux OVS_UNUSED)
+pmd_perf_show_cmd(struct unixctl_conn *conn, int argc, const char *argv[],
+                  enum ovs_output_fmt fmt, void *aux OVS_UNUSED)
 {
     struct pmd_perf_params par;
     long int it_hist = 0, ms_hist = 0;
@@ -1588,12 +1598,13 @@ pmd_perf_show_cmd(struct unixctl_conn *conn, int argc,
     par.iter_hist_len = it_hist;
     par.ms_hist_len = ms_hist;
     par.command_type = PMD_INFO_PERF_SHOW;
-    dpif_netdev_pmd_info(conn, argc, argv, &par);
+    dpif_netdev_pmd_info(conn, argc, argv, fmt, &par);
 }
 
 static void
-dpif_netdev_bond_show(struct unixctl_conn *conn, int argc,
-                      const char *argv[], void *aux OVS_UNUSED)
+dpif_netdev_bond_show(struct unixctl_conn *conn, int argc, const char *argv[],
+                      enum ovs_output_fmt fmt OVS_UNUSED,
+                      void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
     struct dp_netdev *dp = NULL;
@@ -1643,60 +1654,60 @@ dpif_netdev_init(void)
                               sleep_aux = PMD_INFO_SLEEP_SHOW;
 
     unixctl_command_register("dpif-netdev/pmd-stats-show", "[-pmd core] [dp]",
-                             0, 3, dpif_netdev_pmd_info,
+                             0, 3, OVS_OUTPUT_FMT_TEXT, dpif_netdev_pmd_info,
                              (void *)&show_aux);
     unixctl_command_register("dpif-netdev/pmd-stats-clear", "[-pmd core] [dp]",
-                             0, 3, dpif_netdev_pmd_info,
+                             0, 3, OVS_OUTPUT_FMT_TEXT, dpif_netdev_pmd_info,
                              (void *)&clear_aux);
     unixctl_command_register("dpif-netdev/pmd-rxq-show", "[-pmd core] "
                              "[-secs secs] [dp]",
-                             0, 5, dpif_netdev_pmd_info,
+                             0, 5, OVS_OUTPUT_FMT_TEXT, dpif_netdev_pmd_info,
                              (void *)&poll_aux);
     unixctl_command_register("dpif-netdev/pmd-sleep-show", "[dp]",
-                             0, 1, dpif_netdev_pmd_info,
+                             0, 1, OVS_OUTPUT_FMT_TEXT, dpif_netdev_pmd_info,
                              (void *)&sleep_aux);
     unixctl_command_register("dpif-netdev/pmd-perf-show",
                              "[-nh] [-it iter-history-len]"
                              " [-ms ms-history-len]"
                              " [-pmd core] [dp]",
-                             0, 8, pmd_perf_show_cmd,
+                             0, 8, OVS_OUTPUT_FMT_TEXT, pmd_perf_show_cmd,
                              NULL);
     unixctl_command_register("dpif-netdev/pmd-rxq-rebalance", "[dp]",
-                             0, 1, dpif_netdev_pmd_rebalance,
-                             NULL);
+                             0, 1, OVS_OUTPUT_FMT_TEXT,
+                             dpif_netdev_pmd_rebalance, NULL);
     unixctl_command_register("dpif-netdev/pmd-perf-log-set",
                              "on|off [-b before] [-a after] [-e|-ne] "
                              "[-us usec] [-q qlen]",
-                             0, 10, pmd_perf_log_set_cmd,
+                             0, 10, OVS_OUTPUT_FMT_TEXT, pmd_perf_log_set_cmd,
                              NULL);
     unixctl_command_register("dpif-netdev/bond-show", "[dp]",
-                             0, 1, dpif_netdev_bond_show,
+                             0, 1, OVS_OUTPUT_FMT_TEXT, dpif_netdev_bond_show,
                              NULL);
     unixctl_command_register("dpif-netdev/subtable-lookup-prio-set",
                              "[lookup_func] [prio]",
-                             2, 2, dpif_netdev_subtable_lookup_set,
-                             NULL);
+                             2, 2, OVS_OUTPUT_FMT_TEXT,
+                             dpif_netdev_subtable_lookup_set, NULL);
     unixctl_command_register("dpif-netdev/subtable-lookup-info-get", "",
-                             0, 0, dpif_netdev_subtable_lookup_get,
-                             NULL);
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             dpif_netdev_subtable_lookup_get, NULL);
     unixctl_command_register("dpif-netdev/subtable-lookup-prio-get", NULL,
-                             0, 0, dpif_netdev_subtable_lookup_get,
-                             NULL);
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             dpif_netdev_subtable_lookup_get, NULL);
     unixctl_command_register("dpif-netdev/dpif-impl-set",
                              "dpif_implementation_name",
-                             1, 1, dpif_netdev_impl_set,
+                             1, 1, OVS_OUTPUT_FMT_TEXT, dpif_netdev_impl_set,
                              NULL);
     unixctl_command_register("dpif-netdev/dpif-impl-get", "",
-                             0, 0, dpif_netdev_impl_get,
+                             0, 0, OVS_OUTPUT_FMT_TEXT, dpif_netdev_impl_get,
                              NULL);
     unixctl_command_register("dpif-netdev/miniflow-parser-set",
                              "[-pmd core] miniflow_implementation_name"
                              " [study_pkt_cnt]",
-                             1, 5, dpif_miniflow_extract_impl_set,
-                             NULL);
+                             1, 5, OVS_OUTPUT_FMT_TEXT,
+                             dpif_miniflow_extract_impl_set, NULL);
     unixctl_command_register("dpif-netdev/miniflow-parser-get", "",
-                             0, 0, dpif_miniflow_extract_impl_get,
-                             NULL);
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             dpif_miniflow_extract_impl_get, NULL);
     return 0;
 }
 
@@ -10041,7 +10052,9 @@ const struct dpif_class dpif_netdev_class = {
 
 static void
 dpif_dummy_change_port_number(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                              const char *argv[], void *aux OVS_UNUSED)
+                              const char *argv[],
+                              enum ovs_output_fmt fmt OVS_UNUSED,
+                              void *aux OVS_UNUSED)
 {
     struct dp_netdev_port *port;
     struct dp_netdev *dp;
@@ -10137,7 +10150,8 @@ dpif_dummy_register(enum dummy_level level)
 
     unixctl_command_register("dpif-dummy/change-port-number",
                              "dp port new-number",
-                             3, 3, dpif_dummy_change_port_number, NULL);
+                             3, 3, OVS_OUTPUT_FMT_TEXT,
+                             dpif_dummy_change_port_number, NULL);
 }
 
 /* Datapath Classifier. */

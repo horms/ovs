@@ -818,72 +818,97 @@ main(int argc, char *argv[])
         VLOG_INFO("%s (Open vSwitch) %s", program_name, VERSION);
     }
 
-    unixctl_command_register("exit", "", 0, 0, ovsdb_server_exit, &exiting);
+    unixctl_command_register("exit", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_server_exit, &exiting);
     unixctl_command_register("ovsdb-server/compact", "", 0, 1,
-                             ovsdb_server_compact, &all_dbs);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_compact,
+                             &all_dbs);
     unixctl_command_register("ovsdb-server/memory-trim-on-compaction",
-                             "on|off", 1, 1,
+                             "on|off", 1, 1, OVS_OUTPUT_FMT_TEXT,
                              ovsdb_server_memory_trim_on_compaction, NULL);
     unixctl_command_register("ovsdb-server/reconnect", "", 0, 0,
-                             ovsdb_server_reconnect, jsonrpc);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_reconnect,
+                             jsonrpc);
     unixctl_command_register("ovsdb-server/reload", "", 0, 0,
-                             ovsdb_server_reload, &server_config);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_reload,
+                             &server_config);
 
     unixctl_command_register("ovsdb-server/add-remote", "REMOTE", 1, 1,
-                             ovsdb_server_add_remote, &server_config);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_add_remote,
+                             &server_config);
     unixctl_command_register("ovsdb-server/remove-remote", "REMOTE", 1, 1,
-                             ovsdb_server_remove_remote, &server_config);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_remove_remote,
+                             &server_config);
     unixctl_command_register("ovsdb-server/list-remotes", "", 0, 0,
-                             ovsdb_server_list_remotes, &remotes);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_list_remotes,
+                             &remotes);
 
     unixctl_command_register("ovsdb-server/add-db", "DB", 1, 1,
-                             ovsdb_server_add_database, &server_config);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_add_database,
+                             &server_config);
     unixctl_command_register("ovsdb-server/remove-db", "DB", 1, 1,
-                             ovsdb_server_remove_database, &server_config);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_remove_database,
+                             &server_config);
     unixctl_command_register("ovsdb-server/list-dbs", "", 0, 0,
-                             ovsdb_server_list_databases, &all_dbs);
+                             OVS_OUTPUT_FMT_TEXT, ovsdb_server_list_databases,
+                             &all_dbs);
     unixctl_command_register("ovsdb-server/tlog-set", "DB:TABLE on|off",
-                             2, 2, ovsdb_server_tlog_set, &all_dbs);
+                             2, 2, OVS_OUTPUT_FMT_TEXT, ovsdb_server_tlog_set,
+                             &all_dbs);
     unixctl_command_register("ovsdb-server/tlog-list", "",
-                             0, 0, ovsdb_server_tlog_list, &all_dbs);
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_server_tlog_list, &all_dbs);
     unixctl_command_register("ovsdb-server/perf-counters-show", "", 0, 0,
+                             OVS_OUTPUT_FMT_TEXT,
                              ovsdb_server_perf_counters_show, NULL);
     unixctl_command_register("ovsdb-server/perf-counters-clear", "", 0, 0,
+                             OVS_OUTPUT_FMT_TEXT,
                              ovsdb_server_perf_counters_clear, NULL);
     unixctl_command_register("ovsdb-server/set-active-ovsdb-server", "", 1, 1,
+                             OVS_OUTPUT_FMT_TEXT,
                              ovsdb_server_set_active_ovsdb_server,
                              &server_config);
     unixctl_command_register("ovsdb-server/get-active-ovsdb-server", "", 0, 0,
+                             OVS_OUTPUT_FMT_TEXT,
                              ovsdb_server_get_active_ovsdb_server,
                              &server_config);
     unixctl_command_register("ovsdb-server/connect-active-ovsdb-server", "",
-                             0, 0, ovsdb_server_connect_active_ovsdb_server,
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_server_connect_active_ovsdb_server,
                              &server_config);
     unixctl_command_register("ovsdb-server/disconnect-active-ovsdb-server", "",
-                             0, 0, ovsdb_server_disconnect_active_ovsdb_server,
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_server_disconnect_active_ovsdb_server,
                              &server_config);
     unixctl_command_register(
         "ovsdb-server/set-active-ovsdb-server-probe-interval", "", 1, 1,
+        OVS_OUTPUT_FMT_TEXT,
         ovsdb_server_set_active_ovsdb_server_probe_interval, &server_config);
     unixctl_command_register(
         "ovsdb-server/set-relay-source-probe-interval", "", 1, 1,
+        OVS_OUTPUT_FMT_TEXT,
         ovsdb_server_set_relay_source_interval, &server_config);
     unixctl_command_register("ovsdb-server/set-sync-exclude-tables", "",
-                             0, 1, ovsdb_server_set_sync_exclude_tables,
+                             0, 1, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_server_set_sync_exclude_tables,
                              &server_config);
     unixctl_command_register("ovsdb-server/get-sync-exclude-tables", "",
-                             0, 0, ovsdb_server_get_sync_exclude_tables,
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_server_get_sync_exclude_tables,
                              &server_config);
     unixctl_command_register("ovsdb-server/sync-status", "",
-                             0, 0, ovsdb_server_get_sync_status,
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_server_get_sync_status,
                              &server_config);
     unixctl_command_register("ovsdb-server/get-db-storage-status", "DB", 1, 1,
+                             OVS_OUTPUT_FMT_TEXT,
                              ovsdb_server_get_db_storage_status,
                              &server_config);
 
     /* Simulate the behavior of OVS release prior to version 2.5 that
      * does not support the monitor_cond method.  */
     unixctl_command_register("ovsdb-server/disable-monitor-cond", "", 0, 0,
+                             OVS_OUTPUT_FMT_TEXT,
                              ovsdb_server_disable_monitor_cond, jsonrpc);
 
     main_loop(&server_config, jsonrpc, &all_dbs, unixctl, &remotes,
@@ -1841,6 +1866,7 @@ check_config_file_on_unixctl(struct unixctl_conn *conn)
 static void
 ovsdb_server_set_active_ovsdb_server(struct unixctl_conn *conn,
                                      int argc OVS_UNUSED, const char *argv[],
+                                     enum ovs_output_fmt fmt OVS_UNUSED,
                                      void *config_)
 {
     struct server_config *config = config_;
@@ -1871,6 +1897,7 @@ static void
 ovsdb_server_get_active_ovsdb_server(struct unixctl_conn *conn,
                                      int argc OVS_UNUSED,
                                      const char *argv[] OVS_UNUSED,
+                                     enum ovs_output_fmt fmt OVS_UNUSED,
                                      void *config_ )
 {
     struct server_config *config = config_;
@@ -1882,6 +1909,7 @@ static void
 ovsdb_server_connect_active_ovsdb_server(struct unixctl_conn *conn,
                                          int argc OVS_UNUSED,
                                          const char *argv[] OVS_UNUSED,
+                                         enum ovs_output_fmt fmt OVS_UNUSED,
                                          void *config_)
 {
     struct server_config *config = config_;
@@ -1930,6 +1958,7 @@ static void
 ovsdb_server_disconnect_active_ovsdb_server(struct unixctl_conn *conn,
                                             int argc OVS_UNUSED,
                                             const char *argv[] OVS_UNUSED,
+                                            enum ovs_output_fmt fmt OVS_UNUSED,
                                             void *config_)
 {
     struct server_config *config = config_;
@@ -1954,9 +1983,11 @@ ovsdb_server_disconnect_active_ovsdb_server(struct unixctl_conn *conn,
 
 static void
 ovsdb_server_set_active_ovsdb_server_probe_interval(struct unixctl_conn *conn,
-                                                   int argc OVS_UNUSED,
-                                                   const char *argv[],
-                                                   void *config_)
+                                                    int argc OVS_UNUSED,
+                                                    const char *argv[],
+                                                    enum ovs_output_fmt fmt
+                                                    OVS_UNUSED,
+                                                    void *config_)
 {
     struct server_config *config = config_;
     struct shash_node *node;
@@ -1998,6 +2029,7 @@ static void
 ovsdb_server_set_relay_source_interval(struct unixctl_conn *conn,
                                        int argc OVS_UNUSED,
                                        const char *argv[],
+                                       enum ovs_output_fmt fmt OVS_UNUSED,
                                        void *config_)
 {
     struct server_config *config = config_;
@@ -2035,6 +2067,7 @@ static void
 ovsdb_server_set_sync_exclude_tables(struct unixctl_conn *conn,
                                      int argc OVS_UNUSED,
                                      const char *argv[],
+                                     enum ovs_output_fmt fmt OVS_UNUSED,
                                      void *config_)
 {
     struct server_config *config = config_;
@@ -2080,6 +2113,7 @@ static void
 ovsdb_server_get_sync_exclude_tables(struct unixctl_conn *conn,
                                      int argc OVS_UNUSED,
                                      const char *argv[] OVS_UNUSED,
+                                     enum ovs_output_fmt fmt OVS_UNUSED,
                                      void *config_)
 {
     struct server_config *config = config_;
@@ -2090,6 +2124,7 @@ ovsdb_server_get_sync_exclude_tables(struct unixctl_conn *conn,
 static void
 ovsdb_server_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,
                   const char *argv[] OVS_UNUSED,
+                  enum ovs_output_fmt fmt OVS_UNUSED,
                   void *exiting_)
 {
     bool *exiting = exiting_;
@@ -2100,6 +2135,7 @@ ovsdb_server_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,
 static void
 ovsdb_server_perf_counters_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
                                 const char *argv[] OVS_UNUSED,
+                                enum ovs_output_fmt fmt OVS_UNUSED,
                                 void *arg_ OVS_UNUSED)
 {
     char *s = perf_counters_to_string();
@@ -2111,6 +2147,7 @@ ovsdb_server_perf_counters_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
 static void
 ovsdb_server_perf_counters_clear(struct unixctl_conn *conn, int argc OVS_UNUSED,
                                  const char *argv[] OVS_UNUSED,
+                                 enum ovs_output_fmt fmt OVS_UNUSED,
                                  void *arg_ OVS_UNUSED)
 {
     perf_counters_clear();
@@ -2124,6 +2161,7 @@ static void
 ovsdb_server_disable_monitor_cond(struct unixctl_conn *conn,
                                   int argc OVS_UNUSED,
                                   const char *argv[] OVS_UNUSED,
+                                  enum ovs_output_fmt fmt OVS_UNUSED,
                                   void *jsonrpc_)
 {
     struct ovsdb_jsonrpc_server *jsonrpc = jsonrpc_;
@@ -2136,7 +2174,8 @@ ovsdb_server_disable_monitor_cond(struct unixctl_conn *conn,
 
 static void
 ovsdb_server_compact(struct unixctl_conn *conn, int argc,
-                     const char *argv[], void *dbs_)
+                     const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                     void *dbs_)
 {
     const char *db_name = argc < 2 ? NULL : argv[1];
     struct shash *all_dbs = dbs_;
@@ -2199,6 +2238,7 @@ static void
 ovsdb_server_memory_trim_on_compaction(struct unixctl_conn *conn,
                                        int argc OVS_UNUSED,
                                        const char *argv[],
+                                       enum ovs_output_fmt fmt OVS_UNUSED,
                                        void *arg OVS_UNUSED)
 {
     bool old_trim_memory = trim_memory;
@@ -2230,7 +2270,9 @@ ovsdb_server_memory_trim_on_compaction(struct unixctl_conn *conn,
  * connections and reconnect. */
 static void
 ovsdb_server_reconnect(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                       const char *argv[] OVS_UNUSED, void *jsonrpc_)
+                       const char *argv[] OVS_UNUSED,
+                       enum ovs_output_fmt fmt OVS_UNUSED,
+                       void *jsonrpc_)
 {
     struct ovsdb_jsonrpc_server *jsonrpc = jsonrpc_;
     ovsdb_jsonrpc_server_reconnect(
@@ -2242,7 +2284,9 @@ ovsdb_server_reconnect(struct unixctl_conn *conn, int argc OVS_UNUSED,
  * 'config_file_path', read it and sync the runtime configuration with it. */
 static void
 ovsdb_server_reload(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                    const char *argv[] OVS_UNUSED, void *config_)
+                    const char *argv[] OVS_UNUSED,
+                    enum ovs_output_fmt fmt OVS_UNUSED,
+                    void *config_)
 {
     struct server_config *config = config_;
 
@@ -2264,7 +2308,9 @@ ovsdb_server_reload(struct unixctl_conn *conn, int argc OVS_UNUSED,
  * ovsdb-server services. */
 static void
 ovsdb_server_add_remote(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                        const char *argv[], void *config_)
+                        const char *argv[],
+                        enum ovs_output_fmt fmt OVS_UNUSED,
+                        void *config_)
 {
     struct server_config *config = config_;
     const char *remote = argv[1];
@@ -2297,7 +2343,9 @@ ovsdb_server_add_remote(struct unixctl_conn *conn, int argc OVS_UNUSED,
  * that ovsdb-server services. */
 static void
 ovsdb_server_remove_remote(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                           const char *argv[], void *config_)
+                           const char *argv[],
+                           enum ovs_output_fmt fmt OVS_UNUSED,
+                           void *config_)
 {
     struct server_config *config = config_;
     struct ovsdb_jsonrpc_options *options;
@@ -2319,7 +2367,9 @@ ovsdb_server_remove_remote(struct unixctl_conn *conn, int argc OVS_UNUSED,
 /* "ovsdb-server/list-remotes": outputs a list of configured rmeotes. */
 static void
 ovsdb_server_list_remotes(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                          const char *argv[] OVS_UNUSED, void *remotes_)
+                          const char *argv[] OVS_UNUSED,
+                          enum ovs_output_fmt fmt OVS_UNUSED,
+                          void *remotes_)
 {
     const struct shash *remotes = remotes_;
     const struct shash_node **list;
@@ -2341,7 +2391,9 @@ ovsdb_server_list_remotes(struct unixctl_conn *conn, int argc OVS_UNUSED,
 /* "ovsdb-server/add-db DB": adds the DB to ovsdb-server. */
 static void
 ovsdb_server_add_database(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                          const char *argv[], void *config_)
+                          const char *argv[],
+                          enum ovs_output_fmt fmt OVS_UNUSED,
+                          void *config_)
 {
     struct server_config *config = config_;
     const char *filename = argv[1];
@@ -2384,7 +2436,9 @@ remove_db(struct server_config *config, struct shash_node *node, char *comment)
 
 static void
 ovsdb_server_remove_database(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                             const char *argv[], void *config_)
+                             const char *argv[],
+                             enum ovs_output_fmt fmt OVS_UNUSED,
+                             void *config_)
 {
     struct server_config *config = config_;
     struct shash_node *node;
@@ -2410,7 +2464,9 @@ ovsdb_server_remove_database(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovsdb_server_list_databases(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                            const char *argv[] OVS_UNUSED, void *all_dbs_)
+                            const char *argv[] OVS_UNUSED,
+                            enum ovs_output_fmt fmt OVS_UNUSED,
+                            void *all_dbs_)
 {
     struct shash *all_dbs = all_dbs_;
     const struct shash_node **nodes;
@@ -2435,7 +2491,9 @@ ovsdb_server_list_databases(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovsdb_server_tlog_set(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                      const char *argv[], void *all_dbs_)
+                      const char *argv[],
+                      enum ovs_output_fmt fmt OVS_UNUSED,
+                      void *all_dbs_)
 {
     struct shash *all_dbs = all_dbs_;
     const char *name_ = argv[1];
@@ -2481,7 +2539,9 @@ out:
 
 static void
 ovsdb_server_tlog_list(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                       const char *argv[] OVS_UNUSED, void *all_dbs_)
+                       const char *argv[] OVS_UNUSED,
+                       enum ovs_output_fmt fmt OVS_UNUSED,
+                       void *all_dbs_)
 {
     const struct shash_node **db_nodes;
     struct ds s = DS_EMPTY_INITIALIZER;
@@ -2516,7 +2576,9 @@ ovsdb_server_tlog_list(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovsdb_server_get_sync_status(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                             const char *argv[] OVS_UNUSED, void *config_)
+                             const char *argv[] OVS_UNUSED,
+                             enum ovs_output_fmt fmt OVS_UNUSED,
+                             void *config_)
 {
     struct server_config *config = config_;
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -2557,6 +2619,7 @@ static void
 ovsdb_server_get_db_storage_status(struct unixctl_conn *conn,
                                    int argc OVS_UNUSED,
                                    const char *argv[],
+                                   enum ovs_output_fmt fmt OVS_UNUSED,
                                    void *config_)
 {
     struct server_config *config = config_;

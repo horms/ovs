@@ -233,9 +233,11 @@ static bool stp_timer_expired(struct stp_timer *, int elapsed, int timeout);
 static void stp_send_bpdu(struct stp_port *, const void *, size_t)
     OVS_REQUIRES(mutex);
 static void stp_unixctl_tcn(struct unixctl_conn *, int argc,
-                            const char *argv[], void *aux);
+                            const char *argv[],
+                            enum ovs_output_fmt fmt OVS_UNUSED, void *aux);
 static void stp_unixctl_show(struct unixctl_conn *, int argc,
-                             const char *argv[], void *aux);
+                             const char *argv[],
+                             enum ovs_output_fmt fmt OVS_UNUSED, void *aux);
 
 void
 stp_init(void)
@@ -249,10 +251,10 @@ stp_init(void)
          * the call back function, but for now this is what we have. */
         ovs_mutex_init_recursive(&mutex);
 
-        unixctl_command_register("stp/tcn", "[bridge]", 0, 1, stp_unixctl_tcn,
-                                 NULL);
+        unixctl_command_register("stp/tcn", "[bridge]", 0, 1,
+                                 OVS_OUTPUT_FMT_TEXT, stp_unixctl_tcn, NULL);
         unixctl_command_register("stp/show", "[bridge]", 0, 1,
-                                 stp_unixctl_show, NULL);
+                                 OVS_OUTPUT_FMT_TEXT, stp_unixctl_show, NULL);
         ovsthread_once_done(&once);
     }
 }
@@ -1611,8 +1613,8 @@ stp_find(const char *name) OVS_REQUIRES(mutex)
 }
 
 static void
-stp_unixctl_tcn(struct unixctl_conn *conn, int argc,
-                const char *argv[], void *aux OVS_UNUSED)
+stp_unixctl_tcn(struct unixctl_conn *conn, int argc, const char *argv[],
+                enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     ovs_mutex_lock(&mutex);
     if (argc > 1) {
@@ -1702,8 +1704,8 @@ stp_print_details(struct ds *ds, const struct stp *stp)
 }
 
 static void
-stp_unixctl_show(struct unixctl_conn *conn, int argc,
-                 const char *argv[], void *aux OVS_UNUSED)
+stp_unixctl_show(struct unixctl_conn *conn, int argc, const char *argv[],
+                 enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
 

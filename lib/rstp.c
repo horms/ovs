@@ -129,9 +129,11 @@ static struct rstp_port *rstp_get_root_port__(const struct rstp *rstp)
 static rstp_identifier rstp_get_root_id__(const struct rstp *rstp)
     OVS_REQUIRES(rstp_mutex);
 static void rstp_unixctl_tcn(struct unixctl_conn *, int argc,
-                             const char *argv[], void *aux);
+                             const char *argv[],
+                             enum ovs_output_fmt fmt OVS_UNUSED, void *aux);
 static void rstp_unixctl_show(struct unixctl_conn *, int argc,
-                              const char *argv[], void *aux);
+                              const char *argv[],
+                              enum ovs_output_fmt fmt OVS_UNUSED, void *aux);
 
 const char *
 rstp_state_name(enum rstp_state state)
@@ -248,10 +250,10 @@ void
 rstp_init(void)
     OVS_EXCLUDED(rstp_mutex)
 {
-    unixctl_command_register("rstp/tcn", "[bridge]", 0, 1, rstp_unixctl_tcn,
-                             NULL);
-    unixctl_command_register("rstp/show", "[bridge]", 0, 1, rstp_unixctl_show,
-                             NULL);
+    unixctl_command_register("rstp/tcn", "[bridge]", 0, 1,
+                             OVS_OUTPUT_FMT_TEXT, rstp_unixctl_tcn, NULL);
+    unixctl_command_register("rstp/show", "[bridge]", 0, 1,
+                             OVS_OUTPUT_FMT_TEXT, rstp_unixctl_show, NULL);
 }
 
 /* Creates and returns a new RSTP instance that initially has no ports. */
@@ -1550,8 +1552,8 @@ rstp_find(const char *name)
 }
 
 static void
-rstp_unixctl_tcn(struct unixctl_conn *conn, int argc,
-                 const char *argv[], void *aux OVS_UNUSED)
+rstp_unixctl_tcn(struct unixctl_conn *conn, int argc, const char *argv[],
+                 enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
     OVS_EXCLUDED(rstp_mutex)
 {
     ovs_mutex_lock(&rstp_mutex);
@@ -1651,8 +1653,8 @@ rstp_print_details(struct ds *ds, const struct rstp *rstp)
 }
 
 static void
-rstp_unixctl_show(struct unixctl_conn *conn, int argc,
-                  const char *argv[], void *aux OVS_UNUSED)
+rstp_unixctl_show(struct unixctl_conn *conn, int argc, const char *argv[],
+                  enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
     OVS_EXCLUDED(rstp_mutex)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;

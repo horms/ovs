@@ -213,7 +213,8 @@ static cookie_io_functions_t dpdk_log_func = {
 
 static void
 dpdk_unixctl_mem_stream(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                        const char *argv[] OVS_UNUSED, void *aux)
+                        const char *argv[] OVS_UNUSED,
+                        enum ovs_output_fmt fmt OVS_UNUSED, void *aux)
 {
     void (*callback)(FILE *) = aux;
     char *response = NULL;
@@ -260,6 +261,7 @@ dpdk_parse_log_level(const char *s)
 
 static void
 dpdk_unixctl_log_set(struct unixctl_conn *conn, int argc, const char *argv[],
+                     enum ovs_output_fmt fmt OVS_UNUSED,
                      void *aux OVS_UNUSED)
 {
     int i;
@@ -427,14 +429,15 @@ dpdk_init__(const struct smap *ovs_other_config)
         }
     }
 
-    unixctl_command_register("dpdk/lcore-list", "", 0, 0,
-                             dpdk_unixctl_mem_stream, rte_lcore_dump);
-    unixctl_command_register("dpdk/log-list", "", 0, 0,
+    unixctl_command_register("dpdk/lcore-list", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             dpdk_unixctl_mem_stream,  rte_lcore_dump);
+    unixctl_command_register("dpdk/log-list", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                              dpdk_unixctl_mem_stream, rte_log_dump);
     unixctl_command_register("dpdk/log-set", "{level | pattern:level}", 0,
-                             INT_MAX, dpdk_unixctl_log_set, NULL);
+                             INT_MAX, OVS_OUTPUT_FMT_TEXT,
+                             dpdk_unixctl_log_set, NULL);
     unixctl_command_register("dpdk/get-malloc-stats", "", 0, 0,
-                             dpdk_unixctl_mem_stream,
+                             OVS_OUTPUT_FMT_TEXT, dpdk_unixctl_mem_stream,
                              malloc_dump_stats_wrapper);
 
     /* We are called from the main thread here */

@@ -142,5 +142,7 @@ netdev_tnl_push_ip_header(struct dp_packet *packet, const void *header,
                           int size, int *ip_tot_size, ovs_be32 ipv6_label);
 void
 netdev_tnl_egress_port_range(struct unixctl_conn *conn, int argc,
-                             const char *argv[], void *aux OVS_UNUSED);
+                             const char *argv[],
+                             enum ovs_output_fmt fmt OVS_UNUSED,
+                             void *aux OVS_UNUSED);
 #endif

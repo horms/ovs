@@ -43,20 +43,12 @@ int unixctl_client_transact(struct jsonrpc *client,
 
 /* Command registration. */
 struct unixctl_conn;
-/* FIXME: Output format will be passed as 'fmt' to the command in later patch.
- */
 typedef void unixctl_cb_func(struct unixctl_conn *,
                              int argc, const char *argv[],
-                             /* enum ovs_output_fmt fmt, */ void *aux);
-/* FIXME: unixctl_command_register() will be replaced with
- *        unixctl_command_register_fmt() in a later patch of this series.  It
- *        is kept temporarily to reduce the amount of changes in this patch. */
+                             enum ovs_output_fmt fmt, void *aux);
 void unixctl_command_register(const char *name, const char *usage,
-                              int min_args, int max_args,
+                              int min_args, int max_args, int output_fmts,
                               unixctl_cb_func *cb, void *aux);
-void unixctl_command_register_fmt(const char *name, const char *usage,
-                                  int min_args, int max_args, int output_fmts,
-                                  unixctl_cb_func *cb, void *aux);
 void unixctl_command_reply_error(struct unixctl_conn *, const char *error);
 void unixctl_command_reply(struct unixctl_conn *, const char *body);
 void unixctl_command_reply_json(struct unixctl_conn *,

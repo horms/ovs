@@ -432,6 +432,7 @@ void pmd_perf_format_ms_history(struct ds *str, struct pmd_perf_stats *s,
                                 int n_ms);
 void pmd_perf_log_set_cmd(struct unixctl_conn *conn,
                           int argc, const char *argv[],
+                          enum ovs_output_fmt fmt OVS_UNUSED,
                           void *aux OVS_UNUSED);
 
 #ifdef  __cplusplus

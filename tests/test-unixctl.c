@@ -33,7 +33,9 @@ OVS_NO_RETURN static void usage(void);
 
 static void
 test_unixctl_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                  const char *argv[] OVS_UNUSED, void *exiting_)
+                  const char *argv[] OVS_UNUSED,
+                  enum ovs_output_fmt fmt OVS_UNUSED,
+                  void *exiting_)
 {
     bool *exiting = exiting_;
     *exiting = true;
@@ -42,21 +44,26 @@ test_unixctl_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 test_unixctl_echo(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                  const char *argv[], void *aux OVS_UNUSED)
+                  const char *argv[],
+                  enum ovs_output_fmt fmt OVS_UNUSED,
+                  void *aux OVS_UNUSED)
 {
     unixctl_command_reply(conn, argv[1]);
 }
 
 static void
 test_unixctl_echo_error(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                        const char *argv[], void *aux OVS_UNUSED)
+                        const char *argv[],
+                        enum ovs_output_fmt fmt OVS_UNUSED,
+                        void *aux OVS_UNUSED)
 {
     unixctl_command_reply_error(conn, argv[1]);
 }
 
 static void
 test_unixctl_log(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                  const char *argv[], void *aux OVS_UNUSED)
+                  const char *argv[],
+                 enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     VLOG_INFO("%s", argv[1]);
     unixctl_command_reply(conn, NULL);
@@ -64,7 +71,9 @@ test_unixctl_log(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 test_unixctl_block(struct unixctl_conn *conn OVS_UNUSED, int argc OVS_UNUSED,
-                   const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                   const char *argv[] OVS_UNUSED,
+                   enum ovs_output_fmt fmt OVS_UNUSED,
+                   void *aux OVS_UNUSED)
 {
     VLOG_INFO("%s", argv[1]);
     unixctl_command_reply(conn, NULL);
@@ -88,12 +97,16 @@ test_unixctl_main(int argc, char *argv[])
     if (retval) {
         exit(EXIT_FAILURE);
     }
-    unixctl_command_register("exit", "", 0, 0, test_unixctl_exit, &exiting);
-    unixctl_command_register("echo", "ARG", 1, 1, test_unixctl_echo, NULL);
-    unixctl_command_register("echo_error", "ARG", 1, 1,
+    unixctl_command_register("exit", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             test_unixctl_exit, &exiting);
+    unixctl_command_register("echo", "ARG", 1, 1, OVS_OUTPUT_FMT_TEXT,
+                             test_unixctl_echo, NULL);
+    unixctl_command_register("echo_error", "ARG", 1, 1, OVS_OUTPUT_FMT_TEXT,
                              test_unixctl_echo_error, NULL);
-    unixctl_command_register("log", "ARG", 1, 1, test_unixctl_log, NULL);
-    unixctl_command_register("block", "", 0, 0, test_unixctl_block, NULL);
+    unixctl_command_register("log", "ARG", 1, 1, OVS_OUTPUT_FMT_TEXT,
+                             test_unixctl_log, NULL);
+    unixctl_command_register("block", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             test_unixctl_block, NULL);
     daemonize_complete();
 
     VLOG_INFO("Entering run loop.");

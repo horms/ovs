@@ -534,7 +534,8 @@ usage(void)
 
 static void
 ofctl_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,
-           const char *argv[] OVS_UNUSED, void *exiting_)
+           const char *argv[] OVS_UNUSED, enum ovs_output_fmt fmt OVS_UNUSED,
+           void *exiting_)
 {
     bool *exiting = exiting_;
     *exiting = true;
@@ -1945,7 +1946,8 @@ openflow_from_hex(const char *hex, struct ofpbuf **msgp)
 
 static void
 ofctl_send(struct unixctl_conn *conn, int argc,
-           const char *argv[], void *vconn_)
+           const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+           void *vconn_)
 {
     struct vconn *vconn = vconn_;
     struct ds reply;
@@ -1991,7 +1993,8 @@ ofctl_send(struct unixctl_conn *conn, int argc,
 
 static void
 unixctl_packet_out(struct unixctl_conn *conn, int OVS_UNUSED argc,
-                   const char *argv[], void *vconn_)
+                   const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                   void *vconn_)
 {
     struct vconn *vconn = vconn_;
     enum ofputil_protocol protocol
@@ -2052,7 +2055,8 @@ struct barrier_aux {
 
 static void
 ofctl_barrier(struct unixctl_conn *conn, int argc OVS_UNUSED,
-              const char *argv[] OVS_UNUSED, void *aux_)
+              const char *argv[] OVS_UNUSED,
+              enum ovs_output_fmt fmt OVS_UNUSED, void *aux_)
 {
     struct barrier_aux *aux = aux_;
     struct ofpbuf *msg;
@@ -2075,7 +2079,8 @@ ofctl_barrier(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ofctl_set_output_file(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                      const char *argv[], void *aux OVS_UNUSED)
+                      const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                      void *aux OVS_UNUSED)
 {
     int fd;
 
@@ -2093,7 +2098,9 @@ ofctl_set_output_file(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ofctl_block(struct unixctl_conn *conn, int argc OVS_UNUSED,
-            const char *argv[] OVS_UNUSED, void *blocked_)
+            const char *argv[] OVS_UNUSED,
+            enum ovs_output_fmt fmt OVS_UNUSED,
+            void *blocked_)
 {
     bool *blocked = blocked_;
 
@@ -2107,7 +2114,9 @@ ofctl_block(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ofctl_unblock(struct unixctl_conn *conn, int argc OVS_UNUSED,
-              const char *argv[] OVS_UNUSED, void *blocked_)
+              const char *argv[] OVS_UNUSED,
+              enum ovs_output_fmt fmt OVS_UNUSED,
+              void *blocked_)
 {
     bool *blocked = blocked_;
 
@@ -2142,19 +2151,21 @@ monitor_vconn(struct vconn *vconn, bool reply_to_echo_requests,
     if (error) {
         ovs_fatal(error, "failed to create unixctl server");
     }
-    unixctl_command_register("exit", "", 0, 0, ofctl_exit, &exiting);
+    unixctl_command_register("exit", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ofctl_exit, &exiting);
     unixctl_command_register("ofctl/send", "OFMSG...", 1, INT_MAX,
-                             ofctl_send, vconn);
+                             OVS_OUTPUT_FMT_TEXT, ofctl_send, vconn);
     unixctl_command_register("ofctl/packet-out", "\"in_port=<port> packet=<hex data> actions=...\"", 1, 1,
-                             unixctl_packet_out, vconn);
-    unixctl_command_register("ofctl/barrier", "", 0, 0,
+                             OVS_OUTPUT_FMT_TEXT, unixctl_packet_out, vconn);
+    unixctl_command_register("ofctl/barrier", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                              ofctl_barrier, &barrier_aux);
     unixctl_command_register("ofctl/set-output-file", "FILE", 1, 1,
-                             ofctl_set_output_file, NULL);
-
-    unixctl_command_register("ofctl/block", "", 0, 0, ofctl_block, &blocked);
-    unixctl_command_register("ofctl/unblock", "", 0, 0, ofctl_unblock,
-                             &blocked);
+                             OVS_OUTPUT_FMT_TEXT, ofctl_set_output_file,
+                             NULL);
+    unixctl_command_register("ofctl/block", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ofctl_block, &blocked);
+    unixctl_command_register("ofctl/unblock", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ofctl_unblock, &blocked);
 
     daemonize_complete();
 
