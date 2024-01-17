@@ -24,6 +24,7 @@
 #include "ovs-thread.h"
 #include "util.h"
 #include "openvswitch/vlog.h"
+#include "openvswitch/json.h"
 
 VLOG_DEFINE_THIS_MODULE(command_line);
 
@@ -51,6 +52,41 @@ ovs_cmdl_long_options_to_short_options(const struct option options[])
     *p = '\0';
 
     return xstrdup(short_options);
+}
+
+const char *
+ovs_output_fmt_to_string(enum ovs_output_fmt fmt)
+{
+    switch (fmt) {
+    case OVS_OUTPUT_FMT_TEXT:
+        return "text";
+
+    case OVS_OUTPUT_FMT_JSON:
+        return "json";
+
+    default:
+        return NULL;
+    }
+}
+
+struct json *
+ovs_output_fmt_to_json(enum ovs_output_fmt fmt)
+{
+    const char *string = ovs_output_fmt_to_string(fmt);
+    return string ? json_string_create(string) : NULL;
+}
+
+bool
+ovs_output_fmt_from_string(const char *string, enum ovs_output_fmt *fmt)
+{
+    if (!strcmp(string, "text")) {
+        *fmt = OVS_OUTPUT_FMT_TEXT;
+    } else if (!strcmp(string, "json")) {
+        *fmt = OVS_OUTPUT_FMT_JSON;
+    } else {
+        return false;
+    }
+    return true;
 }
 
 static char * OVS_WARN_UNUSED_RESULT

@@ -20,6 +20,7 @@
 /* Utilities for command-line parsing. */
 
 #include "compiler.h"
+#include <openvswitch/list.h>
 
 struct option;
 
@@ -45,6 +46,15 @@ struct ovs_cmdl_command {
 };
 
 char *ovs_cmdl_long_options_to_short_options(const struct option *options);
+
+enum ovs_output_fmt {
+    OVS_OUTPUT_FMT_TEXT = 1 << 0,
+    OVS_OUTPUT_FMT_JSON = 1 << 1
+};
+
+const char *ovs_output_fmt_to_string(enum ovs_output_fmt);
+struct json *ovs_output_fmt_to_json(enum ovs_output_fmt);
+bool ovs_output_fmt_from_string(const char *, enum ovs_output_fmt *);
 
 struct ovs_cmdl_parsed_option {
     const struct option *o;
