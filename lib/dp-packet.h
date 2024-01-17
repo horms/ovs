@@ -92,16 +92,16 @@ enum dp_packet_offload_mask {
     /* Offload packet is tunnel VXLAN. */
     DEF_OL_FLAG(DP_PACKET_OL_TX_TUNNEL_VXLAN,
                 RTE_MBUF_F_TX_TUNNEL_VXLAN, 0x4000),
-    /* Offload tunnel packet, out is ipv4 */
+    /* Offload tunnel packet, out is IPV4 */
     DEF_OL_FLAG(DP_PACKET_OL_TX_OUTER_IPV4,
                 RTE_MBUF_F_TX_OUTER_IPV4, 0x8000),
-    /* Offload TUNNEL out ipv4 checksum */
+    /* Offload tunnel out IPV4 checksum */
     DEF_OL_FLAG(DP_PACKET_OL_TX_OUTER_IP_CKSUM,
                 RTE_MBUF_F_TX_OUTER_IP_CKSUM, 0x10000),
-    /* Offload TUNNEL out udp checksum */
+    /* Offload tunnel out UDP checksum */
     DEF_OL_FLAG(DP_PACKET_OL_TX_OUTER_UDP_CKSUM,
                 RTE_MBUF_F_TX_OUTER_UDP_CKSUM, 0x20000),
-    /* Offload tunnel packet, out is ipv6 */
+    /* Offload tunnel packet, out is IPV6 */
     DEF_OL_FLAG(DP_PACKET_OL_TX_OUTER_IPV6,
                 RTE_MBUF_F_TX_OUTER_IPV6, 0x40000),
 
@@ -164,9 +164,9 @@ struct dp_packet {
                                     * or UINT16_MAX. */
     uint16_t l4_ofs;               /* Transport-level header offset,
                                       or UINT16_MAX. */
-    uint16_t inner_l3_ofs;         /* inner Network-level header offset,
+    uint16_t inner_l3_ofs;         /* Inner Network-level header offset,
                                     * or UINT16_MAX. */
-    uint16_t inner_l4_ofs;         /* inner Transport-level header offset,
+    uint16_t inner_l4_ofs;         /* Inner Transport-level header offset,
                                       or UINT16_MAX. */
     uint32_t cutlen;               /* length in bytes to cut from the end. */
     ovs_be32 packet_type;          /* Packet type as defined in OpenFlow */
@@ -279,8 +279,8 @@ bool dp_packet_compare_offsets(struct dp_packet *good,
                                struct dp_packet *test,
                                struct ds *err_str);
 void dp_packet_ol_send_prepare(struct dp_packet *, uint64_t);
-void dp_packet_tnl_outer_ol_send_prepare(struct dp_packet *p,
-                                         uint64_t flags);
+void dp_packet_tnl_outer_ol_send_prepare(struct dp_packet *,
+                                         uint64_t);
 
 
 
@@ -640,19 +640,19 @@ dp_packet_flow_mark_ptr(const struct dp_packet *b)
 static inline void
 dp_packet_set_l2_len(struct dp_packet *b OVS_UNUSED, size_t l2_len OVS_UNUSED)
 {
-    /* There are no implementation */
+    /* There is no implementation. */
 }
 
 static inline void
 dp_packet_set_l3_len(struct dp_packet *b OVS_UNUSED, size_t l3_len OVS_UNUSED)
 {
-    /* There are no implementation */
+    /* There is no implementation. */
 }
 
 static inline void
 dp_packet_set_l4_len(struct dp_packet *b OVS_UNUSED, size_t l4_len OVS_UNUSED)
 {
-    /* There are no implementation */
+    /* There is no implementation. */
 }
 
 static inline uint32_t *
@@ -1162,23 +1162,26 @@ dp_packet_hwol_is_tunnel_vxlan(struct dp_packet *b)
     return !!(*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_TUNNEL_VXLAN);
 }
 
-/* Returns 'true' if packet 'b' is marked for out ipv4. */
+/* Returns 'true' if packet 'b' is marked as a tunnel
+ * packet with outer header being IPv4. */
 static inline bool
 dp_packet_hwol_is_outer_ipv4(struct dp_packet *b)
 {
     return !!(*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_OUTER_IPV4);
 }
 
-/* Returns 'true' if packet 'b' is marked for out ipv4 csum offload. */
+/* Returns 'true' if a tunnel packet 'b' is marked for IPv4 checksum offload
+ * for the outer header. */
 static inline bool
 dp_packet_hwol_is_outer_ipv4_cksum(struct dp_packet *b)
 {
     return !!(*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_OUTER_IP_CKSUM);
 }
 
-/* Returns 'true' if packet 'b' is marked for out udp csum offload. */
+/* Returns 'true' if a tunnel packet 'b' is marked for UDP checksum  offload
+ * for the outer header. */
 static inline bool
-dp_packet_hwol_is_outer_UDP_cksum(struct dp_packet *b)
+dp_packet_hwol_is_outer_udp_cksum(struct dp_packet *b)
 {
     return !!(*dp_packet_ol_flags_ptr(b) & DP_PACKET_OL_TX_OUTER_UDP_CKSUM);
 }
@@ -1205,7 +1208,8 @@ dp_packet_hwol_set_tx_ipv6(struct dp_packet *a)
     *dp_packet_ol_flags_ptr(a) |= DP_PACKET_OL_TX_IPV6;
 }
 
-/* Mark packet 'a' as IPv6. */
+/* Returns 'true' if packet 'b' is marked as a tunnel
+ * packet with outer header being IPv6. */
 static inline void
 dp_packet_hwol_set_tx_outer_ipv6(struct dp_packet *a)
 {
@@ -1266,30 +1270,28 @@ dp_packet_hwol_set_tcp_seg(struct dp_packet *b)
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TCP_SEG;
 }
 
-/* Mark packet 'b' for tunnel geneve offloading.  It implies that
- * the packet 'b' is marked for tunnel geneve offloading. */
+/* Mark packet 'b' for tunnel geneve offloading. */
 static inline void
 dp_packet_hwol_set_tunnel_geneve(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TUNNEL_GENEVE;
 }
 
-/* Mark packet 'b' for tunnel vxlan offloading.  It implies that
- * the packet 'b' is marked for tunnel vxlan offloading. */
+/* Mark packet 'b' for tunnel vxlan offloading. */
 static inline void
 dp_packet_hwol_set_tunnel_vxlan(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_TUNNEL_VXLAN;
 }
 
-/* Mark packet 'b' for out ipv4 packet. */
+/* Mark packet 'b' as a tunnel packet with IPv4 outer header. */
 static inline void
 dp_packet_hwol_set_tx_outer_ipv4(struct dp_packet *b)
 {
     *dp_packet_ol_flags_ptr(b) |= DP_PACKET_OL_TX_OUTER_IPV4;
 }
 
-/* Mark packet 'b' for out ipv4 csum offloading. */
+/* Mark packet 'b' for IPv4 checksum offload for the outer header. */
 static inline void
 dp_packet_hwol_set_tx_outer_ipv4_csum(struct dp_packet *b)
 {

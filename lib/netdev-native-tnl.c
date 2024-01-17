@@ -244,9 +244,8 @@ udp_extract_tnl_md(struct dp_packet *packet, struct flow_tnl *tnl,
 /* Calculate inner l2 l3 l4 len as tunnel outer header is not
  * encapsulated now. */
 static void
-dp_packet_tnl_ol_process(const struct netdev *netdev,
-                             struct dp_packet *packet,
-                             const struct ovs_action_push_tnl *data)
+dp_packet_tnl_ol_process(struct dp_packet *packet,
+                         const struct ovs_action_push_tnl *data)
 {
     struct udp_header *udp = NULL;
     uint8_t opt_len = 0;
@@ -256,8 +255,8 @@ dp_packet_tnl_ol_process(const struct netdev *netdev,
 
     /* l2 l3 l4 len refer to inner len, tunnel outer
      * header is not encapsulated here. */
-   if (dp_packet_hwol_l4_mask(packet)) {
-       ip = dp_packet_l3(packet);
+    if (dp_packet_hwol_l4_mask(packet)) {
+        ip = dp_packet_l3(packet);
 
         if (ip->ip_proto == IPPROTO_TCP) {
             struct tcp_header *th = dp_packet_l4(packet);
@@ -269,10 +268,10 @@ dp_packet_tnl_ol_process(const struct netdev *netdev,
         }
 
         dp_packet_set_l3_len(packet, (char *) dp_packet_l4(packet) -
-                              (char *) dp_packet_l3(packet));
+                                     (char *) dp_packet_l3(packet));
 
-        if (!strcmp(netdev_get_type(netdev), "geneve") ||
-            !strcmp(netdev_get_type(netdev), "vxlan")) {
+        if (data->tnl_type == OVS_VPORT_TYPE_GENEVE ||
+            data->tnl_type == OVS_VPORT_TYPE_VXLAN) {
 
             if (IP_VER(ip->ip_ihl_ver) == 4) {
                 dp_packet_hwol_set_tx_ipv4(packet);
@@ -284,7 +283,7 @@ dp_packet_tnl_ol_process(const struct netdev *netdev,
 
         /* Attention please, tunnel inner l2 len is consist of udp header
          * len and tunnel header len and inner l2 len. */
-        if (!strcmp(netdev_get_type(netdev), "geneve")) {
+        if (data->tnl_type == OVS_VPORT_TYPE_GENEVE) {
             eth = (struct eth_header *)(data->header);
             ip = (struct ip_header *)(eth + 1);
             udp = (struct udp_header *)(ip + 1);
@@ -292,19 +291,19 @@ dp_packet_tnl_ol_process(const struct netdev *netdev,
             opt_len = gnh->opt_len * 4;
             dp_packet_hwol_set_tunnel_geneve(packet);
             dp_packet_set_l2_len(packet, (char *) dp_packet_l3(packet) -
-                              (char *) dp_packet_eth(packet) +
-                              GENEVE_BASE_HLEN + opt_len);
-        } else if (!strcmp(netdev_get_type(netdev), "vxlan")) {
+                                         (char *) dp_packet_eth(packet) +
+                                         GENEVE_BASE_HLEN + opt_len);
+        } else if (data->tnl_type == OVS_VPORT_TYPE_VXLAN) {
             dp_packet_hwol_set_tunnel_vxlan(packet);
             dp_packet_set_l2_len(packet, (char *) dp_packet_l3(packet) -
-                              (char *) dp_packet_eth(packet) +
-                              VXLAN_HLEN);
+                                         (char *) dp_packet_eth(packet) +
+                                         VXLAN_HLEN);
         }
     }
 }
 
 void
-netdev_tnl_push_udp_header(const struct netdev *netdev,
+netdev_tnl_push_udp_header(const struct netdev *netdev OVS_UNUSED,
                            struct dp_packet *packet,
                            const struct ovs_action_push_tnl *data)
 {
@@ -313,7 +312,7 @@ netdev_tnl_push_udp_header(const struct netdev *netdev,
     uint16_t l3_ofs = packet->l3_ofs;
     uint16_t l4_ofs = packet->l4_ofs;
 
-    dp_packet_tnl_ol_process(netdev, packet, data);
+    dp_packet_tnl_ol_process(packet, data);
     udp = netdev_tnl_push_ip_header(packet, data->header, data->header_len,
                                     &ip_tot_size, 0);
 

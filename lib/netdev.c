@@ -70,6 +70,8 @@ COVERAGE_DEFINE(netdev_sent);
 COVERAGE_DEFINE(netdev_add_router);
 COVERAGE_DEFINE(netdev_get_stats);
 COVERAGE_DEFINE(netdev_push_header_drops);
+COVERAGE_DEFINE(netdev_vxlan_tso_not_support);
+COVERAGE_DEFINE(netdev_geneve_tso_not_support);
 COVERAGE_DEFINE(netdev_soft_seg_good);
 COVERAGE_DEFINE(netdev_soft_seg_drops);
 
@@ -915,12 +917,16 @@ netdev_send(struct netdev *netdev, int qid, struct dp_packet_batch *batch,
                 if (dp_packet_hwol_is_tunnel_vxlan(packet)
                     && !(netdev_flags & NETDEV_TX_VXLAN_TNL_TSO)) {
                         VLOG_ERR("No VXLAN TSO support");
+                        COVERAGE_INC(netdev_vxlan_tso_not_support);
+                        dp_packet_delete(packet);
                         return false;
                 }
 
                 if (dp_packet_hwol_is_tunnel_geneve(packet)
                     && !(netdev_flags & NETDEV_TX_GENEVE_TNL_TSO)) {
                         VLOG_ERR("No GENEVE TSO support");
+                        COVERAGE_INC(netdev_geneve_tso_not_support);
+                        dp_packet_delete(packet);
                         return false;
                 }
                 return netdev_send_tso(netdev, qid, batch, concurrent_txq);
@@ -1001,19 +1007,29 @@ netdev_push_header(const struct netdev *netdev,
     size_t i, size = dp_packet_batch_size(batch);
 
     DP_PACKET_BATCH_REFILL_FOR_EACH (i, size, packet, batch) {
-        if (OVS_UNLIKELY(strcmp(netdev_get_type(netdev), "vxlan") &&
-            strcmp(netdev_get_type(netdev), "geneve") &&
+        if (OVS_UNLIKELY(data->tnl_type != OVS_VPORT_TYPE_GENEVE &&
+            data->tnl_type != OVS_VPORT_TYPE_VXLAN &&
             dp_packet_hwol_is_tso(packet))) {
             COVERAGE_INC(netdev_push_header_drops);
             dp_packet_delete(packet);
-            VLOG_WARN_RL(&rl, "%s: Tunneling packets with tso HW offload"
-                     "flags is not supported: packet dropped",
+            VLOG_WARN_RL(&rl, "Tunneling packets with TSO is not supported"
+                     "for %s tunnels, packet dropped",
                      netdev_get_name(netdev));
         } else {
-            if (strcmp(netdev_get_type(netdev), "vxlan") &&
-                strcmp(netdev_get_type(netdev), "geneve")) {
+            if (OVS_UNLIKELY(dp_packet_hwol_is_tunnel_geneve(packet) ||
+                dp_packet_hwol_is_tunnel_vxlan(packet))) {
+                COVERAGE_INC(netdev_push_header_drops);
+                dp_packet_delete(packet);
+                VLOG_WARN_RL(&rl, "%s tunnel tso packet before encap"
+                         "not support, packet dropped",
+                         netdev_get_name(netdev));
+            }
+
+            if (data->tnl_type != OVS_VPORT_TYPE_GENEVE &&
+                data->tnl_type != OVS_VPORT_TYPE_VXLAN) {
                 dp_packet_ol_send_prepare(packet, 0);
             }
+
             netdev->netdev_class->push_header(netdev, packet, data);
 
             pkt_metadata_init(&packet->md, data->out_port);

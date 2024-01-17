@@ -1157,7 +1157,6 @@ dpdk_eth_dev_port_config(struct netdev_dpdk *dev, int n_rxq, int n_txq)
         conf.txmode.offloads |= RTE_ETH_TX_OFFLOAD_OUTER_UDP_CKSUM;
     }
 
-
     /* Limit configured rss hash functions to only those supported
      * by the eth device. */
     conf.rx_adv_conf.rss_conf.rss_hf &= info.flow_type_rss_offloads;
@@ -2570,8 +2569,8 @@ netdev_dpdk_prep_hwol_packet(struct netdev_dpdk *dev, struct rte_mbuf *mbuf)
 
         if (mbuf->ol_flags & (RTE_MBUF_F_TX_TUNNEL_GENEVE |
             RTE_MBUF_F_TX_TUNNEL_VXLAN)) {
-            mbuf->tso_segsz  = dev->mtu - mbuf->l2_len - mbuf->l3_len -
-            mbuf->l4_len - mbuf->outer_l3_len;
+            mbuf->tso_segsz = dev->mtu - mbuf->l2_len - mbuf->l3_len -
+                              mbuf->l4_len - mbuf->outer_l3_len;
         } else {
             mbuf->l4_len = TCP_OFFSET(th->tcp_ctl) * 4;
             mbuf->tso_segsz = dev->mtu - mbuf->l3_len - mbuf->l4_len;
