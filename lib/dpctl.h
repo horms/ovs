@@ -19,6 +19,7 @@
 #include <stdbool.h>
 
 #include "compiler.h"
+#include "command-line.h"
 
 struct dpctl_params {
     /* True if it is called by ovs-appctl command. */
@@ -41,6 +42,9 @@ struct dpctl_params {
 
     /* --names: Use port names in output? */
     bool names;
+
+    /* Output format. */
+    enum ovs_output_fmt format;
 
     /* Callback for printing.  This function is called from dpctl_run_command()
      * to output data.  The 'aux' parameter is set to the 'aux'

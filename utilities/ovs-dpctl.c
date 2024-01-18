@@ -63,6 +63,7 @@ main(int argc, char *argv[])
     fatal_ignore_sigpipe();
 
     dpctl_p.is_appctl = false;
+    dpctl_p.format = OVS_OUTPUT_FMT_TEXT;
     dpctl_p.output = dpctl_print;
     dpctl_p.usage = usage;
 

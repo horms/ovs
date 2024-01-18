@@ -33,6 +33,8 @@ v3.3.0 - xx xxx xxxx
        "ovs-appctl dpctl/ct-del-limits default".
      * 'dpctl/flush-conntrack' is now capable of flushing connections based
        on mark and labels.
+     * Added new option [-f|--format] to choose the output format, e.g. 'json'
+       or 'text' (by default).
    - ovs-vsctl:
      * New commands 'set-zone-limit', 'del-zone-limit' and 'list-zone-limits'
        to manage the maximum number of connections in conntrack zones via
