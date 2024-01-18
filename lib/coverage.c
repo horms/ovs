@@ -61,7 +61,9 @@ coverage_counter_register(struct coverage_counter* counter)
 
 static void
 coverage_unixctl_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                      const char *argv[] OVS_UNUSED,
+                      enum ovs_output_fmt fmt OVS_UNUSED,
+                      void *aux OVS_UNUSED)
 {
     struct svec lines;
     char *reply;
@@ -76,7 +78,9 @@ coverage_unixctl_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 coverage_unixctl_read_counter(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                              const char *argv[], void *aux OVS_UNUSED)
+                              const char *argv[],
+                              enum ovs_output_fmt fmt OVS_UNUSED,
+                              void *aux OVS_UNUSED)
 {
     unsigned long long count;
     char *reply;
@@ -96,9 +100,10 @@ coverage_unixctl_read_counter(struct unixctl_conn *conn, int argc OVS_UNUSED,
 void
 coverage_init(void)
 {
-    unixctl_command_register("coverage/show", "", 0, 0,
+    unixctl_command_register("coverage/show", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                              coverage_unixctl_show, NULL);
     unixctl_command_register("coverage/read-counter", "COUNTER", 1, 1,
+                             OVS_OUTPUT_FMT_TEXT,
                              coverage_unixctl_read_counter, NULL);
 }
 

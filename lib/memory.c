@@ -160,7 +160,8 @@ memory_report(const struct simap *usage)
 
 static void
 memory_unixctl_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                    const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                    const char *argv[] OVS_UNUSED,
+                    enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     conns = xrealloc(conns, (n_conns + 1) * sizeof *conns);
     conns[n_conns++] = conn;
@@ -173,7 +174,7 @@ memory_init(void)
 
     if (!inited) {
         inited = true;
-        unixctl_command_register("memory/show", "", 0, 0,
+        unixctl_command_register("memory/show", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                                  memory_unixctl_show, NULL);
 
         next_check = time_boot_msec() + MEMORY_CHECK_INTERVAL;

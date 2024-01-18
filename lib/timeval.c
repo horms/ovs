@@ -780,6 +780,7 @@ timeval_stop(void)
 static void
 timeval_stop_cb(struct unixctl_conn *conn,
                 int argc OVS_UNUSED, const char *argv[] OVS_UNUSED,
+                enum ovs_output_fmt fmt OVS_UNUSED,
                 void *aux OVS_UNUSED)
 {
     timeval_stop();
@@ -798,7 +799,8 @@ timeval_stop_cb(struct unixctl_conn *conn,
  * Does not affect wall clock readings. */
 static void
 timeval_warp_cb(struct unixctl_conn *conn,
-                int argc OVS_UNUSED, const char *argv[], void *aux OVS_UNUSED)
+                int argc OVS_UNUSED, const char *argv[],
+                enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     long long int total_warp = argc > 2 ? atoll(argv[1]) : 0;
     long long int msecs = argc > 2 ? atoll(argv[2]) : atoll(argv[1]);
@@ -842,9 +844,10 @@ void
 timeval_dummy_register(void)
 {
     timewarp_enabled = true;
-    unixctl_command_register("time/stop", "", 0, 0, timeval_stop_cb, NULL);
+    unixctl_command_register("time/stop", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             timeval_stop_cb, NULL);
     unixctl_command_register("time/warp", "[large_msecs] msecs", 1, 2,
-                             timeval_warp_cb, NULL);
+                             OVS_OUTPUT_FMT_TEXT, timeval_warp_cb, NULL);
 }
 
 

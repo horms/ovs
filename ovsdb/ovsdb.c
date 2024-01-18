@@ -186,6 +186,7 @@ static bool use_no_data_conversion = true;
 static void
 ovsdb_no_data_conversion_enable(struct unixctl_conn *conn, int argc OVS_UNUSED,
                                 const char *argv[] OVS_UNUSED,
+                                enum ovs_output_fmt fmt OVS_UNUSED,
                                 void *arg OVS_UNUSED)
 {
     use_no_data_conversion = true;
@@ -200,7 +201,8 @@ ovsdb_no_data_conversion_disable(void)
     }
     use_no_data_conversion = false;
     unixctl_command_register("ovsdb/file/no-data-conversion-enable", "",
-                             0, 0, ovsdb_no_data_conversion_enable, NULL);
+                             0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ovsdb_no_data_conversion_enable, NULL);
 }
 
 /* Returns true if the database storage allows conversion records without

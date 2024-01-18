@@ -141,7 +141,7 @@ ofproto_tunnel_init(void)
     if (ovsthread_once_start(&once)) {
         fat_rwlock_init(&rwlock);
         unixctl_command_register("ofproto/list-tunnels", "", 0, 0,
-                                 tnl_unixctl_list, NULL);
+                                 OVS_OUTPUT_FMT_TEXT, tnl_unixctl_list, NULL);
         ovsthread_once_done(&once);
     }
 }
@@ -757,7 +757,7 @@ tnl_port_build_header(const struct ofport_dpif *ofport,
 static void
 tnl_unixctl_list(struct unixctl_conn *conn,
                  int argc OVS_UNUSED, const char *argv[] OVS_UNUSED,
-                 void *aux OVS_UNUSED)
+                 enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct ds reply = DS_EMPTY_INITIALIZER;
 

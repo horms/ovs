@@ -111,7 +111,7 @@ main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     unixctl_command_register("exit", "[--cleanup]", 0, 1,
-                             ovs_vswitchd_exit, NULL);
+                             OVS_OUTPUT_FMT_TEXT, ovs_vswitchd_exit, NULL);
 
     bridge_init(remote);
     free(remote);
@@ -308,7 +308,8 @@ usage(void)
 
 static void
 ovs_vswitchd_exit(struct unixctl_conn *conn, int argc,
-                  const char *argv[], void *args OVS_UNUSED)
+                  const char *argv[],
+                  enum ovs_output_fmt fmt OVS_UNUSED, void *args OVS_UNUSED)
 {
     exit_args.n_conns++;
     exit_args.conns = xrealloc(exit_args.conns,

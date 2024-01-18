@@ -225,10 +225,11 @@ parse_lacp_packet(const struct dp_packet *p, enum pdu_subtype *subtype)
 void
 lacp_init(void)
 {
-    unixctl_command_register("lacp/show", "[port]", 0, 1,
+    unixctl_command_register("lacp/show", "[port]", 0, 1, OVS_OUTPUT_FMT_TEXT,
                              lacp_unixctl_show, NULL);
     unixctl_command_register("lacp/show-stats", "[port]", 0, 1,
-                             lacp_unixctl_show_stats, NULL);
+                             OVS_OUTPUT_FMT_TEXT, lacp_unixctl_show_stats,
+                             NULL);
 }
 
 static void
@@ -1114,6 +1115,7 @@ lacp_print_stats(struct ds *ds, struct lacp *lacp) OVS_REQUIRES(mutex)
 
 static void
 lacp_unixctl_show(struct unixctl_conn *conn, int argc, const char *argv[],
+                  enum ovs_output_fmt fmt OVS_UNUSED,
                   void *aux OVS_UNUSED) OVS_EXCLUDED(mutex)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -1144,6 +1146,7 @@ static void
 lacp_unixctl_show_stats(struct unixctl_conn *conn,
                   int argc,
                   const char *argv[],
+                  enum ovs_output_fmt fmt OVS_UNUSED,
                   void *aux OVS_UNUSED) OVS_EXCLUDED(mutex)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;

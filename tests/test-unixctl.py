@@ -17,12 +17,13 @@ import argparse
 import ovs.daemon
 import ovs.unixctl
 import ovs.unixctl.server
+import ovs.util
 
 vlog = ovs.vlog.Vlog("test-unixctl")
 exiting = False
 
 
-def unixctl_exit(conn, unused_argv, aux):
+def unixctl_exit(conn, unused_argv, unused_fmt, aux):
     assert aux == "aux_exit"
     global exiting
 
@@ -30,22 +31,22 @@ def unixctl_exit(conn, unused_argv, aux):
     conn.reply(None)
 
 
-def unixctl_echo(conn, argv, aux):
+def unixctl_echo(conn, argv, unused_fmt, aux):
     assert aux == "aux_echo"
     conn.reply(str(argv))
 
 
-def unixctl_echo_error(conn, argv, aux):
+def unixctl_echo_error(conn, argv, unused_fmt, aux):
     assert aux == "aux_echo_error"
     conn.reply_error(str(argv))
 
 
-def unixctl_log(conn, argv, unused_aux):
+def unixctl_log(conn, argv, unused_fmt, unused_aux):
     vlog.info(str(argv[0]))
     conn.reply(None)
 
 
-def unixctl_block(conn, unused_argv, unused_aux):
+def unixctl_block(conn, unused_argv, unused_fmt, unused_aux):
     pass
 
 
@@ -66,13 +67,19 @@ def main():
         ovs.util.ovs_fatal(error, "could not create unixctl server at %s"
                            % args.unixctl, vlog)
 
-    ovs.unixctl.command_register("exit", "", 0, 0, unixctl_exit, "aux_exit")
-    ovs.unixctl.command_register("echo", "[arg ...]", 1, 2, unixctl_echo,
+    ovs.unixctl.command_register("exit", "", 0, 0, ovs.util.OutputFormat.TEXT,
+                                 unixctl_exit, "aux_exit")
+    ovs.unixctl.command_register("echo", "[arg ...]", 1, 2,
+                                 ovs.util.OutputFormat.TEXT, unixctl_echo,
                                  "aux_echo")
-    ovs.unixctl.command_register("log", "[arg ...]", 1, 2, unixctl_log, None)
+    ovs.unixctl.command_register("log", "[arg ...]", 1, 2,
+                                 ovs.util.OutputFormat.TEXT, unixctl_log,
+                                 None)
     ovs.unixctl.command_register("echo_error", "[arg ...]", 1, 2,
+                                 ovs.util.OutputFormat.TEXT,
                                  unixctl_echo_error, "aux_echo_error")
-    ovs.unixctl.command_register("block", "", 0, 0, unixctl_block, None)
+    ovs.unixctl.command_register("block", "", 0, 0, ovs.util.OutputFormat.TEXT,
+                                 unixctl_block, None)
     ovs.daemon.daemonize_complete()
 
     vlog.info("Entering run loop.")

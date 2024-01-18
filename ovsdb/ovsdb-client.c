@@ -1253,7 +1253,8 @@ parse_monitor_columns(char *arg, const char *server, const char *database,
 
 static void
 ovsdb_client_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                  const char *argv[] OVS_UNUSED, void *exiting_)
+                  const char *argv[] OVS_UNUSED,
+                  enum ovs_output_fmt fmt OVS_UNUSED, void *exiting_)
 {
     bool *exiting = exiting_;
     *exiting = true;
@@ -1262,7 +1263,8 @@ ovsdb_client_exit(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovsdb_client_block(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                   const char *argv[] OVS_UNUSED, void *blocked_)
+                   const char *argv[] OVS_UNUSED,
+                   enum ovs_output_fmt fmt OVS_UNUSED, void *blocked_)
 {
     bool *blocked = blocked_;
 
@@ -1276,7 +1278,8 @@ ovsdb_client_block(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovsdb_client_unblock(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[] OVS_UNUSED, void *blocked_)
+                     const char *argv[] OVS_UNUSED,
+                     enum ovs_output_fmt fmt OVS_UNUSED, void *blocked_)
 {
     bool *blocked = blocked_;
 
@@ -1290,7 +1293,8 @@ ovsdb_client_unblock(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovsdb_client_cond_change(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[], void *rpc_)
+                         const char *argv[],
+                         enum ovs_output_fmt fmt OVS_UNUSED, void *rpc_)
 {
     struct jsonrpc *rpc = rpc_;
     struct json *monitor_cond_update_requests = json_object_create();
@@ -1404,13 +1408,16 @@ do_monitor__(struct jsonrpc *rpc, const char *database,
             ovs_fatal(error, "failed to create unixctl server");
         }
 
-        unixctl_command_register("exit", "", 0, 0,
+        unixctl_command_register("exit", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                                  ovsdb_client_exit, &exiting);
         unixctl_command_register("ovsdb-client/block", "", 0, 0,
-                                 ovsdb_client_block, &blocked);
+                                 OVS_OUTPUT_FMT_TEXT,  ovsdb_client_block,
+                                 &blocked);
         unixctl_command_register("ovsdb-client/unblock", "", 0, 0,
-                                 ovsdb_client_unblock, &blocked);
+                                 OVS_OUTPUT_FMT_TEXT, ovsdb_client_unblock,
+                                 &blocked);
         unixctl_command_register("ovsdb-client/cond_change", "TABLE COND", 2, 2,
+                                 OVS_OUTPUT_FMT_TEXT,
                                  ovsdb_client_cond_change, rpc);
     } else {
         unixctl = NULL;
@@ -2244,7 +2251,9 @@ create_lock_request(struct ovsdb_client_lock_req *lock_req)
 
 static void
 ovsdb_client_lock(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                  const char *argv[], void *lock_req_)
+                  const char *argv[],
+                  enum ovs_output_fmt fmt OVS_UNUSED,
+                  void *lock_req_)
 {
     struct ovsdb_client_lock_req *lock_req = lock_req_;
     lock_req_init(lock_req, "lock", argv[1]);
@@ -2253,7 +2262,9 @@ ovsdb_client_lock(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovsdb_client_unlock(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                    const char *argv[], void *lock_req_)
+                    const char *argv[],
+                    enum ovs_output_fmt fmt OVS_UNUSED,
+                    void *lock_req_)
 {
     struct ovsdb_client_lock_req *lock_req = lock_req_;
     lock_req_init(lock_req, "unlock", argv[1]);
@@ -2262,7 +2273,8 @@ ovsdb_client_unlock(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ovsdb_client_steal(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                   const char *argv[], void *lock_req_)
+                   const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                   void *lock_req_)
 {
     struct ovsdb_client_lock_req *lock_req = lock_req_;
     lock_req_init(lock_req, "steal", argv[1]);
@@ -2292,13 +2304,13 @@ do_lock(struct jsonrpc *rpc, const char *method, const char *lock)
             ovs_fatal(error, "failed to create unixctl server");
         }
 
-        unixctl_command_register("unlock", "LOCK", 1, 1,
+        unixctl_command_register("unlock", "LOCK", 1, 1, OVS_OUTPUT_FMT_TEXT,
                                   ovsdb_client_unlock, &lock_req);
-        unixctl_command_register("steal", "LOCK", 1, 1,
+        unixctl_command_register("steal", "LOCK", 1, 1, OVS_OUTPUT_FMT_TEXT,
                                   ovsdb_client_steal, &lock_req);
-        unixctl_command_register("lock", "LOCK", 1, 1,
+        unixctl_command_register("lock", "LOCK", 1, 1, OVS_OUTPUT_FMT_TEXT,
                                   ovsdb_client_lock, &lock_req);
-        unixctl_command_register("exit", "", 0, 0,
+        unixctl_command_register("exit", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                                  ovsdb_client_exit, &exiting);
     } else {
         unixctl = NULL;

@@ -1472,6 +1472,7 @@ bond_lookup_member(struct bond *bond, const char *member_name)
 static void
 bond_unixctl_list(struct unixctl_conn *conn,
                   int argc OVS_UNUSED, const char *argv[] OVS_UNUSED,
+                  enum ovs_output_fmt fmt OVS_UNUSED,
                   void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -1617,6 +1618,7 @@ bond_print_details(struct ds *ds, const struct bond *bond)
 static void
 bond_unixctl_show(struct unixctl_conn *conn,
                   int argc, const char *argv[],
+                  enum ovs_output_fmt fmt OVS_UNUSED,
                   void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -1648,6 +1650,7 @@ out:
 static void
 bond_unixctl_migrate(struct unixctl_conn *conn,
                      int argc OVS_UNUSED, const char *argv[],
+                     enum ovs_output_fmt fmt OVS_UNUSED,
                      void *aux OVS_UNUSED)
 {
     const char *bond_s = argv[1];
@@ -1701,6 +1704,7 @@ out:
 static void
 bond_unixctl_set_active_member(struct unixctl_conn *conn,
                                int argc OVS_UNUSED, const char *argv[],
+                               enum ovs_output_fmt fmt OVS_UNUSED,
                                void *aux OVS_UNUSED)
 {
     const char *bond_s = argv[1];
@@ -1773,6 +1777,7 @@ out:
 static void
 bond_unixctl_enable_member(struct unixctl_conn *conn,
                            int argc OVS_UNUSED, const char *argv[],
+                           enum ovs_output_fmt fmt OVS_UNUSED,
                            void *aux OVS_UNUSED)
 {
     enable_member(conn, argv, true);
@@ -1781,6 +1786,7 @@ bond_unixctl_enable_member(struct unixctl_conn *conn,
 static void
 bond_unixctl_disable_member(struct unixctl_conn *conn,
                             int argc OVS_UNUSED, const char *argv[],
+                            enum ovs_output_fmt fmt OVS_UNUSED,
                             void *aux OVS_UNUSED)
 {
     enable_member(conn, argv, false);
@@ -1788,6 +1794,7 @@ bond_unixctl_disable_member(struct unixctl_conn *conn,
 
 static void
 bond_unixctl_hash(struct unixctl_conn *conn, int argc, const char *argv[],
+                  enum ovs_output_fmt fmt OVS_UNUSED,
                   void *aux OVS_UNUSED)
 {
     const char *mac_s = argv[1];
@@ -1831,27 +1838,34 @@ bond_unixctl_hash(struct unixctl_conn *conn, int argc, const char *argv[],
 void
 bond_init(void)
 {
-    unixctl_command_register("bond/list", "", 0, 0, bond_unixctl_list, NULL);
-    unixctl_command_register("bond/show", "[port]", 0, 1, bond_unixctl_show,
-                             NULL);
+    unixctl_command_register("bond/list", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             bond_unixctl_list, NULL);
+    unixctl_command_register("bond/show", "[port]", 0, 1, OVS_OUTPUT_FMT_TEXT,
+                             bond_unixctl_show, NULL);
     unixctl_command_register("bond/migrate", "port hash member", 3, 3,
-                             bond_unixctl_migrate, NULL);
+                             OVS_OUTPUT_FMT_TEXT, bond_unixctl_migrate, NULL);
     unixctl_command_register("bond/set-active-member", "port member", 2, 2,
+                             OVS_OUTPUT_FMT_TEXT,
                              bond_unixctl_set_active_member, NULL);
     unixctl_command_register("bond/enable-member", "port member", 2, 2,
-                             bond_unixctl_enable_member, NULL);
+                             OVS_OUTPUT_FMT_TEXT, bond_unixctl_enable_member,
+                             NULL);
     unixctl_command_register("bond/disable-member", "port member", 2, 2,
-                             bond_unixctl_disable_member, NULL);
+                             OVS_OUTPUT_FMT_TEXT, bond_unixctl_disable_member,
+                             NULL);
     unixctl_command_register("bond/hash", "mac [vlan] [basis]", 1, 3,
-                             bond_unixctl_hash, NULL);
+                             OVS_OUTPUT_FMT_TEXT, bond_unixctl_hash, NULL);
 
     /* Backward-compatibility command names. */
     unixctl_command_register("bond/set-active-slave", NULL, 2, 2,
+                             OVS_OUTPUT_FMT_TEXT,
                              bond_unixctl_set_active_member, NULL);
     unixctl_command_register("bond/enable-slave", NULL, 2, 2,
-                             bond_unixctl_enable_member, NULL);
+                             OVS_OUTPUT_FMT_TEXT, bond_unixctl_enable_member,
+                             NULL);
     unixctl_command_register("bond/disable-slave", NULL, 2, 2,
-                             bond_unixctl_disable_member, NULL);
+                             OVS_OUTPUT_FMT_TEXT, bond_unixctl_disable_member,
+                             NULL);
 }
 
 static void

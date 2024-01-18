@@ -326,7 +326,8 @@ aa_print_isid_status(struct ds *ds, struct lldp *lldp) OVS_REQUIRES(mutex)
 
 static void
 aa_unixctl_status(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                  const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                  const char *argv[] OVS_UNUSED,
+                  enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
     OVS_EXCLUDED(mutex)
 {
     struct lldp *lldp;
@@ -345,7 +346,8 @@ aa_unixctl_status(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 aa_unixctl_show_isid(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                     const char *argv[] OVS_UNUSED,
+                     enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
     OVS_EXCLUDED(mutex)
 {
     struct lldp *lldp;
@@ -364,7 +366,8 @@ aa_unixctl_show_isid(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 aa_unixctl_statistics(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                      const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                      const char *argv[] OVS_UNUSED,
+                      enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
     OVS_EXCLUDED(mutex)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -644,11 +647,12 @@ void
 lldp_init(void)
 {
     unixctl_command_register("autoattach/status", "[bridge]", 0, 1,
-                             aa_unixctl_status, NULL);
+                             OVS_OUTPUT_FMT_TEXT, aa_unixctl_status, NULL);
     unixctl_command_register("autoattach/show-isid", "[bridge]", 0, 1,
-                             aa_unixctl_show_isid, NULL);
+                             OVS_OUTPUT_FMT_TEXT, aa_unixctl_show_isid, NULL);
     unixctl_command_register("autoattach/statistics", "[bridge]", 0, 1,
-                             aa_unixctl_statistics, NULL);
+                             OVS_OUTPUT_FMT_TEXT, aa_unixctl_statistics,
+                             NULL);
 }
 
 /* Returns true if 'lldp' should process packets from 'flow'.  Sets

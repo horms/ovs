@@ -273,7 +273,9 @@ tnl_neigh_flush(const char br_name[IFNAMSIZ])
 
 static void
 tnl_neigh_cache_flush(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                    const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                      const char *argv[] OVS_UNUSED,
+                      enum ovs_output_fmt fmt OVS_UNUSED,
+                      void *aux OVS_UNUSED)
 {
     struct tnl_neigh_entry *neigh;
     bool changed = false;
@@ -291,8 +293,9 @@ tnl_neigh_cache_flush(struct unixctl_conn *conn, int argc OVS_UNUSED,
 }
 
 static void
-tnl_neigh_cache_aging(struct unixctl_conn *conn, int argc,
-                        const char *argv[], void *aux OVS_UNUSED)
+tnl_neigh_cache_aging(struct unixctl_conn *conn, int argc, const char *argv[],
+                      enum ovs_output_fmt fmt OVS_UNUSED,
+                      void *aux OVS_UNUSED)
 {
     long long int new_exp, curr_exp;
     struct tnl_neigh_entry *neigh;
@@ -348,7 +351,8 @@ lookup_any(const char *host_name, struct in6_addr *address)
 
 static void
 tnl_neigh_cache_add(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                    const char *argv[], void *aux OVS_UNUSED)
+                    const char *argv[],
+                    enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     const char *br_name = argv[1];
     struct eth_addr mac;
@@ -370,7 +374,9 @@ tnl_neigh_cache_add(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 tnl_neigh_cache_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                     const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                     const char *argv[] OVS_UNUSED,
+                     enum ovs_output_fmt fmt OVS_UNUSED,
+                     void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     struct tnl_neigh_entry *neigh;
@@ -404,20 +410,23 @@ void
 tnl_neigh_cache_init(void)
 {
     atomic_init(&neigh_aging, NEIGH_ENTRY_DEFAULT_IDLE_TIME_MS);
-    unixctl_command_register("tnl/arp/show", "", 0, 0,
+    unixctl_command_register("tnl/arp/show", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                              tnl_neigh_cache_show, NULL);
     unixctl_command_register("tnl/arp/set", "BRIDGE IP MAC", 3, 3,
-                             tnl_neigh_cache_add, NULL);
+                             OVS_OUTPUT_FMT_TEXT, tnl_neigh_cache_add, NULL);
     unixctl_command_register("tnl/arp/flush", "", 0, 0,
-                             tnl_neigh_cache_flush, NULL);
+                             OVS_OUTPUT_FMT_TEXT, tnl_neigh_cache_flush,
+                             NULL);
     unixctl_command_register("tnl/arp/aging", "[SECS]", 0, 1,
-                             tnl_neigh_cache_aging, NULL);
+                             OVS_OUTPUT_FMT_TEXT, tnl_neigh_cache_aging,
+                             NULL);
     unixctl_command_register("tnl/neigh/show", "", 0, 0,
-                             tnl_neigh_cache_show, NULL);
+                             OVS_OUTPUT_FMT_TEXT, tnl_neigh_cache_show, NULL);
     unixctl_command_register("tnl/neigh/set", "BRIDGE IP MAC", 3, 3,
-                             tnl_neigh_cache_add, NULL);
-    unixctl_command_register("tnl/neigh/flush", "", 0, 0,
+                             OVS_OUTPUT_FMT_TEXT, tnl_neigh_cache_add, NULL);
+    unixctl_command_register("tnl/neigh/flush", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                              tnl_neigh_cache_flush, NULL);
     unixctl_command_register("tnl/neigh/aging", "[SECS]", 0, 1,
-                             tnl_neigh_cache_aging, NULL);
+                             OVS_OUTPUT_FMT_TEXT, tnl_neigh_cache_aging,
+                             NULL);
 }

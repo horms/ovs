@@ -4624,6 +4624,7 @@ raft_lookup_by_name(const char *name)
 static void
 raft_unixctl_cid(struct unixctl_conn *conn,
                  int argc OVS_UNUSED, const char *argv[],
+                 enum ovs_output_fmt fmt OVS_UNUSED,
                  void *aux OVS_UNUSED)
 {
     struct raft *raft = raft_lookup_by_name(argv[1]);
@@ -4641,6 +4642,7 @@ raft_unixctl_cid(struct unixctl_conn *conn,
 static void
 raft_unixctl_sid(struct unixctl_conn *conn,
                  int argc OVS_UNUSED, const char *argv[],
+                 enum ovs_output_fmt fmt OVS_UNUSED,
                  void *aux OVS_UNUSED)
 {
     struct raft *raft = raft_lookup_by_name(argv[1]);
@@ -4672,6 +4674,7 @@ raft_put_sid(const char *title, const struct uuid *sid,
 static void
 raft_unixctl_status(struct unixctl_conn *conn,
                     int argc OVS_UNUSED, const char *argv[],
+                    enum ovs_output_fmt fmt OVS_UNUSED,
                     void *aux OVS_UNUSED)
 {
     struct raft *raft = raft_lookup_by_name(argv[1]);
@@ -4830,7 +4833,8 @@ raft_unixctl_leave__(struct unixctl_conn *conn, struct raft *raft)
 
 static void
 raft_unixctl_leave(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                   const char *argv[], void *aux OVS_UNUSED)
+                   const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                   void *aux OVS_UNUSED)
 {
     struct raft *raft = raft_lookup_by_name(argv[1]);
     if (!raft) {
@@ -4866,7 +4870,8 @@ raft_lookup_server_best_match(struct raft *raft, const char *id)
 
 static void
 raft_unixctl_kick(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                  const char *argv[], void *aux OVS_UNUSED)
+                  const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                  void *aux OVS_UNUSED)
 {
     const char *cluster_name = argv[1];
     const char *server_name = argv[2];
@@ -4939,6 +4944,7 @@ raft_log_election_timer(struct raft *raft)
 static void
 raft_unixctl_change_election_timer(struct unixctl_conn *conn,
                                    int argc OVS_UNUSED, const char *argv[],
+                                   enum ovs_output_fmt fmt OVS_UNUSED,
                                    void *aux OVS_UNUSED)
 {
     const char *cluster_name = argv[1];
@@ -4993,6 +4999,7 @@ raft_unixctl_change_election_timer(struct unixctl_conn *conn,
 static void
 raft_unixctl_set_backlog_threshold(struct unixctl_conn *conn,
                                    int argc OVS_UNUSED, const char *argv[],
+                                   enum ovs_output_fmt fmt OVS_UNUSED,
                                    void *aux OVS_UNUSED)
 {
     const char *cluster_name = argv[1];
@@ -5029,6 +5036,7 @@ raft_unixctl_set_backlog_threshold(struct unixctl_conn *conn,
 static void
 raft_unixctl_failure_test(struct unixctl_conn *conn OVS_UNUSED,
                           int argc OVS_UNUSED, const char *argv[],
+                          enum ovs_output_fmt fmt OVS_UNUSED,
                           void *aux OVS_UNUSED)
 {
     const char *test = argv[1];
@@ -5083,22 +5091,24 @@ raft_init(void)
     if (!ovsthread_once_start(&once)) {
         return;
     }
-    unixctl_command_register("cluster/cid", "DB", 1, 1,
+    unixctl_command_register("cluster/cid", "DB", 1, 1, OVS_OUTPUT_FMT_TEXT,
                              raft_unixctl_cid, NULL);
-    unixctl_command_register("cluster/sid", "DB", 1, 1,
+    unixctl_command_register("cluster/sid", "DB", 1, 1, OVS_OUTPUT_FMT_TEXT,
                              raft_unixctl_sid, NULL);
-    unixctl_command_register("cluster/status", "DB", 1, 1,
+    unixctl_command_register("cluster/status", "DB", 1, 1, OVS_OUTPUT_FMT_TEXT,
                              raft_unixctl_status, NULL);
-    unixctl_command_register("cluster/leave", "DB", 1, 1,
+    unixctl_command_register("cluster/leave", "DB", 1, 1, OVS_OUTPUT_FMT_TEXT,
                              raft_unixctl_leave, NULL);
     unixctl_command_register("cluster/kick", "DB SERVER", 2, 2,
-                             raft_unixctl_kick, NULL);
+                             OVS_OUTPUT_FMT_TEXT,  raft_unixctl_kick, NULL);
     unixctl_command_register("cluster/change-election-timer", "DB TIME", 2, 2,
+                             OVS_OUTPUT_FMT_TEXT,
                              raft_unixctl_change_election_timer, NULL);
     unixctl_command_register("cluster/set-backlog-threshold",
-                             "DB N_MSGS N_BYTES", 3, 3,
+                             "DB N_MSGS N_BYTES", 3, 3, OVS_OUTPUT_FMT_TEXT,
                              raft_unixctl_set_backlog_threshold, NULL);
     unixctl_command_register("cluster/failure-test", "FAILURE SCENARIO", 1, 1,
-                             raft_unixctl_failure_test, NULL);
+                             OVS_OUTPUT_FMT_TEXT, raft_unixctl_failure_test,
+                             NULL);
     ovsthread_once_done(&once);
 }

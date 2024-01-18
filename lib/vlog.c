@@ -689,6 +689,7 @@ vlog_facility_exists(const char* facility, int *value)
 
 static void
 vlog_unixctl_set(struct unixctl_conn *conn, int argc, const char *argv[],
+                 enum ovs_output_fmt fmt OVS_UNUSED,
                  void *aux OVS_UNUSED)
 {
     int i;
@@ -710,7 +711,8 @@ vlog_unixctl_set(struct unixctl_conn *conn, int argc, const char *argv[],
 
 static void
 vlog_unixctl_list(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                  const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                  const char *argv[] OVS_UNUSED,
+                  enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     char *msg = vlog_get_levels();
     unixctl_command_reply(conn, msg);
@@ -719,7 +721,9 @@ vlog_unixctl_list(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 vlog_unixctl_list_pattern(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                          const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                          const char *argv[] OVS_UNUSED,
+                          enum ovs_output_fmt fmt OVS_UNUSED,
+                          void *aux OVS_UNUSED)
 {
     char *msg;
 
@@ -730,7 +734,9 @@ vlog_unixctl_list_pattern(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 vlog_unixctl_reopen(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                    const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                    const char *argv[] OVS_UNUSED,
+                    enum ovs_output_fmt fmt OVS_UNUSED,
+                    void *aux OVS_UNUSED)
 {
     bool has_log_file;
 
@@ -752,7 +758,9 @@ vlog_unixctl_reopen(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 vlog_unixctl_close(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                   const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                   const char *argv[] OVS_UNUSED,
+                   enum ovs_output_fmt fmt OVS_UNUSED,
+                   void *aux OVS_UNUSED)
 {
     ovs_mutex_lock(&log_file_mutex);
     if (log_fd >= 0) {
@@ -811,14 +819,18 @@ set_rate_limits(struct unixctl_conn *conn, int argc,
 
 static void
 vlog_enable_rate_limit(struct unixctl_conn *conn, int argc,
-                       const char *argv[], void *aux OVS_UNUSED)
+                       const char *argv[],
+                       enum ovs_output_fmt fmt OVS_UNUSED,
+                       void *aux OVS_UNUSED)
 {
     set_rate_limits(conn, argc, argv, true);
 }
 
 static void
 vlog_disable_rate_limit(struct unixctl_conn *conn, int argc,
-                       const char *argv[], void *aux OVS_UNUSED)
+                        const char *argv[],
+                        enum ovs_output_fmt fmt OVS_UNUSED,
+                        void *aux OVS_UNUSED)
 {
     set_rate_limits(conn, argc, argv, false);
 }
@@ -860,20 +872,24 @@ vlog_init(void)
             free(s);
         }
 
-        unixctl_command_register(
-            "vlog/set", "{spec | PATTERN:destination:pattern}",
-            0, INT_MAX, vlog_unixctl_set, NULL);
-        unixctl_command_register("vlog/list", "", 0, 0, vlog_unixctl_list,
-                                 NULL);
+        unixctl_command_register("vlog/set",
+                                 "{spec | PATTERN:destination:pattern}",
+                                 0, INT_MAX, OVS_OUTPUT_FMT_TEXT,
+                                 vlog_unixctl_set, NULL);
+        unixctl_command_register("vlog/list", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                                 vlog_unixctl_list, NULL);
         unixctl_command_register("vlog/list-pattern", "", 0, 0,
+                                 OVS_OUTPUT_FMT_TEXT,
                                  vlog_unixctl_list_pattern, NULL);
         unixctl_command_register("vlog/enable-rate-limit", "[module]...",
-                                 0, INT_MAX, vlog_enable_rate_limit, NULL);
+                                 0, INT_MAX, OVS_OUTPUT_FMT_TEXT,
+                                 vlog_enable_rate_limit, NULL);
         unixctl_command_register("vlog/disable-rate-limit", "[module]...",
-                                 0, INT_MAX, vlog_disable_rate_limit, NULL);
-        unixctl_command_register("vlog/reopen", "", 0, 0,
+                                 0, INT_MAX, OVS_OUTPUT_FMT_TEXT,
+                                 vlog_disable_rate_limit, NULL);
+        unixctl_command_register("vlog/reopen", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                                  vlog_unixctl_reopen, NULL);
-        unixctl_command_register("vlog/close", "", 0, 0,
+        unixctl_command_register("vlog/close", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                                  vlog_unixctl_close, NULL);
 
         ovs_rwlock_rdlock(&pattern_rwlock);

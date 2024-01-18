@@ -354,7 +354,8 @@ tnl_port_show_v(struct ds *ds)
 
 static void
 tnl_port_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-               const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+              const char *argv[] OVS_UNUSED,
+              enum ovs_output_fmt fmt OVS_UNUSED, void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     struct tnl_port *p;
@@ -523,5 +524,6 @@ tnl_port_map_init(void)
     classifier_init(&cls, flow_segment_u64s);
     ovs_list_init(&addr_list);
     ovs_list_init(&port_list);
-    unixctl_command_register("tnl/ports/show", "-v", 0, 1, tnl_port_show, NULL);
+    unixctl_command_register("tnl/ports/show", "-v", 0, 1,
+                             OVS_OUTPUT_FMT_TEXT, tnl_port_show, NULL);
 }

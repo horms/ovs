@@ -706,6 +706,7 @@ pmd_perf_log_susp_iteration_neighborhood(struct pmd_perf_stats *s)
 void
 pmd_perf_log_set_cmd(struct unixctl_conn *conn,
                  int argc, const char *argv[],
+                 enum ovs_output_fmt fmt OVS_UNUSED,
                  void *aux OVS_UNUSED)
 {
     unsigned int it_before, it_after, us_thr, q_thr;

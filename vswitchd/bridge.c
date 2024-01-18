@@ -516,13 +516,16 @@ bridge_init(const char *remote)
 
     /* Register unixctl commands. */
     unixctl_command_register("qos/show-types", "interface", 1, 1,
-                             qos_unixctl_show_types, NULL);
+                             OVS_OUTPUT_FMT_TEXT, qos_unixctl_show_types,
+                             NULL);
     unixctl_command_register("qos/show", "interface", 1, 1,
-                             qos_unixctl_show, NULL);
+                             OVS_OUTPUT_FMT_TEXT, qos_unixctl_show, NULL);
     unixctl_command_register("bridge/dump-flows", "[--offload-stats] bridge",
-                             1, 2, bridge_unixctl_dump_flows, NULL);
+                             1, 2, OVS_OUTPUT_FMT_TEXT,
+                             bridge_unixctl_dump_flows, NULL);
     unixctl_command_register("bridge/reconnect", "[bridge]", 0, 1,
-                             bridge_unixctl_reconnect, NULL);
+                             OVS_OUTPUT_FMT_TEXT, bridge_unixctl_reconnect,
+                             NULL);
     lacp_init();
     bond_init();
     cfm_init();
@@ -3512,7 +3515,8 @@ qos_unixctl_show_queue(unsigned int queue_id,
 
 static void
 qos_unixctl_show_types(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                       const char *argv[], void *aux OVS_UNUSED)
+                       const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                       void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     struct sset types = SSET_INITIALIZER(&types);
@@ -3550,7 +3554,8 @@ qos_unixctl_show_types(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 qos_unixctl_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                 const char *argv[], void *aux OVS_UNUSED)
+                 const char *argv[], enum ovs_output_fmt fmt OVS_UNUSED,
+                 void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     struct smap smap = SMAP_INITIALIZER(&smap);
@@ -3670,7 +3675,9 @@ bridge_lookup(const char *name)
  * stack, including those normally hidden. */
 static void
 bridge_unixctl_dump_flows(struct unixctl_conn *conn, int argc,
-                          const char *argv[], void *aux OVS_UNUSED)
+                          const char *argv[],
+                          enum ovs_output_fmt fmt OVS_UNUSED,
+                          void *aux OVS_UNUSED)
 {
     struct bridge *br;
     struct ds results;
@@ -3700,7 +3707,9 @@ bridge_unixctl_dump_flows(struct unixctl_conn *conn, int argc,
  * drop their controller connections and reconnect. */
 static void
 bridge_unixctl_reconnect(struct unixctl_conn *conn, int argc,
-                         const char *argv[], void *aux OVS_UNUSED)
+                         const char *argv[],
+                         enum ovs_output_fmt fmt OVS_UNUSED,
+                         void *aux OVS_UNUSED)
 {
     struct bridge *br;
     if (argc > 1) {

@@ -471,6 +471,7 @@ free_ct_states(struct ovs_list *ct_states)
 
 static void
 ofproto_unixctl_trace(struct unixctl_conn *conn, int argc, const char *argv[],
+                      enum ovs_output_fmt fmt OVS_UNUSED,
                       void *aux OVS_UNUSED)
 {
     struct ofproto_dpif *ofproto;
@@ -500,7 +501,9 @@ ofproto_unixctl_trace(struct unixctl_conn *conn, int argc, const char *argv[],
 
 static void
 ofproto_unixctl_trace_actions(struct unixctl_conn *conn, int argc,
-                              const char *argv[], void *aux OVS_UNUSED)
+                              const char *argv[],
+                              enum ovs_output_fmt fmt OVS_UNUSED,
+                              void *aux OVS_UNUSED)
 {
     enum ofputil_protocol usable_protocols;
     struct ofproto_dpif *ofproto;
@@ -870,12 +873,13 @@ ofproto_dpif_trace_init(void)
     unixctl_command_register(
         "ofproto/trace",
         "{[dp_name] odp_flow | bridge br_flow} [OPTIONS...] "
-        "[-generate|packet]", 1, INT_MAX, ofproto_unixctl_trace, NULL);
+        "[-generate|packet]", 1, INT_MAX, OVS_OUTPUT_FMT_TEXT,
+        ofproto_unixctl_trace, NULL);
     unixctl_command_register(
         "ofproto/trace-packet-out",
         "[-consistent] {[dp_name] odp_flow | bridge br_flow} [OPTIONS...] "
         "[-generate|packet] actions",
-        2, INT_MAX, ofproto_unixctl_trace_actions, NULL);
+        2, INT_MAX, OVS_OUTPUT_FMT_TEXT, ofproto_unixctl_trace_actions, NULL);
 }
 
 void

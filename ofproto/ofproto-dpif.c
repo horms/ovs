@@ -5892,7 +5892,9 @@ ofproto_dpif_lookup_by_uuid(const struct uuid *uuid)
 
 static void
 ofproto_unixctl_fdb_flush(struct unixctl_conn *conn, int argc,
-                          const char *argv[], void *aux OVS_UNUSED)
+                          const char *argv[],
+                          enum ovs_output_fmt fmt OVS_UNUSED,
+                          void *aux OVS_UNUSED)
 {
     struct ofproto_dpif *ofproto;
 
@@ -5919,7 +5921,9 @@ ofproto_unixctl_fdb_flush(struct unixctl_conn *conn, int argc,
 
 static void
 ofproto_unixctl_mcast_snooping_flush(struct unixctl_conn *conn, int argc,
-                                     const char *argv[], void *aux OVS_UNUSED)
+                                     const char *argv[],
+                                     enum ovs_output_fmt fmt OVS_UNUSED,
+                                     void *aux OVS_UNUSED)
 {
     struct ofproto_dpif *ofproto;
 
@@ -5957,7 +5961,9 @@ ofbundle_get_a_port(const struct ofbundle *bundle)
 
 static void
 ofproto_unixctl_fdb_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                         const char *argv[], void *aux OVS_UNUSED)
+                         const char *argv[],
+                         enum ovs_output_fmt fmt OVS_UNUSED,
+                         void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     const struct ofproto_dpif *ofproto;
@@ -5993,7 +5999,9 @@ ofproto_unixctl_fdb_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ofproto_unixctl_fdb_add(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                         const char *argv[], void *aux OVS_UNUSED)
+                        const char *argv[],
+                        enum ovs_output_fmt fmt OVS_UNUSED,
+                        void *aux OVS_UNUSED)
 {
     const struct ofproto_dpif *ofproto;
     const struct mac_entry *mac_entry;
@@ -6058,7 +6066,9 @@ ofproto_unixctl_fdb_add(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ofproto_unixctl_fdb_delete(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                           const char *argv[], void *aux OVS_UNUSED)
+                           const char *argv[],
+                           enum ovs_output_fmt fmt OVS_UNUSED,
+                           void *aux OVS_UNUSED)
 {
     const struct ofproto_dpif *ofproto;
     const char *br_name = argv[1];
@@ -6084,7 +6094,9 @@ ofproto_unixctl_fdb_delete(struct unixctl_conn *conn, int argc OVS_UNUSED,
 
 static void
 ofproto_unixctl_fdb_stats_clear(struct unixctl_conn *conn, int argc,
-                                const char *argv[], void *aux OVS_UNUSED)
+                                const char *argv[],
+                                enum ovs_output_fmt fmt OVS_UNUSED,
+                                void *aux OVS_UNUSED)
 {
     struct ofproto_dpif *ofproto;
 
@@ -6111,7 +6123,9 @@ ofproto_unixctl_fdb_stats_clear(struct unixctl_conn *conn, int argc,
 
 static void
 ofproto_unixctl_fdb_stats_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                               const char *argv[], void *aux OVS_UNUSED)
+                               const char *argv[],
+                               enum ovs_output_fmt fmt OVS_UNUSED,
+                               void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     const struct ofproto_dpif *ofproto;
@@ -6152,6 +6166,7 @@ static void
 ofproto_unixctl_mcast_snooping_show(struct unixctl_conn *conn,
                                     int argc OVS_UNUSED,
                                     const char *argv[],
+                                    enum ovs_output_fmt fmt OVS_UNUSED,
                                     void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -6227,6 +6242,7 @@ get_ofprotos(struct shash *ofproto_shash)
 static void
 ofproto_unixctl_dpif_dump_dps(struct unixctl_conn *conn, int argc OVS_UNUSED,
                               const char *argv[] OVS_UNUSED,
+                              enum ovs_output_fmt fmt OVS_UNUSED,
                               void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -6473,7 +6489,9 @@ dpif_show_backer(const struct dpif_backer *backer, struct ds *ds)
 
 static void
 ofproto_unixctl_dpif_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
-                          const char *argv[] OVS_UNUSED, void *aux OVS_UNUSED)
+                          const char *argv[] OVS_UNUSED,
+                          enum ovs_output_fmt fmt OVS_UNUSED,
+                          void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
     const struct shash_node **backers;
@@ -6492,6 +6510,7 @@ ofproto_unixctl_dpif_show(struct unixctl_conn *conn, int argc OVS_UNUSED,
 static void
 ofproto_unixctl_dpif_dump_flows(struct unixctl_conn *conn,
                                 int argc OVS_UNUSED, const char *argv[],
+                                enum ovs_output_fmt fmt OVS_UNUSED,
                                 void *aux OVS_UNUSED)
 {
     const struct ofproto_dpif *ofproto;
@@ -6586,6 +6605,7 @@ ofproto_unixctl_dpif_dump_flows(struct unixctl_conn *conn,
 static void
 ofproto_unixctl_dpif_show_dp_features(struct unixctl_conn *conn,
                                       int argc, const char *argv[],
+                                      enum ovs_output_fmt fmt OVS_UNUSED,
                                       void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -6605,6 +6625,7 @@ ofproto_unixctl_dpif_show_dp_features(struct unixctl_conn *conn,
 static void
 ofproto_unixctl_dpif_set_dp_features(struct unixctl_conn *conn,
                                      int argc, const char *argv[],
+                                     enum ovs_output_fmt fmt OVS_UNUSED,
                                      void *aux OVS_UNUSED)
 {
     struct ds ds = DS_EMPTY_INITIALIZER;
@@ -6641,31 +6662,40 @@ ofproto_unixctl_init(void)
     registered = true;
 
     unixctl_command_register("fdb/add", "bridge port vlan mac", 4, 4,
-                             ofproto_unixctl_fdb_add, NULL);
+                             OVS_OUTPUT_FMT_TEXT, ofproto_unixctl_fdb_add,
+                             NULL);
     unixctl_command_register("fdb/del", "bridge vlan mac", 3, 3,
-                             ofproto_unixctl_fdb_delete, NULL);
+                             OVS_OUTPUT_FMT_TEXT, ofproto_unixctl_fdb_delete,
+                             NULL);
     unixctl_command_register("fdb/flush", "[bridge]", 0, 1,
-                             ofproto_unixctl_fdb_flush, NULL);
-    unixctl_command_register("fdb/show", "bridge", 1, 1,
+                             OVS_OUTPUT_FMT_TEXT, ofproto_unixctl_fdb_flush,
+                             NULL);
+    unixctl_command_register("fdb/show", "bridge", 1, 1, OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_fdb_show, NULL);
     unixctl_command_register("fdb/stats-clear", "[bridge]", 0, 1,
+                             OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_fdb_stats_clear, NULL);
     unixctl_command_register("fdb/stats-show", "bridge", 1, 1,
+                             OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_fdb_stats_show, NULL);
     unixctl_command_register("mdb/flush", "[bridge]", 0, 1,
+                             OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_mcast_snooping_flush, NULL);
-    unixctl_command_register("mdb/show", "bridge", 1, 1,
+    unixctl_command_register("mdb/show", "bridge", 1, 1, OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_mcast_snooping_show, NULL);
-    unixctl_command_register("dpif/dump-dps", "", 0, 0,
+    unixctl_command_register("dpif/dump-dps", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_dpif_dump_dps, NULL);
-    unixctl_command_register("dpif/show", "", 0, 0, ofproto_unixctl_dpif_show,
-                             NULL);
+    unixctl_command_register("dpif/show", "", 0, 0, OVS_OUTPUT_FMT_TEXT,
+                             ofproto_unixctl_dpif_show, NULL);
     unixctl_command_register("dpif/show-dp-features", "bridge", 1, 1,
+                             OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_dpif_show_dp_features, NULL);
     unixctl_command_register("dpif/dump-flows",
                              "[-m] [--names | --no-names] bridge", 1, INT_MAX,
+                             OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_dpif_dump_flows, NULL);
-    unixctl_command_register("dpif/set-dp-features", "bridge", 1, 3 ,
+    unixctl_command_register("dpif/set-dp-features", "bridge", 1, 3,
+                             OVS_OUTPUT_FMT_TEXT,
                              ofproto_unixctl_dpif_set_dp_features, NULL);
 }
 

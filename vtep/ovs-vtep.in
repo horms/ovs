@@ -76,7 +76,7 @@ def vtep_ctl(args):
     return call_prog("vtep-ctl", shlex.split(args))
 
 
-def unixctl_exit(conn, unused_argv, unused_aux):
+def unixctl_exit(conn, unused_argv, unused_fmt, unused_aux):
     global exiting
     exiting = True
     conn.reply(None)
@@ -732,7 +732,8 @@ def main():
 
     ovs.daemon.daemonize()
 
-    ovs.unixctl.command_register("exit", "", 0, 0, unixctl_exit, None)
+    ovs.unixctl.command_register("exit", "", 0, 0, ovs.util.OutputFormat.TEXT,
+                                 unixctl_exit, None)
     error, unixctl = ovs.unixctl.server.UnixctlServer.create(None,
                                                              version=VERSION)
     if error:

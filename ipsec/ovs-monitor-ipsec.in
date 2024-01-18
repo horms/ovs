@@ -1229,25 +1229,25 @@ def address_family(address):
     return "IPv4"
 
 
-def unixctl_xfrm_policies(conn, unused_argv, unused_aux):
+def unixctl_xfrm_policies(conn, unused_argv, unused_fmt, unused_aux):
     global xfrm
     policies = xfrm.get_policies()
     conn.reply(str(policies))
 
 
-def unixctl_xfrm_state(conn, unused_argv, unused_aux):
+def unixctl_xfrm_state(conn, unused_argv, unused_fmt, unused_aux):
     global xfrm
     securities = xfrm.get_securities()
     conn.reply(str(securities))
 
 
-def unixctl_ipsec_status(conn, unused_argv, unused_aux):
+def unixctl_ipsec_status(conn, unused_argv, unused_fmt, unused_aux):
     global monitor
     conns = monitor.ike_helper.get_active_conns()
     conn.reply(str(conns))
 
 
-def unixctl_show(conn, unused_argv, unused_aux):
+def unixctl_show(conn, unused_argv, unused_fmt, unused_aux):
     global monitor
     global xfrm
     policies = xfrm.get_policies()
@@ -1255,13 +1255,13 @@ def unixctl_show(conn, unused_argv, unused_aux):
     monitor.show(conn, policies, securities)
 
 
-def unixctl_refresh(conn, unused_argv, unused_aux):
+def unixctl_refresh(conn, unused_argv, unused_fmt, unused_aux):
     global monitor
     monitor.ike_helper.refresh(monitor)
     conn.reply(None)
 
 
-def unixctl_exit(conn, argv, unused_aux):
+def unixctl_exit(conn, argv, unused_fmt, unused_aux):
     global monitor
     global exiting
     ret = None
@@ -1336,17 +1336,25 @@ def main():
 
     ovs.daemon.daemonize()
     ovs.unixctl.command_register("list-commands", "", 0, 0,
+                                 ovs.util.OutputFormat.TEXT,
                                  ovs.unixctl._unixctl_help, None)
     ovs.unixctl.command_register("xfrm/policies", "", 0, 0,
+                                 ovs.util.OutputFormat.TEXT,
                                  unixctl_xfrm_policies, None)
     ovs.unixctl.command_register("xfrm/state", "", 0, 0,
+                                 ovs.util.OutputFormat.TEXT,
                                  unixctl_xfrm_state, None)
     ovs.unixctl.command_register("ipsec/status", "", 0, 0,
+                                 ovs.util.OutputFormat.TEXT,
                                  unixctl_ipsec_status, None)
     ovs.unixctl.command_register("tunnels/show", "", 0, 0,
+                                 ovs.util.OutputFormat.TEXT,
                                  unixctl_show, None)
-    ovs.unixctl.command_register("refresh", "", 0, 0, unixctl_refresh, None)
+    ovs.unixctl.command_register("refresh", "", 0, 0,
+                                 ovs.util.OutputFormat.TEXT,
+                                 unixctl_refresh, None)
     ovs.unixctl.command_register("exit", "[--no-cleanup]", 0, 1,
+                                 ovs.util.OutputFormat.TEXT,
                                  unixctl_exit, None)
 
     error, unixctl_server = ovs.unixctl.server.UnixctlServer.create(None)
