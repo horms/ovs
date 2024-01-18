@@ -20,10 +20,14 @@ commands = {}
 
 
 class _UnixctlCommand(object):
-    def __init__(self, usage, min_args, max_args, callback, aux):
+    # FIXME: Output format will be passed as 'output_fmts' to the command in
+    #        later patch.
+    def __init__(self, usage, min_args, max_args,  # FIXME: output_fmts,
+                 callback, aux):
         self.usage = usage
         self.min_args = min_args
         self.max_args = max_args
+        # FIXME: self.output_fmts = output_fmts
         self.callback = callback
         self.aux = aux
 
@@ -42,10 +46,13 @@ def _unixctl_help(conn, unused_argv, unused_aux):
     conn.reply(reply)
 
 
-def command_register(name, usage, min_args, max_args, callback, aux):
+def command_register_fmt(name, usage, min_args, max_args, output_fmts,
+                         callback, aux):
     """ Registers a command with the given 'name' to be exposed by the
     UnixctlServer. 'usage' describes the arguments to the command; it is used
-    only for presentation to the user in "help" output.
+    only for presentation to the user in "help" output.  'output_fmts' is a
+    bitmap that defines what output formats a command supports, e.g.
+    OVS_OUTPUT_FMT_TEXT | OVS_OUTPUT_FMT_JSON.
 
     'callback' is called when the command is received.  It is passed a
     UnixctlConnection object, the list of arguments as unicode strings, and
@@ -63,8 +70,30 @@ def command_register(name, usage, min_args, max_args, callback, aux):
     assert callable(callback)
 
     if name not in commands:
-        commands[name] = _UnixctlCommand(usage, min_args, max_args, callback,
-                                         aux)
+        commands[name] = _UnixctlCommand(usage, min_args, max_args,
+                                         # FIXME: output_fmts,
+                                         callback, aux)
+
+
+# FIXME: command_register() will be replaced with command_register_fmt() in a
+#        later patch of this series. It is is kept temporarily to reduce the
+#        amount of changes in this patch.
+def command_register(name, usage, min_args, max_args, callback, aux):
+    """ Registers a command with the given 'name' to be exposed by the
+    UnixctlServer. 'usage' describes the arguments to the command; it is used
+    only for presentation to the user in "help" output.
+
+    'callback' is called when the command is received.  It is passed a
+    UnixctlConnection object, the list of arguments as unicode strings, and
+    'aux'.  Normally 'callback' should reply by calling
+    UnixctlConnection.reply() or UnixctlConnection.reply_error() before it
+    returns, but if the command cannot be handled immediately, then it can
+    defer the reply until later.  A given connection can only process a single
+    request at a time, so a reply must be made eventually to avoid blocking
+    that connection."""
+
+    command_register_fmt(name, usage, min_args, max_args,
+                         ovs.util.OutputFormat.TEXT, callback, aux)
 
 
 def socket_name_from_target(target):
