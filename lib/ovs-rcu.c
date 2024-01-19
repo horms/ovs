@@ -327,6 +327,7 @@ ovsrcu_postpone__(void (*function)(void *aux), void *aux)
 }
 
 static bool
+OVS_FUNCTION_PTR
 ovsrcu_call_postponed(void)
 {
     struct ovsrcu_cbset *cbset;
