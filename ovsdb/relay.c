@@ -267,7 +267,7 @@ ovsdb_relay_parse_update__(struct ovsdb *db,
 
 exit:
     if (error) {
-        ovsdb_txn_abort(txn);
+        ovsdb_txn_hard_stop(txn);
         return error;
     } else {
         if (uuid_is_zero(last_id)) {

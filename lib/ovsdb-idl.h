@@ -292,7 +292,7 @@ bool ovsdb_idl_row_is_synthetic(const struct ovsdb_idl_row *);
  *
  * When a transaction is complete, which must be before the next call to
  * ovsdb_idl_run() on 'idl', call ovsdb_idl_txn_commit() or
- * ovsdb_idl_txn_abort().
+ * ovsdb_idl_txn_hard_stop().
  *
  * The life-cycle of a transaction looks like this:
  *
@@ -323,7 +323,7 @@ enum ovsdb_idl_txn_status {
     TXN_UNCOMMITTED,            /* Not yet committed or aborted. */
     TXN_UNCHANGED,              /* Transaction didn't include any changes. */
     TXN_INCOMPLETE,             /* Commit in progress, please wait. */
-    TXN_ABORTED,                /* ovsdb_idl_txn_abort() called. */
+    TXN_ABORTED,                /* ovsdb_idl_txn_hard_stop() called. */
     TXN_SUCCESS,                /* Commit successful. */
     TXN_TRY_AGAIN,              /* Commit failed because a "verify" operation
                                  * reported an inconsistency, due to a network
@@ -347,7 +347,7 @@ void ovsdb_idl_txn_destroy(struct ovsdb_idl_txn *);
 void ovsdb_idl_txn_wait(const struct ovsdb_idl_txn *);
 enum ovsdb_idl_txn_status ovsdb_idl_txn_commit(struct ovsdb_idl_txn *);
 enum ovsdb_idl_txn_status ovsdb_idl_txn_commit_block(struct ovsdb_idl_txn *);
-void ovsdb_idl_txn_abort(struct ovsdb_idl_txn *);
+void ovsdb_idl_txn_hard_stop(struct ovsdb_idl_txn *);
 
 const char *ovsdb_idl_txn_get_error(const struct ovsdb_idl_txn *);
 

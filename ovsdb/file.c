@@ -276,7 +276,7 @@ ovsdb_file_txn_from_json(struct ovsdb *db, const struct json *json,
     return NULL;
 
 error:
-    ovsdb_txn_abort(txn);
+    ovsdb_txn_hard_stop(txn);
     return error;
 }
 
@@ -393,7 +393,7 @@ ovsdb_convert(const struct ovsdb *src, const struct ovsdb_schema *new_schema,
 
     error = ovsdb_txn_replay_commit(txn);
     if (error) {
-        txn = NULL;            /* ovsdb_txn_replay_commit() already aborted. */
+        txn = NULL;  /* ovsdb_txn_replay_commit() already hard stopped. */
         goto error;
     }
 
@@ -403,7 +403,7 @@ ovsdb_convert(const struct ovsdb *src, const struct ovsdb_schema *new_schema,
 error:
     ovsdb_destroy(dst);
     if (txn) {
-        ovsdb_txn_abort(txn);
+        ovsdb_txn_hard_stop(txn);
     }
     *dstp = NULL;
     return error;

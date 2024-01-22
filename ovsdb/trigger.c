@@ -257,7 +257,7 @@ ovsdb_trigger_try(struct ovsdb_trigger *t, long long int now)
 
             if (forwarding_needed) {
                 /* Transaction is good, but we don't need it. */
-                ovsdb_txn_abort(txn);
+                ovsdb_txn_hard_stop(txn);
                 json_destroy(result);
                 /* Transition to "forwarding" state. */
                 t->txn_forward = ovsdb_txn_forward_create(t->db, t->request);
@@ -360,10 +360,11 @@ ovsdb_trigger_try(struct ovsdb_trigger *t, long long int now)
         }
 
         /* Fall through to the general handling for the "committing" state.  We
-         * abort the transaction--if and when it eventually commits, we'll read
-         * it back from storage and replay it locally. */
+         * perform a hard stop on the transaction--if and when it
+         * eventually commits, we'll read it back from storage and replay
+         * it locally. */
         if (txn) {
-            ovsdb_txn_abort(txn);
+            ovsdb_txn_hard_stop(txn);
         }
     }
 

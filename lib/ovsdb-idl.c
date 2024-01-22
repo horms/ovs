@@ -179,7 +179,7 @@ static void ovsdb_idl_row_track_change(struct ovsdb_idl_row *,
 static void ovsdb_idl_row_untrack_change(struct ovsdb_idl_row *);
 static void ovsdb_idl_row_clear_changeseqno(struct ovsdb_idl_row *);
 
-static void ovsdb_idl_txn_abort_all(struct ovsdb_idl *);
+static void ovsdb_idl_txn_hard_stop_all(struct ovsdb_idl *);
 static bool ovsdb_idl_txn_extract_mutations(struct ovsdb_idl_row *,
                                             struct json *);
 static void ovsdb_idl_txn_add_map_op(struct ovsdb_idl_row *,
@@ -347,7 +347,7 @@ ovsdb_idl_destroy(struct ovsdb_idl *idl)
     if (idl) {
         ovs_assert(!idl->txn);
 
-        ovsdb_idl_txn_abort_all(idl);
+        ovsdb_idl_txn_hard_stop_all(idl);
         hmap_destroy(&idl->outstanding_txns);
 
         ovsdb_idl_clear(idl);
@@ -451,7 +451,7 @@ ovsdb_idl_run(struct ovsdb_idl *idl)
     LIST_FOR_EACH_POP (event, list_node, &events) {
         switch (event->type) {
         case OVSDB_CS_EVENT_TYPE_RECONNECT:
-            ovsdb_idl_txn_abort_all(idl);
+            ovsdb_idl_txn_hard_stop_all(idl);
             break;
 
         case OVSDB_CS_EVENT_TYPE_LOCKED:
@@ -2597,7 +2597,7 @@ ovsdb_idl_next_row(const struct ovsdb_idl_row *row)
  * Various kinds of changes can invalidate the returned value: writing to the
  * same 'column' in 'row' (e.g. with ovsdb_idl_txn_write()), deleting 'row'
  * (e.g. with ovsdb_idl_txn_delete()), or completing an ongoing transaction
- * (e.g. with ovsdb_idl_txn_commit() or ovsdb_idl_txn_abort()).  If the
+ * (e.g. with ovsdb_idl_txn_commit() or ovsdb_idl_txn_hard_stop()).  If the
  * returned value is needed for a long time, it is best to make a copy of it
  * with ovsdb_datum_clone(). */
 const struct ovsdb_datum *
@@ -2807,7 +2807,7 @@ ovsdb_idl_txn_destroy(struct ovsdb_idl_txn *txn)
         hmap_remove(&txn->idl->outstanding_txns, &txn->hmap_node);
     }
     json_destroy(txn->request_id);
-    ovsdb_idl_txn_abort(txn);
+    ovsdb_idl_txn_hard_stop(txn);
     ds_destroy(&txn->comment);
     free(txn->error);
     HMAP_FOR_EACH_SAFE (insert, hmap_node, &txn->inserted_rows) {
@@ -3156,7 +3156,7 @@ ovsdb_idl_txn_extract_mutations(struct ovsdb_idl_row *row,
  *
  *   TXN_ABORTED:
  *
- *       The caller previously called ovsdb_idl_txn_abort().
+ *       The caller previously called ovsdb_idl_txn_hard_stop().
  *
  *   TXN_SUCCESS:
  *
@@ -3498,7 +3498,7 @@ ovsdb_idl_txn_get_increment_new_value(const struct ovsdb_idl_txn *txn)
  * Aborting a transaction doesn't free its memory.  Use
  * ovsdb_idl_txn_destroy() to do that. */
 void
-ovsdb_idl_txn_abort(struct ovsdb_idl_txn *txn)
+ovsdb_idl_txn_hard_stop(struct ovsdb_idl_txn *txn)
 {
     ovsdb_idl_txn_disassemble(txn);
     if (txn->status == TXN_UNCOMMITTED || txn->status == TXN_INCOMPLETE) {
@@ -3860,7 +3860,7 @@ ovsdb_idl_txn_insert_persist_uuid(struct ovsdb_idl_txn *txn,
 }
 
 static void
-ovsdb_idl_txn_abort_all(struct ovsdb_idl *idl)
+ovsdb_idl_txn_hard_stop_all(struct ovsdb_idl *idl)
 {
     struct ovsdb_idl_txn *txn;
 

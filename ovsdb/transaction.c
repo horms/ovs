@@ -153,8 +153,8 @@ ovsdb_txn_free(struct ovsdb_txn *txn)
 }
 
 static struct ovsdb_error *
-ovsdb_txn_row_abort(struct ovsdb_txn *txn OVS_UNUSED,
-                    struct ovsdb_txn_row *txn_row)
+ovsdb_txn_row_hard_stop(struct ovsdb_txn *txn OVS_UNUSED,
+                        struct ovsdb_txn_row *txn_row)
 {
     struct ovsdb_row *old = txn_row->old;
     struct ovsdb_row *new = txn_row->new;
@@ -222,9 +222,9 @@ ovsdb_row_from_index_node(struct hmap_node *index_node,
 }
 
 void
-ovsdb_txn_abort(struct ovsdb_txn *txn)
+ovsdb_txn_hard_stop(struct ovsdb_txn *txn)
 {
-    ovsdb_error_assert(for_each_txn_row(txn, ovsdb_txn_row_abort));
+    ovsdb_error_assert(for_each_txn_row(txn, ovsdb_txn_row_hard_stop));
     ovsdb_txn_free(txn);
 }
 
@@ -858,7 +858,7 @@ determine_changes(struct ovsdb_txn *txn, struct ovsdb_txn_row *txn_row)
 
         if (!changed) {
             /* Nothing actually changed in this row, so drop it. */
-            ovsdb_txn_row_abort(txn, txn_row);
+            ovsdb_txn_row_hard_stop(txn, txn_row);
         }
     } else {
         bitmap_set_multiple(txn_row->changed, 0,
@@ -1086,11 +1086,11 @@ ovsdb_txn_precommit(struct ovsdb_txn *txn)
 {
     struct ovsdb_error *error;
 
-    /* Figure out what actually changed, and abort early if the transaction
-     * was really a no-op. */
+    /* Figure out what actually changed, and perform a hard stop early
+     * if the transaction was really a no-op. */
     error = for_each_txn_row(txn, determine_changes);
     if (error) {
-        ovsdb_txn_abort(txn);
+        ovsdb_txn_hard_stop(txn);
         return OVSDB_WRAP_BUG("can't happen", error);
     }
     if (ovs_list_is_empty(&txn->txn_tables)) {
@@ -1248,7 +1248,7 @@ ovsdb_txn_replay_commit(struct ovsdb_txn *txn)
 {
     struct ovsdb_error *error = ovsdb_txn_precommit(txn);
     if (error) {
-        ovsdb_txn_abort(txn);
+        ovsdb_txn_hard_stop(txn);
     } else {
         ovsdb_txn_add_to_history(txn);
         ovsdb_txn_complete(txn);
@@ -1338,8 +1338,8 @@ ovsdb_txn_propose_commit(struct ovsdb_txn *txn, bool durable)
 /* Proposes 'txn' for commitment and then waits for the commit to succeed or
  * fail.  Returns null if successful, otherwise the error.
  *
- * **In addition**, this function also completes or aborts the transaction if
- * the transaction succeeded or failed, respectively. */
+ * **In addition**, this function also completes or performs a hard stop of
+ * the transaction if the transaction succeeded or failed, respectively. */
 struct ovsdb_error * OVS_WARN_UNUSED_RESULT
 ovsdb_txn_propose_commit_block(struct ovsdb_txn *txn, bool durable)
 {
@@ -1352,7 +1352,7 @@ ovsdb_txn_propose_commit_block(struct ovsdb_txn *txn, bool durable)
             ovsdb_txn_progress_destroy(p);
 
             if (error) {
-                ovsdb_txn_abort(txn);
+                ovsdb_txn_hard_stop(txn);
             } else {
                 ovsdb_txn_complete(txn);
             }
@@ -1644,8 +1644,9 @@ ovsdb_txn_table_destroy(struct ovsdb_txn_table *txn_table)
 }
 
 /* Calls 'cb' for every txn_row within 'txn'.  If 'cb' returns nonnull, this
- * aborts the iteration and for_each_txn_row() passes the error up.  Otherwise,
- * returns a null pointer after iteration is complete.
+ * performs a hard stop of the iteration and for_each_txn_row() passes the
+ * error up.  Otherwise, returns a null pointer after iteration is
+ * complete.
  *
  * 'cb' may insert new txn_rows and new txn_tables into 'txn'.  It may delete
  * the txn_row that it is passed in, or txn_rows in txn_tables other than the

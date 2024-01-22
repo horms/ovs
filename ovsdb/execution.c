@@ -225,7 +225,7 @@ ovsdb_execute_compose(struct ovsdb *db, const struct ovsdb_session *session,
 
 exit:
     if (error) {
-        ovsdb_txn_abort(x.txn);
+        ovsdb_txn_hard_stop(x.txn);
         x.txn = NULL;
 
         ovsdb_error_destroy(error);
@@ -777,8 +777,8 @@ ovsdb_execute_wait(struct ovsdb_execution *x, struct ovsdb_parser *parser,
             }
 
             if (!ovsdb_row_hash_insert(&expected, row)) {
-                /* XXX Perhaps we should abort with an error or log a
-                 * warning. */
+                /* XXX Perhaps we should perform a hard stop
+                 * with an error or log a warning. */
                 ovsdb_row_destroy(row);
             }
         }
