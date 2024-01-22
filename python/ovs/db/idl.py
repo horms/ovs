@@ -442,7 +442,7 @@ class Idl(object):
             seqno = self._session.get_seqno()
             if seqno != self._last_seqno:
                 self._last_seqno = seqno
-                self.__txn_abort_all()
+                self.__txn_hard_stop_all()
                 self.restart_fsm()
                 if self.lock_name:
                     self.__send_lock_request()
@@ -1205,7 +1205,7 @@ class Idl(object):
     def __error(self):
         self._session.force_reconnect()
 
-    def __txn_abort_all(self):
+    def __txn_hard_stop_all(self):
         while self._outstanding_txns:
             txn = self._outstanding_txns.popitem()[1]
             txn._status = Transaction.TRY_AGAIN
@@ -1650,7 +1650,7 @@ class Transaction(object):
     UNCHANGED = "unchanged"
     # Commit in progress, please wait.
     INCOMPLETE = "incomplete"
-    # ovsdb_idl_txn_abort() called.
+    # ovsdb_idl_txn_hard_stop() called.
     ABORTED = "aborted"
     # Commit successful.
     SUCCESS = "success"

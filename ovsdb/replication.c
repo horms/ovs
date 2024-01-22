@@ -613,7 +613,7 @@ process_notification(struct json *table_updates, struct ovsdb *db)
         }
 
         if (error) {
-            ovsdb_txn_abort(txn);
+            ovsdb_txn_hard_stop(txn);
             return error;
         } else {
             /* Commit transaction. */

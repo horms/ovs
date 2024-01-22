@@ -293,7 +293,7 @@ static void
 vtep_ctl_exit(int status)
 {
     if (the_idl_txn) {
-        ovsdb_idl_txn_abort(the_idl_txn);
+        ovsdb_idl_txn_hard_stop(the_idl_txn);
         ovsdb_idl_txn_destroy(the_idl_txn);
     }
     ovsdb_idl_destroy(the_idl);
@@ -2366,7 +2366,7 @@ do_vtep_ctl(const char *args, struct ctl_command *commands,
         OVS_NOT_REACHED();
 
     case TXN_ABORTED:
-        /* Should not happen--we never call ovsdb_idl_txn_abort(). */
+        /* Should not happen--we never call ovsdb_idl_txn_hard_stop(). */
         ctl_fatal("transaction aborted");
 
     case TXN_UNCHANGED:
@@ -2434,7 +2434,7 @@ try_again:
     /* Our transaction needs to be rerun, or a prerequisite was not met.  Free
      * resources and return so that the caller can try again. */
     if (txn) {
-        ovsdb_idl_txn_abort(txn);
+        ovsdb_idl_txn_hard_stop(txn);
         ovsdb_idl_txn_destroy(txn);
     }
     ovsdb_symbol_table_destroy(symtab);

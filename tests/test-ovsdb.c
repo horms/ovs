@@ -1704,7 +1704,7 @@ do_transact_commit(struct ovs_cmdl_context *ctx OVS_UNUSED)
 static void
 do_transact_abort(struct ovs_cmdl_context *ctx OVS_UNUSED)
 {
-    ovsdb_txn_abort(do_transact_txn);
+    ovsdb_txn_hard_stop(do_transact_txn);
     do_transact_txn = NULL;
 }
 
@@ -1918,7 +1918,7 @@ do_transact(struct ovs_cmdl_context *ctx)
         free(args);
         json_destroy(command);
     }
-    ovsdb_txn_abort(do_transact_txn);
+    ovsdb_txn_hard_stop(do_transact_txn);
     ovsdb_destroy(do_transact_db); /* Also destroys 'schema'. */
 }
 
@@ -2529,7 +2529,7 @@ idl_set(struct ovsdb_idl *idl, char *commands, int step)
                                     false);
             increment = true;
         } else if (!strcmp(name, "abort")) {
-            ovsdb_idl_txn_abort(txn);
+            ovsdb_idl_txn_hard_stop(txn);
             ovsdb_idl_check_consistency(idl);
             break;
         } else if (!strcmp(name, "destroy")) {
