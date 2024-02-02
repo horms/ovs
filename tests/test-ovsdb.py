@@ -493,12 +493,12 @@ def idl_set(idl, commands, step):
             s.increment("i")
             increment = True
         elif name == "abort":
-            txn.abort()
+            txn.hard_stop()
             break
         elif name == "destroy":
             print("%03d: destroy" % step)
             sys.stdout.flush()
-            txn.abort()
+            txn.hard_stop()
             return True
         elif name == "linktest":
             l1_0 = txn.insert(idl.tables["link1"])

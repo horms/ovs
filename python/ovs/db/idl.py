@@ -1618,7 +1618,7 @@ class Transaction(object):
     written by client B.
 
     When a transaction is complete, which must be before the next call to
-    Idl.run(), call Transaction.commit() or Transaction.abort().
+    Idl.run(), call Transaction.commit() or Transaction.hard_stop().
 
     The life-cycle of a transaction looks like this:
 
@@ -1684,7 +1684,7 @@ class Transaction(object):
         Row.verify().
 
         When a transaction is complete (which must be before the next call to
-        Idl.run()), call Transaction.commit() or Transaction.abort()."""
+        Idl.run()), call Transaction.commit() or Transaction.hard_stop()."""
         assert idl.txn is None
 
         idl.txn = self
@@ -1765,7 +1765,7 @@ class Transaction(object):
 
           Transaction.ABORTED:
 
-              The caller previously called Transaction.abort().
+              The caller previously called Transaction.hard_stop().
 
           Transaction.SUCCESS:
 
@@ -2017,8 +2017,8 @@ class Transaction(object):
         assert self._status == Transaction.SUCCESS
         return self._inc_new_value
 
-    def abort(self):
-        """Aborts this transaction.  If Transaction.commit() has already been
+    def hard_stop(self):
+        """Hard stop this transaction.  If Transaction.commit() has already been
         called then the transaction might get committed anyhow."""
         self.__disassemble()
         if self._status in (Transaction.UNCOMMITTED,
