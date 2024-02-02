@@ -2687,8 +2687,8 @@ ovsdb_idl_txn_status_to_string(enum ovsdb_idl_txn_status status)
         return "unchanged";
     case TXN_INCOMPLETE:
         return "incomplete";
-    case TXN_ABORTED:
-        return "aborted";
+    case TXN_HARD_STOP:
+        return "hard_stop";
     case TXN_SUCCESS:
         return "success";
     case TXN_TRY_AGAIN:
@@ -3450,7 +3450,7 @@ coverage_out:
     case TXN_UNCOMMITTED:   COVERAGE_INC(txn_uncommitted);    break;
     case TXN_UNCHANGED:     COVERAGE_INC(txn_unchanged);      break;
     case TXN_INCOMPLETE:    COVERAGE_INC(txn_incomplete);     break;
-    case TXN_ABORTED:       COVERAGE_INC(txn_hard_stop);      break;
+    case TXN_HARD_STOP:     COVERAGE_INC(txn_hard_stop);      break;
     case TXN_SUCCESS:       COVERAGE_INC(txn_success);        break;
     case TXN_TRY_AGAIN:     COVERAGE_INC(txn_try_again);      break;
     case TXN_NOT_LOCKED:    COVERAGE_INC(txn_not_locked);     break;
@@ -3502,7 +3502,7 @@ ovsdb_idl_txn_hard_stop(struct ovsdb_idl_txn *txn)
 {
     ovsdb_idl_txn_disassemble(txn);
     if (txn->status == TXN_UNCOMMITTED || txn->status == TXN_INCOMPLETE) {
-        txn->status = TXN_ABORTED;
+        txn->status = TXN_HARD_STOP;
     }
 }
 
@@ -4448,7 +4448,7 @@ ovsdb_idl_try_commit_loop_txn(struct ovsdb_idl_loop *loop,
             loop->cur_cfg = loop->next_cfg;
             break;
 
-        case TXN_ABORTED:
+        case TXN_HARD_STOP:
         case TXN_NOT_LOCKED:
         case TXN_ERROR:
             retval = 0;
