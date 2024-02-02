@@ -190,7 +190,7 @@ class Idl(object):
 
     The IDL also assists with issuing database transactions.  The client
     creates a transaction, manipulates the IDL data structures, and commits or
-    aborts the transaction.  The IDL then composes and issues the necessary
+    hard stops the transaction.  The IDL then composes and issues the necessary
     JSON-RPC requests and reports to the client whether the transaction
     completed successfully.
 
@@ -1525,7 +1525,7 @@ class Row(object):
         be verified as a prerequisite to completing the transaction.  That is,
         if 'column_name' changed in this row (or if this row was deleted)
         between the time that the IDL originally read its contents and the time
-        that the transaction commits, then the transaction aborts and
+        that the transaction commits, then the transaction hard stops and
         Transaction.commit() returns Transaction.TRY_AGAIN.
 
         The intention is that, to ensure that no transaction commits based on
@@ -1644,14 +1644,14 @@ class Transaction(object):
 
     # Status values that Transaction.commit() can return.
 
-    # Not yet committed or aborted.
+    # Not yet committed or hard stopped.
     UNCOMMITTED = "uncommitted"
     # Transaction didn't include any changes.
     UNCHANGED = "unchanged"
     # Commit in progress, please wait.
     INCOMPLETE = "incomplete"
     # ovsdb_idl_txn_hard_stop() called.
-    ABORTED = "hard stop"
+    HARD_STOP = "hard stop"
     # Commit successful.
     SUCCESS = "success"
     # Commit failed because a "verify" operation
@@ -1763,7 +1763,7 @@ class Transaction(object):
               database, so the IDL didn't send any request to the database
               server.)
 
-          Transaction.ABORTED:
+          Transaction.HARD_STOP:
 
               The caller previously called Transaction.hard_stop().
 
@@ -1975,7 +1975,7 @@ class Transaction(object):
 
         # Dry run?
         if self.dry_run:
-            operations.append({"op": "abort"})
+            operations.append({"op": "hard_stop"})
 
         if not any_updates:
             self._status = Transaction.UNCHANGED
@@ -2023,7 +2023,7 @@ class Transaction(object):
         self.__disassemble()
         if self._status in (Transaction.UNCOMMITTED,
                             Transaction.INCOMPLETE):
-            self._status = Transaction.ABORTED
+            self._status = Transaction.HARD_STOP
 
     def get_error(self):
         """Returns a string representing this transaction's current status,
