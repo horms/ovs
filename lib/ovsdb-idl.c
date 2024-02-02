@@ -54,7 +54,7 @@ VLOG_DEFINE_THIS_MODULE(ovsdb_idl);
 COVERAGE_DEFINE(txn_uncommitted);
 COVERAGE_DEFINE(txn_unchanged);
 COVERAGE_DEFINE(txn_incomplete);
-COVERAGE_DEFINE(txn_aborted);
+COVERAGE_DEFINE(txn_hard_stop);
 COVERAGE_DEFINE(txn_success);
 COVERAGE_DEFINE(txn_try_again);
 COVERAGE_DEFINE(txn_not_locked);
@@ -3154,7 +3154,7 @@ ovsdb_idl_txn_extract_mutations(struct ovsdb_idl_row *row,
  *       The transaction is complete.  (It didn't actually change the database,
  *       so the IDL didn't send any request to the database server.)
  *
- *   TXN_ABORTED:
+ *   TXN_HARD_STOP:
  *
  *       The caller previously called ovsdb_idl_txn_hard_stop().
  *
@@ -3450,7 +3450,7 @@ coverage_out:
     case TXN_UNCOMMITTED:   COVERAGE_INC(txn_uncommitted);    break;
     case TXN_UNCHANGED:     COVERAGE_INC(txn_unchanged);      break;
     case TXN_INCOMPLETE:    COVERAGE_INC(txn_incomplete);     break;
-    case TXN_ABORTED:       COVERAGE_INC(txn_aborted);        break;
+    case TXN_ABORTED:       COVERAGE_INC(txn_hard_stop);      break;
     case TXN_SUCCESS:       COVERAGE_INC(txn_success);        break;
     case TXN_TRY_AGAIN:     COVERAGE_INC(txn_try_again);      break;
     case TXN_NOT_LOCKED:    COVERAGE_INC(txn_not_locked);     break;
