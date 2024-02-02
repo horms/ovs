@@ -3054,9 +3054,9 @@ do_vsctl(const char *args, struct ctl_command *commands, size_t n_commands,
     case TXN_INCOMPLETE:
         OVS_NOT_REACHED();
 
-    case TXN_ABORTED:
+    case TXN_HARD_STOP:
         /* Should not happen--we never call ovsdb_idl_txn_hard_stop(). */
-        ctl_fatal("transaction aborted");
+        ctl_fatal("transaction hard stop");
 
     case TXN_UNCHANGED:
     case TXN_SUCCESS:

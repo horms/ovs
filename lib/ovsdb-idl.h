@@ -323,7 +323,7 @@ enum ovsdb_idl_txn_status {
     TXN_UNCOMMITTED,            /* Not yet committed or aborted. */
     TXN_UNCHANGED,              /* Transaction didn't include any changes. */
     TXN_INCOMPLETE,             /* Commit in progress, please wait. */
-    TXN_ABORTED,                /* ovsdb_idl_txn_hard_stop() called. */
+    TXN_HARD_STOP,              /* ovsdb_idl_txn_hard_stop() called. */
     TXN_SUCCESS,                /* Commit successful. */
     TXN_TRY_AGAIN,              /* Commit failed because a "verify" operation
                                  * reported an inconsistency, due to a network
