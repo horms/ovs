@@ -1203,7 +1203,7 @@ OvsTunnelFilterRequestListProcess(POVS_TUNFLT_THREAD_CONTEXT threadCtx)
     if (inTransaction) {
         FwpmTransactionAbort(threadCtx->engineSession);
         OVS_LOG_ERROR("Failed to execute request, status: %x.\
-                       Transaction aborted.", status);
+                       Transaction hard stop.", status);
     }
 }
 

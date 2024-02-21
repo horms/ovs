@@ -125,7 +125,7 @@ typedef enum _NL_ERROR_
     NL_ERROR_BADMSG = ((ULONG)-104),
     /* The operation was canceled */
     NL_ERROR_CANCELED = ((ULONG)-105),
-    /* The software has caused a connection abort */
+    /* The software has caused a connection hard stop */
     NL_ERROR_CONNABORTED = ((ULONG)-106),
     /*The connection was refused */
     NL_ERROR_CONNREFUSED = ((ULONG)-107),
@@ -148,7 +148,7 @@ typedef enum _NL_ERROR_
     /* The network is down */
     NL_ERROR_NETDOWN = ((ULONG)-116),
     /* The network has dropped connection because of a reset (i.e. the
-     * connection was aborted by the network)
+     * connection was hard stopped by the network)
     */
     NL_ERROR_NETRESET = ((ULONG)-117),
     /* The network is unreachable */
