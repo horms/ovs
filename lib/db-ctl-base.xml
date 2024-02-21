@@ -395,7 +395,7 @@
           -- get bridge br0 datapath_id</code> waits until a bridge named
           <code>br0</code> is created, then prints its <code>datapath_id</code> column,
           whereas <code>get bridge br0 datapath_id -- wait-until bridge br0</code>
-          will abort if no bridge named <code>br0</code> exists when <code>ovs-vsctl</code>
+          will hard stop if no bridge named <code>br0</code> exists when <code>ovs-vsctl</code>
           initially connects to the database.
         </dd>
       </dl>

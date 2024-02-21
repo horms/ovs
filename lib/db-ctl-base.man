@@ -268,7 +268,7 @@ of \fBovs\-vsctl\fR commands.  For example, \fBwait\-until bridge br0
 \-\- get bridge br0 datapath_id\fR waits until a bridge named
 \fBbr0\fR is created, then prints its \fBdatapath_id\fR column,
 whereas \fBget bridge br0 datapath_id \-\- wait\-until bridge br0\fR
-will abort if no bridge named \fBbr0\fR exists when \fBovs\-vsctl\fR
+will hard stop if no bridge named \fBbr0\fR exists when \fBovs\-vsctl\fR
 initially connects to the database.
 .RE
 .IP
