@@ -562,7 +562,7 @@ OVSDB_CHECK_IDL([simple idl, aborting],
   [['set 0 r 2.0, abort' \
 '+set 0 b 1']],
   [[000: table simple: i=0 r=0 b=false s= u=<0> ia=[] ra=[] ba=[] sa=[] ua=[] uuid=<1>
-001: commit, status=aborted
+001: commit, status=hard stop
 002: commit, status=success
 003: table simple: i=0 r=0 b=true s= u=<0> ia=[] ra=[] ba=[] sa=[] ua=[] uuid=<1>
 004: done

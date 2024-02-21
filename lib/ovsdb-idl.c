@@ -2688,7 +2688,7 @@ ovsdb_idl_txn_status_to_string(enum ovsdb_idl_txn_status status)
     case TXN_INCOMPLETE:
         return "incomplete";
     case TXN_ABORTED:
-        return "aborted";
+        return "hard stop";
     case TXN_SUCCESS:
         return "success";
     case TXN_TRY_AGAIN:
@@ -4047,7 +4047,7 @@ ovsdb_idl_txn_process_reply(struct ovsdb_idl *idl,
                         } else if (!strcmp(error->string, "not allowed")) {
                             hard_errors++;
                             ovsdb_idl_txn_set_error_json(txn, op);
-                        } else if (strcmp(error->string, "aborted")) {
+                        } else if (strcmp(error->string, "hard stop")) {
                             hard_errors++;
                             ovsdb_idl_txn_set_error_json(txn, op);
                             VLOG_WARN_RL(&other_rl,

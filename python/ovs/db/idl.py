@@ -1651,7 +1651,7 @@ class Transaction(object):
     # Commit in progress, please wait.
     INCOMPLETE = "incomplete"
     # ovsdb_idl_txn_hard_stop() called.
-    ABORTED = "aborted"
+    ABORTED = "hard stop"
     # Commit successful.
     SUCCESS = "success"
     # Commit failed because a "verify" operation
@@ -2142,7 +2142,7 @@ class Transaction(object):
                             soft_errors = True
                         elif error == "not owner":
                             lock_errors = True
-                        elif error == "aborted":
+                        elif error == "hard stop":
                             pass
                         else:
                             hard_errors = True
