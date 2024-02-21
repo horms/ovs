@@ -696,15 +696,15 @@ read_pidfile(const char *pidfile_)
 }
 
 /* Checks whether a process with the given 'pidfile' is already running and,
- * if so, aborts.  If 'pidfile' is stale, deletes it. */
+ * if so, hard stops.  If 'pidfile' is stale, deletes it. */
 static void
 check_already_running(void)
 {
     long int pid = read_pidfile__(pidfile, true);
     if (pid > 0) {
-        VLOG_FATAL("%s: already running as pid %ld, aborting", pidfile, pid);
+        VLOG_FATAL("%s: already running as pid %ld, hard stop", pidfile, pid);
     } else if (pid < 0) {
-        VLOG_FATAL("%s: pidfile check failed (%s), aborting",
+        VLOG_FATAL("%s: pidfile check failed (%s), hard stop",
                    pidfile, ovs_strerror(-pid));
     }
 }
@@ -750,7 +750,7 @@ static void
 daemon_switch_group(gid_t gid_)
 {
     if ((setgid(gid_) == -1) || !gid_verify(gid_)) {
-        VLOG_FATAL("%s: fail to switch group to gid as %d, aborting",
+        VLOG_FATAL("%s: fail to switch group to gid as %d, hard stop",
                    pidfile, gid_);
     }
 }
@@ -776,7 +776,7 @@ static void
 daemon_switch_user(const uid_t uid_, const char *user_)
 {
     if ((setuid(uid_) == -1) || !uid_verify(uid_)) {
-        VLOG_FATAL("%s: fail to switch user to %s, aborting",
+        VLOG_FATAL("%s: fail to switch user to %s, hard stop",
                    pidfile, user_);
     }
 }
@@ -800,7 +800,7 @@ daemon_become_new_user_unix(void)
     daemon_switch_group(gid);
     if (user && initgroups(user, gid) == -1) {
         VLOG_FATAL("%s: fail to add supplementary group gid %d, "
-                   "aborting", pidfile, gid);
+                   "hard stop", pidfile, gid);
     }
     daemon_switch_user(uid, user);
 }
@@ -864,7 +864,7 @@ daemon_become_new_user_linux(bool access_datapath OVS_UNUSED,
 
     if (ret) {
         VLOG_FATAL("%s: libcap-ng fail to switch to user and group "
-                   "%d:%d, aborting", pidfile, uid, gid);
+                   "%d:%d, hard stop", pidfile, uid, gid);
     }
 #endif
 }
@@ -883,7 +883,7 @@ daemon_become_new_user__(bool access_datapath, bool access_hardware_ports)
         } else {
             VLOG_FATAL("%s: fail to downgrade user using libcap-ng. "
                        "(libcap-ng is not configured at compile time), "
-                       "aborting.", pidfile);
+                       "hard stop.", pidfile);
         }
     } else {
         daemon_become_new_user_unix();
@@ -922,7 +922,7 @@ get_sysconf_buffer_size(void)
     if ((pwd_bs = sysconf(_SC_GETPW_R_SIZE_MAX)) == -1) {
         if (errno) {
             VLOG_FATAL("%s: Read initial passwordd struct size "
-                       "failed (%s), aborting. ", pidfile,
+                       "failed (%s), hard stop. ", pidfile,
                        ovs_strerror(errno));
         }
     }
@@ -930,7 +930,7 @@ get_sysconf_buffer_size(void)
     if ((grp_bs = sysconf(_SC_GETGR_R_SIZE_MAX)) == -1) {
         if (errno) {
             VLOG_FATAL("%s: Read initial group struct size "
-                       "failed (%s), aborting. ", pidfile,
+                       "failed (%s), hard stop. ", pidfile,
                        ovs_strerror(errno));
         }
     }
@@ -999,11 +999,11 @@ daemon_set_new_user(const char *user_spec)
         }
 
         if (e != 0) {
-            VLOG_FATAL("%s: Failed to retrieve user %s's uid (%s), aborting.",
-                       pidfile, user, ovs_strerror(e));
+            VLOG_FATAL("%s: Failed to retrieve user %s's uid (%s), "
+                       "hard stop.", pidfile, user, ovs_strerror(e));
         }
         if (res == NULL) {
-            VLOG_FATAL("%s: user %s not found, aborting.", pidfile, user);
+            VLOG_FATAL("%s: user %s not found, hard stop.", pidfile, user);
         }
     } else {
         /* User name is not specified, use current user.  */
@@ -1015,7 +1015,7 @@ daemon_set_new_user(const char *user_spec)
 
         if (e != 0) {
             VLOG_FATAL("%s: Failed to retrieve current user's name "
-                       "(%s), aborting.", pidfile, ovs_strerror(e));
+                       "(%s), hard stop.", pidfile, ovs_strerror(e));
         }
         user = xstrdup(pwd.pw_name);
     }
@@ -1042,11 +1042,11 @@ daemon_set_new_user(const char *user_spec)
 
             if (e) {
                 VLOG_FATAL("%s: Failed to get group entry for %s, "
-                           "(%s), aborting.", pidfile, grpstr,
+                           "(%s), hard stop.", pidfile, grpstr,
                            ovs_strerror(e));
             }
             if (gres == NULL) {
-                VLOG_FATAL("%s: group %s not found, aborting.", pidfile,
+                VLOG_FATAL("%s: group %s not found, hard stop.", pidfile,
                            grpstr);
             }
 
@@ -1061,7 +1061,7 @@ daemon_set_new_user(const char *user_spec)
 
                 if (!*mem) {
                     VLOG_FATAL("%s: Invalid --user option %s (user %s is "
-                               "not in group %s), aborting.", pidfile,
+                               "not in group %s), hard stop.", pidfile,
                                user_spec, user, grpstr);
                 }
                 gid = grp.gr_gid;
