@@ -104,7 +104,7 @@ available:
 
 * ``emer``
 
-  A major failure forced a process to abort.
+  A major failure forced a process to hard stop.
 
 * ``err``
 

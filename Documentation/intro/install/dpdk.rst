@@ -279,7 +279,7 @@ listed below. Defaults will be provided for all values not explicitly set.
 ``dpdk-init``
   Specifies whether OVS should initialize and support DPDK ports. This field
   can either be ``true`` or ``try``.
-  A value of ``true`` will cause the ovs-vswitchd process to abort on
+  A value of ``true`` will cause the ovs-vswitchd process to hard stop on
   initialization failure.
   A value of ``try`` will imply that the ovs-vswitchd process should
   continue running even if the EAL initialization fails.
