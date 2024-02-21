@@ -55,7 +55,7 @@ struct netdev_stats {
     uint64_t rx_missed_errors;  /* Receiver missed packet. */
 
     /* Detailed transmit errors. */
-    uint64_t tx_aborted_errors;
+    uint64_t tx_hard_stop_errors;
     uint64_t tx_carrier_errors;
     uint64_t tx_fifo_errors;
     uint64_t tx_heartbeat_errors;

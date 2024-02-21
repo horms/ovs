@@ -217,7 +217,7 @@ struct rtnl_link_stats64 {
     uint64_t rx_fifo_errors;
     uint64_t rx_missed_errors;
 
-    uint64_t tx_aborted_errors;
+    uint64_t tx_hard_stop_errors;
     uint64_t tx_carrier_errors;
     uint64_t tx_fifo_errors;
     uint64_t tx_heartbeat_errors;
@@ -2229,7 +2229,7 @@ netdev_stats_from_ovs_vport_stats(struct netdev_stats *dst,
     dst->rx_frame_errors = 0;
     dst->rx_fifo_errors = 0;
     dst->rx_missed_errors = 0;
-    dst->tx_aborted_errors = 0;
+    dst->tx_hard_stop_errors = 0;
     dst->tx_carrier_errors = 0;
     dst->tx_fifo_errors = 0;
     dst->tx_heartbeat_errors = 0;
@@ -2309,7 +2309,7 @@ netdev_linux_get_stats(const struct netdev *netdev_,
         stats->rx_frame_errors     += dev_stats.rx_frame_errors;
         stats->rx_fifo_errors      += dev_stats.rx_fifo_errors;
         stats->rx_missed_errors    += dev_stats.rx_missed_errors;
-        stats->tx_aborted_errors   += dev_stats.tx_aborted_errors;
+        stats->tx_hard_stop_errors += dev_stats.tx_hard_stop_errors;
         stats->tx_carrier_errors   += dev_stats.tx_carrier_errors;
         stats->tx_fifo_errors      += dev_stats.tx_fifo_errors;
         stats->tx_heartbeat_errors += dev_stats.tx_heartbeat_errors;
@@ -2354,7 +2354,7 @@ netdev_tap_get_stats(const struct netdev *netdev_, struct netdev_stats *stats)
         stats->rx_frame_errors = 0;
         stats->rx_fifo_errors = 0;
         stats->rx_missed_errors = 0;
-        stats->tx_aborted_errors = 0;
+        stats->tx_hard_stop_errors = 0;
         stats->tx_carrier_errors = 0;
         stats->tx_fifo_errors = 0;
         stats->tx_heartbeat_errors = 0;
@@ -6675,7 +6675,7 @@ netdev_stats_from_rtnl_link_stats(struct netdev_stats *dst,
     dst->rx_frame_errors = src->rx_frame_errors;
     dst->rx_fifo_errors = src->rx_fifo_errors;
     dst->rx_missed_errors = src->rx_missed_errors;
-    dst->tx_aborted_errors = src->tx_aborted_errors;
+    dst->tx_hard_stop_errors = src->tx_aborted_errors;
     dst->tx_carrier_errors = src->tx_carrier_errors;
     dst->tx_fifo_errors = src->tx_fifo_errors;
     dst->tx_heartbeat_errors = src->tx_heartbeat_errors;
@@ -6703,7 +6703,7 @@ netdev_stats_from_rtnl_link_stats64(struct netdev_stats *dst,
     dst->rx_frame_errors = src->rx_frame_errors;
     dst->rx_fifo_errors = src->rx_fifo_errors;
     dst->rx_missed_errors = src->rx_missed_errors;
-    dst->tx_aborted_errors = src->tx_aborted_errors;
+    dst->tx_hard_stop_errors = src->tx_hard_stop_errors;
     dst->tx_carrier_errors = src->tx_carrier_errors;
     dst->tx_fifo_errors = src->tx_fifo_errors;
     dst->tx_heartbeat_errors = src->tx_heartbeat_errors;

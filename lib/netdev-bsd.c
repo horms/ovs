@@ -915,7 +915,7 @@ convert_stats_system(struct netdev_stats *stats, const struct if_data *ifd)
     stats->rx_frame_errors = UINT64_MAX;
     stats->rx_fifo_errors = UINT64_MAX;
     stats->rx_missed_errors = UINT64_MAX;
-    stats->tx_aborted_errors = UINT64_MAX;
+    stats->tx_hard_stop_errors = UINT64_MAX;
     stats->tx_carrier_errors = UINT64_MAX;
     stats->tx_fifo_errors = UINT64_MAX;
     stats->tx_heartbeat_errors = UINT64_MAX;
@@ -949,7 +949,7 @@ convert_stats_tap(struct netdev_stats *stats, const struct if_data *ifd)
     stats->rx_frame_errors = UINT64_MAX;
     stats->rx_fifo_errors = UINT64_MAX;
     stats->rx_missed_errors = UINT64_MAX;
-    stats->tx_aborted_errors = UINT64_MAX;
+    stats->tx_hard_stop_errors = UINT64_MAX;
     stats->tx_carrier_errors = UINT64_MAX;
     stats->tx_fifo_errors = UINT64_MAX;
     stats->tx_heartbeat_errors = UINT64_MAX;

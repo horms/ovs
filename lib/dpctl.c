@@ -750,7 +750,7 @@ show_dpif(struct dpif *dpif, struct dpctl_params *dpctl_p)
                 print_stat(dpctl_p, "    TX packets:", s.tx_packets);
                 print_stat(dpctl_p, " errors:", s.tx_errors);
                 print_stat(dpctl_p, " dropped:", s.tx_dropped);
-                print_stat(dpctl_p, " aborted:", s.tx_aborted_errors);
+                print_stat(dpctl_p, " hard stop:", s.tx_hard_stop_errors);
                 print_stat(dpctl_p, " carrier:", s.tx_carrier_errors);
                 dpctl_print(dpctl_p, "\n");
 

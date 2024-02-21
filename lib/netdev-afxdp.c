@@ -1344,7 +1344,7 @@ netdev_afxdp_get_stats(const struct netdev *netdev,
         stats->rx_frame_errors     += dev_stats.rx_frame_errors;
         stats->rx_fifo_errors      += dev_stats.rx_fifo_errors;
         stats->rx_missed_errors    += dev_stats.rx_missed_errors;
-        stats->tx_aborted_errors   += dev_stats.tx_aborted_errors;
+        stats->tx_hard_stop_errors += dev_stats.tx_aborted_errors;
         stats->tx_carrier_errors   += dev_stats.tx_carrier_errors;
         stats->tx_fifo_errors      += dev_stats.tx_fifo_errors;
         stats->tx_heartbeat_errors += dev_stats.tx_heartbeat_errors;
