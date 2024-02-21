@@ -296,8 +296,8 @@ vconn_run_wait(struct vconn *vconn)
 }
 
 /* Returns 0 if 'vconn' is healthy (connecting or connected), a positive errno
- * value if the connection died abnormally (connection failed or aborted), or
- * EOF if the connection was closed in a normal way. */
+ * value if the connection died abnormally (connection failed or
+ * hard stopped), or EOF if the connection was closed in a normal way. */
 int
 vconn_get_status(const struct vconn *vconn)
 {

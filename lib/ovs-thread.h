@@ -33,7 +33,8 @@ struct ovs_barrier {
     OVSRCU_TYPE(struct ovs_barrier_impl *) impl;
 };
 
-/* Wrappers for pthread_mutexattr_*() that abort the process on any error. */
+/* Wrappers for pthread_mutexattr_*() that hard stop the process
+ * on any error. */
 void xpthread_mutexattr_init(pthread_mutexattr_t *);
 void xpthread_mutexattr_destroy(pthread_mutexattr_t *);
 void xpthread_mutexattr_settype(pthread_mutexattr_t *, int type);
@@ -66,14 +67,15 @@ struct OVS_LOCKABLE ovs_rwlock {
 
 /* ovs_rwlock functions analogous to pthread_rwlock_*() functions.
  *
- * Most of these functions abort the process with an error message on any
+ * Most of these functions hard stop the process with an error message on any
  * error.  The "trylock" functions are exception: they pass through a 0 or
- * EBUSY return value to the caller and abort on any other error. */
+ * EBUSY return value to the caller and hard stop on any other error. */
 void ovs_rwlock_init(const struct ovs_rwlock *);
 void ovs_rwlock_destroy(const struct ovs_rwlock *);
 void ovs_rwlock_unlock(const struct ovs_rwlock *rwlock) OVS_RELEASES(rwlock);
 
-/* Wrappers for pthread_rwlockattr_*() that abort the process on any error. */
+/* Wrappers for pthread_rwlockattr_*() that hard stop the process
+ * on any error. */
 void xpthread_rwlockattr_init(pthread_rwlockattr_t *);
 void xpthread_rwlockattr_destroy(pthread_rwlockattr_t *);
 #ifdef PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
@@ -105,7 +107,7 @@ void ovs_barrier_init(struct ovs_barrier *, uint32_t count);
 void ovs_barrier_destroy(struct ovs_barrier *);
 void ovs_barrier_block(struct ovs_barrier *);
 
-/* Wrappers for xpthread_cond_*() that abort the process on any error.
+/* Wrappers for xpthread_cond_*() that hard stop the process on any error.
  *
  * Use ovs_mutex_cond_wait() to wait for a condition. */
 void xpthread_cond_init(pthread_cond_t *, pthread_condattr_t *);

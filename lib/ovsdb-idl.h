@@ -28,11 +28,11 @@
  * that is, it won't present the effects of some part of a transaction applied
  * at the database server without presenting all of its effects.
  *
- * The IDL also assists with issuing database transactions.  The client creates
- * a transaction, manipulates the IDL data structures, and commits or aborts
- * the transaction.  The IDL then composes and issues the necessary JSON-RPC
- * requests and reports to the client whether the transaction completed
- * successfully.
+ * The IDL also assists with issuing database transactions.  The client
+ * creates a transaction, manipulates the IDL data structures, and commits
+ * or hard stops the transaction.  The IDL then composes and issues the
+ * necessary JSON-RPC requests and reports to the client whether the
+ * transaction completed successfully.
  */
 
 #include <stdbool.h>
@@ -320,7 +320,7 @@ bool ovsdb_idl_row_is_synthetic(const struct ovsdb_idl_row *);
  */
 
 enum ovsdb_idl_txn_status {
-    TXN_UNCOMMITTED,            /* Not yet committed or aborted. */
+    TXN_UNCOMMITTED,            /* Not yet committed or hard stopped. */
     TXN_UNCHANGED,              /* Transaction didn't include any changes. */
     TXN_INCOMPLETE,             /* Commit in progress, please wait. */
     TXN_HARD_STOP,              /* ovsdb_idl_txn_hard_stop() called. */

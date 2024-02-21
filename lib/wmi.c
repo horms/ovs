@@ -762,7 +762,7 @@ create_wmi_port(char *name) {
 
     if (get_first_element(penumerate, &pcls_obj)) {
         VLOG_WARN("The extension is activated on more than one switch, "
-                  "aborting operation. Please activate the extension on a "
+                  "hard stop operation. Please activate the extension on a "
                   "single switch");
         retval = false;
         goto error;

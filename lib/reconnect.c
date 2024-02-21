@@ -414,7 +414,7 @@ reconnect_disconnected(struct reconnect *fsm, long long int now, int error)
 /* Tell 'fsm' that a connection or listening attempt is in progress.
  *
  * The FSM will start a timer, after which the connection or listening attempt
- * will be aborted (by returning RECONNECT_DISCONNECT from
+ * will hard stop (by returning RECONNECT_DISCONNECT from
  * reconnect_run()).  */
 void
 reconnect_connecting(struct reconnect *fsm, long long int now)
@@ -469,7 +469,7 @@ reconnect_listen_error(struct reconnect *fsm, long long int now, int error)
  * The FSM will start the probe interval timer, which is reset by
  * reconnect_activity().  If the timer expires, a probe will be sent (by
  * returning RECONNECT_PROBE from reconnect_run()).  If the timer expires
- * again without being reset, the connection will be aborted (by returning
+ * again without being reset, the connection will hard stop (by returning
  * RECONNECT_DISCONNECT from reconnect_run()). */
 void
 reconnect_connected(struct reconnect *fsm, long long int now)
@@ -604,9 +604,9 @@ reconnect_deadline__(const struct reconnect *fsm, long long int now)
  *       failed, it should call reconnect_connect_failed().
  *
  *       The FSM is smart enough to back off correctly after successful
- *       connections that quickly abort, so it is OK to call
+ *       connections that quickly hard stop, so it is OK to call
  *       reconnect_connected() after a low-level successful connection
- *       (e.g. connect()) even if the connection might soon abort due to a
+ *       (e.g. connect()) even if the connection might soon hard stop due to a
  *       failure at a high-level (e.g. SSL negotiation failure).
  *
  *     - Passive client, RECONNECT_CONNECT: The client should try to listen for
@@ -619,9 +619,10 @@ reconnect_deadline__(const struct reconnect *fsm, long long int now)
  *       connection and report an accepted connection with
  *       reconnect_connected().
  *
- *     - RECONNECT_DISCONNECT: The client should abort the current connection
- *       or connection attempt or listen attempt and call
- *       reconnect_disconnected() or reconnect_connect_failed() to indicate it.
+ *     - RECONNECT_DISCONNECT: The client should hard stop the current
+ *       connection or connection attempt or listen attempt and call
+ *       reconnect_disconnected() or reconnect_connect_failed() to indicate
+ *       it.
  *
  *     - RECONNECT_PROBE: The client should send some kind of request to the
  *       peer that will elicit a response, to ensure that the connection is

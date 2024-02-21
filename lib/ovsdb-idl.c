@@ -702,8 +702,8 @@ add_row_references(const struct ovsdb_base_type *type,
  * reference from one row to a different row should be reflected as a "struct
  * ovsdb_idl_arc" between those rows.
  *
- * This function is slow, big-O wise, and aborts if it finds an inconsistency,
- * thus it is only for use in test programs. */
+ * This function is slow, big-O wise, and hard stop if it finds an
+ * inconsistency, thus it is only for use in test programs. */
 void
 ovsdb_idl_check_consistency(const struct ovsdb_idl *idl)
 {
@@ -2507,9 +2507,9 @@ ovsdb_idl_get_row_arc(struct ovsdb_idl_row *src,
     if (idl->txn || is_index_row(src)) {
         /* There are two cases we should not update any arcs:
          *
-         * 1. We're being called from ovsdb_idl_txn_write(). We must not update
-         * any arcs, because the transaction will be backed out at commit or
-         * abort time and we don't want our graph screwed up.
+         * 1. We're being called from ovsdb_idl_txn_write(). We must not
+         * update any arcs, because the transaction will be backed out on
+         * commit or hard stop, and we don't want our graph screwed up.
          *
          * 2. The row is used as an index for querying purpose only.
          *
@@ -2629,8 +2629,8 @@ ovsdb_idl_read(const struct ovsdb_idl_row *row,
  * have a value type of OVSDB_TYPE_VOID.)
  *
  * This is useful in code that "knows" that a particular column has a given
- * type, so that it will abort if someone changes the column's type without
- * updating the code that uses it. */
+ * type, so that it will hard stop if someone changes the column's type
+ * without updating the code that uses it. */
 const struct ovsdb_datum *
 ovsdb_idl_get(const struct ovsdb_idl_row *row,
               const struct ovsdb_idl_column *column,
@@ -2745,13 +2745,13 @@ ovsdb_idl_txn_add_comment(struct ovsdb_idl_txn *txn, const char *s, ...)
     va_end(args);
 }
 
-/* Marks 'txn' as a transaction that will not actually modify the database.  In
- * almost every way, the transaction is treated like other transactions.  It
- * must be committed or aborted like other transactions, it will be sent to the
- * database server like other transactions, and so on.  The only difference is
- * that the operations sent to the database server will include, as the last
- * step, an "abort" operation, so that any changes made by the transaction will
- * not actually take effect. */
+/* Marks 'txn' as a transaction that will not actually modify the database.
+ * In almost every way, the transaction is treated like other transactions.
+ * It must be committed or hard stop like other transactions, it will be
+ * sent to the database server like other transactions, and so on.  The
+ * only difference is that the operations sent to the database server will
+ * include, as the last step, an "abort" operation, so that any changes
+ * made by the transaction will not actually take effect. */
 void
 ovsdb_idl_txn_set_dry_run(struct ovsdb_idl_txn *txn)
 {
@@ -3707,7 +3707,7 @@ ovsdb_idl_txn_write_clone(const struct ovsdb_idl_row *row,
  * prerequisite to completing the transaction.  That is, if 'column' in 'row_'
  * changed (or if 'row_' was deleted) between the time that the IDL originally
  * read its contents and the time that the transaction commits, then the
- * transaction aborts and ovsdb_idl_txn_commit() returns TXN_TRY_AGAIN.
+ * transaction hard stops, and ovsdb_idl_txn_commit() returns TXN_TRY_AGAIN.
  *
  * The intention is that, to ensure that no transaction commits based on dirty
  * reads, an application should call ovsdb_idl_txn_verify() on each data item

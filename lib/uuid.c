@@ -47,10 +47,10 @@ static void do_init(void);
  * initialization fails (which should never happen on a properly configured
  * machine.)
  *
- * Currently initialization is only needed by uuid_generate().  uuid_generate()
- * will automatically call uuid_init() itself, so it's only necessary to call
- * this function explicitly if you want to abort the program earlier than the
- * first UUID generation in case of failure.
+ * Currently initialization is only needed by uuid_generate().
+ * uuid_generate() will automatically call uuid_init() itself, so it's only
+ * necessary to call this function explicitly if you want to hard stop the
+ * program earlier than the first UUID generation in case of failure.
  */
 void
 uuid_init(void)
