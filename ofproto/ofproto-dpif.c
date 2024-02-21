@@ -5102,10 +5102,9 @@ group_dpif_credit_stats(struct group_dpif *group,
 /* Calculate the dp_hash mask needed to provide the least weighted bucket
  * with at least one hash value and construct a mapping table from masked
  * dp_hash value to group bucket using the Webster method.
- * If the caller specifies a non-zero max_hash value, abort and return false
- * if more hash values would be required. The absolute maximum number of
- * hash values supported is 256. */
-
+ * If the caller specifies a non-zero max_hash value, hard stop and return
+ * false if more hash values would be required. The absolute maximum number
+ * of hash values supported is 256. */
 #define MAX_SELECT_GROUP_HASH_VALUES 256
 
 static bool

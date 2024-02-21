@@ -242,15 +242,16 @@ struct xlate_ctx {
      * tables in strictly monotonically increasing order don't contribute to
      * 'depth' because they cannot cause a flow translation to take an infinite
      * amount of time (because the number of tables is finite).  Translation
-     * aborts when 'depth' exceeds MAX_DEPTH.
+     * hard stop occurs when 'depth' exceeds MAX_DEPTH.
      *
      * 'resubmits', on the other hand, prevents flow translation from
-     * performing an extraordinarily large while still finite amount of work.
-     * It counts the total number of resubmits (and a few other activities)
-     * that have been executed.  Returning from a resubmit does not affect this
-     * counter.  Thus, this limits the amount of work that a particular
-     * translation can perform.  Translation aborts when 'resubmits' exceeds
-     * MAX_RESUBMITS (which is much larger than MAX_DEPTH).
+     * performing an extraordinarily large while still finite amount of
+     * work.  It counts the total number of resubmits (and a few other
+     * activities) that have been executed.  Returning from a resubmit does
+     * not affect this counter.  Thus, this limits the amount of work that
+     * a particular translation can perform.  Translation hard stop occurs
+     * when 'resubmits' exceeds MAX_RESUBMITS (which is much larger than
+     * MAX_DEPTH).
      */
     int depth;                  /* Current resubmit nesting depth. */
     int resubmits;              /* Total number of resubmits. */
