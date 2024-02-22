@@ -421,7 +421,7 @@ AC_DEFUN([OVS_CHECK_FLAKE8],
 dnl Checks for sphinx.
 AC_DEFUN([OVS_CHECK_SPHINX],
   [AC_CHECK_PROGS(
-     [SPHINXBUILD], [sphinx-build-3 sphinx-build-2 sphinx-build], [none])
+     [SPHINXBUILD], [sphinx-build-3 sphinx-build], [none])
    AC_ARG_VAR([SPHINXBUILD])
    AM_CONDITIONAL([HAVE_SPHINX], [test "$SPHINXBUILD" != none])])
 

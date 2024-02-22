@@ -33,7 +33,7 @@ Build-Depends:
  python3-all-dev,
  python3-setuptools,
  python3-sortedcontainers,
- python3-sphinx,
+ python3-sphinx (>= 4.0),
 Standards-Version: 4.6.1
 Rules-Requires-Root: no
 Homepage: http://openvswitch.org/

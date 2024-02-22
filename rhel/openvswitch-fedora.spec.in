@@ -63,7 +63,7 @@ BuildRequires: python3-devel
 BuildRequires: desktop-file-utils
 BuildRequires: groff graphviz
 BuildRequires: checkpolicy, selinux-policy-devel
-BuildRequires: /usr/bin/sphinx-build-3
+BuildRequires: python-sphinx >= 4.0
 # make check dependencies
 BuildRequires: procps-ng
 %if %{with libcapng}
