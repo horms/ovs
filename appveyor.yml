@@ -2,7 +2,7 @@ version: 1.0.{build}
 image: Visual Studio 2019
 branches:
   only:
-  - master
+  - main
 configuration:
   - Debug
   - Release
@@ -23,7 +23,7 @@ install:
     New-Item -ItemType Directory -Force -Path C:\ovs-build-downloads
 
     # Find and download the latest stable OpenSSl 3.0.
-    $URL = "https://raw.githubusercontent.com/slproweb/opensslhashes/master/win32_openssl_hashes.json"
+    $URL = "https://raw.githubusercontent.com/slproweb/opensslhashes/main/win32_openssl_hashes.json"
     $webData = (Invoke-WebRequest -Uri $URL).content | ConvertFrom-Json
     $source = ($webData.files.PSObject.Properties | Where-Object {
         $_.Value.basever   -match "3.0.*" -and
@@ -74,6 +74,6 @@ build_script:
          c:\OpenvSwitch-$env:CONFIGURATION.msi
 
 after_build:
-- ps: 7z a C:\ovs-master-$env:CONFIGURATION.zip C:\openvswitch
-- ps: Push-AppveyorArtifact C:\ovs-master-$env:CONFIGURATION.zip
+- ps: 7z a C:\ovs-main-$env:CONFIGURATION.zip C:\openvswitch
+- ps: Push-AppveyorArtifact C:\ovs-main-$env:CONFIGURATION.zip
 - ps: Push-AppveyorArtifact C:\OpenvSwitch-$env:CONFIGURATION.msi
