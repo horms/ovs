@@ -256,9 +256,6 @@ Q: I get an error like this when I configure Open vSwitch:
       that one, because it may support the kernel that you are building
       against.  (To find out, consult the table in the previous FAQ.)
 
-    - The Open vSwitch "master" branch may support the kernel that you are
-      using, so consider building the kernel module from "master".
-
     All versions of Open vSwitch userspace are compatible with all versions of
     the Open vSwitch kernel module, so you do not have to use the kernel module
     from one source along with the userspace programs from the same source.

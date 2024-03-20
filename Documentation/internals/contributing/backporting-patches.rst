@@ -51,12 +51,7 @@ branches.
 
 For Linux datapath code, the primary development branch is in the `net-next`_
 tree as described in the section below, and patch discussion occurs on the
-`netdev`__ mailing list. Patches are first applied to the upstream branch by the
-networking maintainer, then the contributor backports the patch to the Open
-vSwitch `master` development branch. Patches in this category may include
-features which have been applied upstream, or bugfixes to the Open vSwitch
-datapath code. For bugfixes, the patches subsequently follow the regular Open
-vSwitch process as described above to reach older branches.
+`netdev`__ mailing list.
 
 __ https://lore.kernel.org/netdev/
 
