@@ -149,7 +149,7 @@ if [ "$TESTSUITE" = 'test' ]; then
 
     export DISTCHECK_CONFIGURE_FLAGS="$OPTS"
     make distcheck ${JOBS} CFLAGS="${CFLAGS_FOR_OVS}" \
-        TESTSUITEFLAGS=${JOBS} RECHECK=yes
+        TESTSUITEFLAGS="-v ${JOBS}" RECHECK=yes
 else
     build_ovs
     for testsuite in $TESTSUITE; do
@@ -167,7 +167,7 @@ else
             [ "$(cat /proc/sys/vm/nr_hugepages)" = '1024' ]
             export DPDK_EAL_OPTIONS="--lcores 0@1,1@1,2@1"
         fi
-        $run_as_root make $testsuite TESTSUITEFLAGS="${JOBS} ${TEST_RANGE}" \
+        $run_as_root make $testsuite TESTSUITEFLAGS="-v ${JOBS} ${TEST_RANGE}" \
                                      RECHECK=yes
     done
 fi
