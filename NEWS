@@ -16,7 +16,13 @@ Post-v3.6.0
      * New ovsdb_idl_txn_assert_read_only() interface to mark transactions
        as read-only and trigger assertion failure when application attempts
        to modify the database data through this transaction.
-
+   - Deprecation of support for running OVS user-space with OOT kernel module
+     * The OOT kernel module refers to the kernel module that was
+       previously distributed as part of OVS - out of tree (OOT) from the
+       perspective of the upstream Kernel tree.
+     * The OOT kernel module: was deprecated in v2.15; was last present in
+       the v2.17 release; and is no longer present in any supported release
+       since v2.17 went EOL when v3.5 was released.
 
 v3.6.0 - 18 Aug 2025
 --------------------

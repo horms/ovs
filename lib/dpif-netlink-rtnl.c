@@ -542,8 +542,8 @@ dpif_netlink_rtnl_port_destroy(const char *name, const char *type)
  *
  * See ovs_tunnels_out_of_tree
  */
-bool
-dpif_netlink_rtnl_probe_oot_tunnels(void)
+static bool
+__dpif_netlink_rtnl_probe_oot_tunnels(void)
 {
     char namebuf[NETDEV_VPORT_NAME_BUFSIZE];
     struct netdev *netdev = NULL;
@@ -620,6 +620,19 @@ dpif_netlink_rtnl_probe_oot_tunnels(void)
             out_of_tree = true;
         }
         netdev_close(netdev);
+    }
+
+    return out_of_tree;
+}
+
+bool
+dpif_netlink_rtnl_probe_oot_tunnels(void)
+{
+    bool out_of_tree = __dpif_netlink_rtnl_probe_oot_tunnels();
+
+    if (out_of_tree) {
+        VLOG_WARN_ONCE("Use of OOT kernel datapath module deprecated. "
+                       "Please module proivided by upsteram kernel instead.");
     }
 
     return out_of_tree;
